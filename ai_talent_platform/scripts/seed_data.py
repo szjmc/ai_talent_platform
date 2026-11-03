@@ -2,6 +2,8 @@
 脚本：scripts/seed_data.py
 职责：初始化演示数据（部门树 + 各角色测试账号）。
 
+标签：[架构组] [P1]（部门树 + 各角色测试账号，演示前置）
+
 使用方式：
     python scripts/seed_data.py
 

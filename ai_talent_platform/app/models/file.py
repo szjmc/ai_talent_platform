@@ -2,6 +2,8 @@
 模块：app/models/file.py
 职责：文件记录表（统一管理上传文件元数据）。
 
+标签：[业务组] [P1]（文件元数据表）
+
 ============================ 实现思路与代码要点 ============================
 表设计：files
 - file_name(原始名)、stored_name(磁盘名/UUID)、file_path、file_size、content_type、

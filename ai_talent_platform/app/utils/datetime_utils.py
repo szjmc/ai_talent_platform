@@ -2,6 +2,8 @@
 模块：app/utils/datetime_utils.py
 职责：时间处理工具。
 
+标签：[架构组] [P2]（报表日期：now / month_range / humanize）
+
 实现思路：
 - 全平台统一使用「无时区本地时间」（数据库 DATETIME 存本地时间），
   仅 JWT 用 UTC 时间戳，避免混用导致 8 小时偏差；

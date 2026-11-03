@@ -2,6 +2,8 @@
 模块：app/routers/router.py
 职责：总路由注册（全平台唯一对外入口聚合点）。
 
+标签：[架构组] [P0]（总路由 /api/v1 + /system 段：ai_ready / skills 清单）
+
 实现思路：
 1. 每个业务模块一个 APIRouter（带自己的 prefix 和 tags）；
 2. 在这里汇总成 api_router，再由 core/application.py 以 settings.API_PREFIX（/api/v1）挂载；

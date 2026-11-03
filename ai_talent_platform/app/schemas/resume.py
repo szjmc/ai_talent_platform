@@ -2,6 +2,8 @@
 模块：app/schemas/resume.py
 职责：简历上传与解析相关结构。
 
+标签：[业务组] [P1]
+
 ============================ 实现思路与代码要点 ============================
 需要定义的 Schema：
 1. ResumeUploadResponse   file_id、resume_id、file_name、file_size、status="uploaded"

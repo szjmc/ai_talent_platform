@@ -2,6 +2,8 @@
 模块：app/routers/talent_router.py
 职责：人才档案接口层（人才档案）。
 
+标签：[业务组] [P1]（当前 501 占位）
+
 ============================ 实现思路与代码要点 ============================
 统一写法：
     router = APIRouter(prefix="/talents", tags=["人才档案"], responses=COMMON_ERROR_RESPONSES)

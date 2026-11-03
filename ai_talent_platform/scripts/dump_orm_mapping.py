@@ -1,5 +1,7 @@
 """导出全局 ORM 映射关系。
 
+标签：[架构组] [P2]（导出全局 ORM 映射，文档 / 评审用）
+
 用法：
     python scripts/dump_orm_mapping.py                    # 控制台打印精简映射
     python scripts/dump_orm_mapping.py --format md        # 输出完整 Markdown 到 stdout

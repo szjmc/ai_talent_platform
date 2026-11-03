@@ -2,6 +2,8 @@
 模块：app/services/__init__.py
 职责：业务服务层出口。
 
+标签：[业务组] [P1]（业务服务层出口与约定）
+
 已实现：AuthService / UserService / OrganizationService
 待实现：position / talent / resume / assessment / training / matching /
         knowledge / analytics / agent / file / audit（每个文件开头有方法清单）

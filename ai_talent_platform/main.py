@@ -2,6 +2,8 @@
 模块：main.py（项目根目录 ai_talent_platform/main.py）
 职责：项目启动入口。
 
+标签：[架构组] [P0]（项目启动入口，被所有组依赖）
+
 实现思路：
 1. 只做「启动」这一件事：调用 core/application.create_application() 得到 app；
 2. 直接 `python main.py` 或 `uvicorn main:app --reload` 均可启动；

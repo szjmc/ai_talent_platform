@@ -1,4 +1,7 @@
-"""Skills 可编排技能组件库测试（不依赖 LLM / Milvus / PgSQL）。"""
+"""Skills 可编排技能组件库测试（不依赖 LLM / Milvus / PgSQL）。
+
+标签：[架构组] [P0]（Skills 21 用例验收）
+"""
 
 from __future__ import annotations
 

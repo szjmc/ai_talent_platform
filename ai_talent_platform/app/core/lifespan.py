@@ -2,6 +2,8 @@
 模块：app/core/lifespan.py
 职责：应用生命周期管理（启动 / 关闭钩子）。
 
+标签：[架构组] [P0]（启动 / 关闭资源编排：四库连通性与降级）
+
 实现思路：
 1. 使用 asynccontextmanager 定义 lifespan，替代已废弃的 on_event；
 2. 启动阶段：

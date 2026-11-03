@@ -2,6 +2,8 @@
 模块：app/core/pagination.py
 职责：统一分页参数与分页结果计算。
 
+标签：[架构组] [P1]（分页契约）
+
 实现思路：
 1. PageParams：作为 FastAPI 依赖使用（Depends(PageParams)），自动解析 page / page_size，
    并从 settings 读取默认值与上限，越界自动收敛而不是报错；

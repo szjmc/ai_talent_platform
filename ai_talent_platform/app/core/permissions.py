@@ -2,6 +2,8 @@
 模块：app/core/permissions.py
 职责：RBAC 权限模型与校验工具。
 
+标签：[架构组] [P0]（RBAC + 数据范围，安全红线）
+
 实现思路：
 1. 系统内置角色枚举 RoleEnum；每个角色映射一组权限码 PermissionEnum（字符串常量）；
 2. 权限码命名规范：`模块:动作`，如 talent:create、position:read、analytics:export；

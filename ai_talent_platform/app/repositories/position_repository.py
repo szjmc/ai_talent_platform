@@ -2,6 +2,8 @@
 模块：app/repositories/position_repository.py
 职责：岗位数据访问层。
 
+标签：[业务组] [P0]（list_open_by_org / search_by_title，被 position_search 技能依赖）
+
 ============================ 实现思路与代码要点 ============================
 本仓库继承 BaseRepository，只需声明：
     model = <Model>

@@ -2,6 +2,8 @@
 模块：app/routers/analytics_router.py
 职责：数据分析接口层（数据分析）。
 
+标签：[Vanna组] [P1]  依赖：analytics_service（问数 / 看板 / 导出）
+
 ============================ 实现思路与代码要点 ============================
 统一写法：
     router = APIRouter(prefix="/analytics", tags=["数据分析"], responses=COMMON_ERROR_RESPONSES)

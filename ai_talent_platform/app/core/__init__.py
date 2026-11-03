@@ -2,6 +2,8 @@
 模块：app/core/__init__.py
 职责：核心公共层出口。
 
+标签：[架构组] [P0]（核心公共层出口）
+
 包含：
     application.py         应用工厂
     lifespan.py            生命周期（启动/关闭）

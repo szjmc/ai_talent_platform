@@ -2,6 +2,8 @@
 模块：app/schemas/talent.py
 职责：人才档案相关请求 / 响应结构。
 
+标签：[业务组] [P1]
+
 ============================ 实现思路与代码要点 ============================
 需要定义的 Schema：
 1. TalentCreate      name、gender、birth_date、mobile、email、education、school、major、

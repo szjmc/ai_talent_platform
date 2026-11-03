@@ -1,5 +1,7 @@
 """独立初始化 PgSQL 分析库。
 
+标签：[架构组]+[Vanna组] [P1]（分析库建库 / schema / 6 张分析表 / 默认分区，幂等）
+
 用法：
     python scripts/init_pgsql.py              # 建库 + schema + 6 张分析表 + 默认分区（幂等）
     python scripts/init_pgsql.py --check      # 只读检查表/字段/默认分区是否齐全

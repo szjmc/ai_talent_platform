@@ -2,6 +2,8 @@
 脚本：scripts/init_db.py
 职责：数据库初始化脚本（MySQL 业务库建库建表 + PgSQL 分析库建库建表 + 内置角色）。
 
+标签：[架构组] [P0]（MySQL + PgSQL 建库建表 + 内置角色，联调前置）
+
 前置条件：
     MySQL 8 已启动（默认 127.0.0.1:3306），账号具备 CREATE DATABASE 权限
     PgSQL 15+ 已启动（默认 127.0.0.1:5432），账号具备 CREATE DATABASE 权限

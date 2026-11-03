@@ -2,6 +2,8 @@
 模块：app/schemas/assessment.py
 职责：人才测评相关请求 / 响应结构。
 
+标签：[业务组] [P1]
+
 ============================ 实现思路与代码要点 ============================
 需要定义的 Schema：
 1. AssessmentCreate       title、talent_id、position_id(可空)、question_count、deadline

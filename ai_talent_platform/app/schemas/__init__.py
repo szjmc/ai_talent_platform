@@ -2,6 +2,8 @@
 模块：app/schemas/__init__.py
 职责：数据校验层出口。
 
+标签：[业务组] [P1]（数据校验层出口与命名规范）
+
 命名规范：
     XxxCreate / XxxUpdate / XxxQuery / XxxResponse / XxxDetail
 基类：

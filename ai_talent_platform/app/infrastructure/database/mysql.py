@@ -2,6 +2,8 @@
 模块：app/infrastructure/database/mysql.py
 职责：MySQL（业务主库）异步引擎的创建与连通性检测。
 
+标签：[架构组] [P0]（业务主库引擎，硬依赖）
+
 实现思路：
 1. 按 settings.DATABASE_URL（mysql+aiomysql）创建 AsyncEngine；
 2. 连接池：pool_size / max_overflow / pool_recycle / pool_pre_ping / pool_timeout，

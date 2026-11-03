@@ -2,6 +2,8 @@
 模块：app/ai/rag/retriever.py
 职责：向量检索 + 关键词检索 + 重排（混合检索）。
 
+标签：[RAG组] [P0]  依赖：milvus_adapter + embedding_service；被 [架构组] knowledge_search 技能依赖
+
 ============================ 实现思路与代码要点 ============================
 流程：
     问题向量化 -> Milvus top_k 检索（带权限 expr 过滤）

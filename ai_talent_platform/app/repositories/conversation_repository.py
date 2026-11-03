@@ -2,6 +2,8 @@
 模块：app/repositories/conversation_repository.py
 职责：AI 会话数据访问层。
 
+标签：[Agent组] [P1]（记忆持久化：get_recent_messages / append_message / list_by_user）
+
 ============================ 实现思路与代码要点 ============================
 本仓库继承 BaseRepository，只需声明：
     model = <Model>

@@ -2,6 +2,8 @@
 模块：app/infrastructure/database/transaction.py
 职责：显式事务控制（跨多个 Repository 的原子操作）。
 
+标签：[架构组] [P1]（事务上下文管理）
+
 实现思路：
 1. 默认策略：一个 HTTP 请求 = 一个事务，由 get_db() 统一提交/回滚，业务代码无需关心；
 2. 需要「局部事务」或「嵌套事务」时使用本模块：

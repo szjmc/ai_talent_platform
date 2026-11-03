@@ -2,6 +2,8 @@
 模块：app/ai/__init__.py
 职责：AI 能力层入口。
 
+标签：[架构组] [P1]（AI 能力层入口与硬性约束）
+
 分层（与文档一致）：
     ai/core/      llm_manager（模型实例管理）、model_selector（按任务选模型）、token_manager（成本统计）
     ai/agents/    base_agent + 6 个业务 Agent（人才/简历/匹配/测评/培训/助手）

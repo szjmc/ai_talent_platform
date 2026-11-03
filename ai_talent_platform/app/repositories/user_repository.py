@@ -2,6 +2,8 @@
 模块：app/repositories/user_repository.py
 职责：用户与角色的数据访问（公共层已实现，供 auth / user 模块复用）。
 
+标签：[业务组] [P0]（认证 / 用户管理数据访问）
+
 设计说明：
 - 继承 BaseRepository，直接获得 create/get_by_id/paginate/update/soft_delete 等能力；
 - 这里只补充「用户特有」的查询与写入：按用户名、按手机号、角色绑定、登录状态更新；

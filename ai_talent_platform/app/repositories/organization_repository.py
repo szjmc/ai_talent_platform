@@ -2,6 +2,8 @@
 模块：app/repositories/organization_repository.py
 职责：组织架构数据访问层。
 
+标签：[业务组] [P0]（组织树查询，数据权限范围依赖）
+
 实现思路：
 - 继承 BaseRepository 获得通用 CRUD；
 - 树形相关查询优先使用 path 前缀匹配（`path LIKE '/1/3/%'`），避免递归 SQL；

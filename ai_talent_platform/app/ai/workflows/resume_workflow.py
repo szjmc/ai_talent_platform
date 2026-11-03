@@ -2,6 +2,8 @@
 模块：app/ai/workflows/resume_workflow.py
 职责：简历解析工作流（上传 -> 文本提取 -> 清洗 -> LLM 结构化 -> 校验 -> 落库）。
 
+标签：[Agent组] [P0]  依赖：[架构组] resume_* 技能（上传 → 解析 → 查重 → 入库，幂等）
+
 ============================ 实现思路与代码要点 ============================
 节点编排：
     extract_text   PDF/Word/图片 -> 文本（pdfplumber / python-docx / OCR）

@@ -2,6 +2,8 @@
 模块：app/models/matching.py
 职责：人岗匹配记录表。
 
+标签：[业务组] [P0]（匹配记录表，被 matching_repository 依赖）
+
 ============================ 实现思路与代码要点 ============================
 表设计：matching_records
 - position_id、talent_id、score(0-100)、dimension_scores(JSON)、

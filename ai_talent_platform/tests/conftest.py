@@ -2,6 +2,8 @@
 模块：tests/conftest.py
 职责：pytest 公共夹具（MySQL 测试库 + 覆盖数据库依赖的 AsyncClient）。
 
+标签：[架构组] [P0]（全部测试的公共夹具：MySQL 测试库 + AsyncClient）
+
 数据库说明（平台不使用 SQLite）：
 - 测试与开发一致使用 **MySQL**，默认覆盖到独立测试库 `ai_talent_platform_test`，
   避免污染开发库；库不存在时自动创建（需要 CREATE DATABASE 权限）；

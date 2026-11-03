@@ -2,6 +2,8 @@
 模块：app/repositories/resume_repository.py
 职责：简历数据访问层。
 
+标签：[业务组] [P0]（get_by_hash / list_by_talent / update_parse_result）
+
 ============================ 实现思路与代码要点 ============================
 本仓库继承 BaseRepository，只需声明：
     model = <Model>

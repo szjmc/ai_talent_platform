@@ -2,6 +2,8 @@
 模块：app/models/conversation.py
 职责：AI 会话与消息表（多轮对话记忆的持久化）。
 
+标签：[Agent组] [P1]（会话 / 消息表，被 conversation_repository 与记忆依赖）
+
 ============================ 实现思路与代码要点 ============================
 表设计：
 1. conversations  会话：user_id、title、agent_type(assistant/resume/matching...)、

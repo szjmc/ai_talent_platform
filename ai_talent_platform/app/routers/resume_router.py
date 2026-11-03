@@ -2,6 +2,8 @@
 模块：app/routers/resume_router.py
 职责：简历管理接口层（简历管理）。
 
+标签：[业务组] [P1]（当前 501 占位）
+
 ============================ 实现思路与代码要点 ============================
 统一写法：
     router = APIRouter(prefix="/resumes", tags=["简历管理"], responses=COMMON_ERROR_RESPONSES)

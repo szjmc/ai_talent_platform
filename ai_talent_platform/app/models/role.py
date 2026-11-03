@@ -2,6 +2,8 @@
 模块：app/models/role.py
 职责：角色表 + 用户角色关联表（RBAC）。
 
+标签：[业务组] [P0]（角色 / 权限表，RBAC 基础）
+
 ============================ 实现思路与代码要点 ============================
 1. roles：角色定义
    - code 唯一（super_admin / admin / hr / manager / employee）

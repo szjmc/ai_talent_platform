@@ -2,6 +2,8 @@
 模块：app/routers/agent_router.py
 职责：AI 智能体接口层（AI 智能体）。
 
+标签：[Agent组] [P1]  依赖：agent_service（POST /agents/tasks + SSE）
+
 ============================ 实现思路与代码要点 ============================
 统一写法：
     router = APIRouter(prefix="/agents", tags=["AI 智能体"], responses=COMMON_ERROR_RESPONSES)

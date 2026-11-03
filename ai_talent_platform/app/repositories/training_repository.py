@@ -2,6 +2,8 @@
 模块：app/repositories/training_repository.py
 职责：培训数据访问层。
 
+标签：[业务组] [P1]（完成率聚合）
+
 ============================ 实现思路与代码要点 ============================
 本仓库继承 BaseRepository，只需声明：
     model = <Model>

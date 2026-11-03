@@ -2,6 +2,8 @@
 模块：app/repositories/talent_repository.py
 职责：人才档案数据访问层。
 
+标签：[业务组] [P0]（get_by_mobile / search_by_skills / count_by_organization / stats_*）
+
 ============================ 实现思路与代码要点 ============================
 本仓库继承 BaseRepository，只需声明：
     model = <Model>

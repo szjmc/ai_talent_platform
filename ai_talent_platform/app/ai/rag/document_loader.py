@@ -2,6 +2,8 @@
 模块：app/ai/rag/document_loader.py
 职责：文档读取（PDF / Word / Excel / TXT / 图片 OCR）。
 
+标签：[RAG组] [P1]  依赖：[架构组] 文件存储（pdf/docx/txt 解析）
+
 ============================ 实现思路与代码要点 ============================
 统一接口：
     load(file_path: str) -> list[Document]     # Document = {content, metadata{source, page}}

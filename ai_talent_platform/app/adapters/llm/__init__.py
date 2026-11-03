@@ -2,6 +2,8 @@
 模块：app/adapters/llm/__init__.py
 职责：大模型适配器出口。
 
+标签：[架构组] [P1]（LLM 适配出口）
+
 待实现：
     base_llm.py        统一接口 BaseLLM / ChatMessage / LLMResult
     openai_adapter.py  OpenAI 兼容协议（DashScope compatible-mode 也可复用）

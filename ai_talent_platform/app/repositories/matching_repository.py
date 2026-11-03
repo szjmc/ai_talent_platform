@@ -2,6 +2,8 @@
 模块：app/repositories/matching_repository.py
 职责：人岗匹配数据访问层。
 
+标签：[业务组] [P0]（save_batch / get_latest_by_position / get_history_by_talent）
+
 ============================ 实现思路与代码要点 ============================
 本仓库继承 BaseRepository，只需声明：
     model = <Model>

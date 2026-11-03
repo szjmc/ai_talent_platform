@@ -2,6 +2,8 @@
 模块：app/routers/auth_router.py
 职责：认证接口（注册、登录、刷新令牌、退出、当前用户、修改密码）。
 
+标签：[业务组] [P0]（注册 / 登录 / 刷新 / 当前用户，全平台入口）
+
 实现思路：
 - Router 只做三件事：取参数 -> 调 Service -> 包统一响应；
 - 所有返回值为 ApiResponse，data 由 Schema 序列化（不直接暴露 ORM 对象）；

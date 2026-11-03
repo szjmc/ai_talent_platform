@@ -2,6 +2,8 @@
 脚本：scripts/create_admin.py
 职责：创建 / 重置超级管理员账号。
 
+标签：[架构组] [P1]（超管创建 / 重置，运维脚本）
+
 使用方式：
     python scripts/create_admin.py                        # 交互式输入
     python scripts/create_admin.py -u admin -p Admin@12345 -n 系统管理员

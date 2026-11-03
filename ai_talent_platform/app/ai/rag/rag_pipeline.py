@@ -2,6 +2,8 @@
 模块：app/ai/rag/rag_pipeline.py
 职责：RAG 完整流程编排（索引 + 问答）。
 
+标签：[RAG组] [P1]  依赖：retriever + [架构组] LLMManager（索引 + 问答编排，答案必须带 citations）
+
 ============================ 实现思路与代码要点 ============================
 索引流程：
     upload -> document_loader -> document_splitter -> embedding_service

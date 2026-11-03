@@ -2,6 +2,8 @@
 模块：app/adapters/vector_store/milvus_adapter.py
 职责：Milvus 向量库适配（统一向量库接口的实现）。
 
+标签：[RAG组] [P0]  依赖：[RAG组] infrastructure/vector/milvus.py（insert/search/delete，带权限 expr）
+
 ============================ 实现思路与代码要点 ============================
 职责边界（三处不要混淆）：
     infrastructure/vector/milvus.py  -> 只负责「建立 Milvus 客户端连接」

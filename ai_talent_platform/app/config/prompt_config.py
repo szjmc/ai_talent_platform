@@ -2,6 +2,8 @@
 模块：app/config/prompt_config.py
 职责：AI 提示词集中管理（版本化）。
 
+标签：[架构组] [P1]（PromptRegistry，与 ai/prompts 合并去重）
+
 实现思路：
 1. 所有提示词以「常量 + 版本号」的形式集中在此文件，禁止散落在 Service / Router；
 2. 提供 PromptRegistry，可按名称取提示词并渲染变量（str.format 风格）；

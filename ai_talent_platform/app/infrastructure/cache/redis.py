@@ -2,6 +2,8 @@
 模块：app/infrastructure/cache/redis.py
 职责：Redis 客户端管理（可选依赖，未安装 redis 包时自动降级）。
 
+标签：[架构组] [P1]（可降级：token 配额 / 会话记忆 / 限流）
+
 实现思路：
 1. 使用 redis.asyncio 连接池，单例管理；
 2. init_redis() / get_redis() / close_redis() 三个入口，由 lifespan 调用；

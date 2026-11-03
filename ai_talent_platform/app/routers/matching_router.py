@@ -2,6 +2,8 @@
 模块：app/routers/matching_router.py
 职责：人岗匹配接口层（人岗匹配）。
 
+标签：[业务组] [P1]（当前 501 占位）
+
 ============================ 实现思路与代码要点 ============================
 统一写法：
     router = APIRouter(prefix="/matchings", tags=["人岗匹配"], responses=COMMON_ERROR_RESPONSES)

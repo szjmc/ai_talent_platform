@@ -2,6 +2,8 @@
 模块：app/infrastructure/database/postgres.py
 职责：PgSQL（分析 / 时序库）异步引擎的创建与连通性检测。
 
+标签：[架构组] [P1]  被 [Vanna组] analytics_service / VannaAdapter 依赖（PgSQL 分析库引擎）
+
 职责边界（四库协同，禁止混用）：
     MySQL   业务主数据（用户/组织/岗位/人才/测评等），由 session.py 提供写事务
     PgSQL   海量履历、测评历史、行为时序、分析宽表 —— 主要供统计分析与 Vanna NL2SQL 查询

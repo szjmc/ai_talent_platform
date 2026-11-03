@@ -2,6 +2,8 @@
 模块：app/core/security.py
 职责：密码加密与 JWT 签发/解析（纯工具，不依赖数据库）。
 
+标签：[架构组] [P0]（bcrypt / JWT，安全红线）
+
 实现思路：
 1. 密码：使用 bcrypt 单向哈希（自带盐），提供 hash_password / verify_password；
    - bcrypt 明文上限 72 字节，超长先做 sha256 预哈希，避免异常；
