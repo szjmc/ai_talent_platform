@@ -1,6 +1,6 @@
 # 分组代码实现规范（每组每个文件写什么、怎么验）
 
-> 配套：[分组开发计划](team_sprint_plan.md) ｜ 版本 v1.0.0
+> 配套：[分组开发计划索引](team_sprint_plan.md) ｜ 各组独立计划：[架构组](plan/00-架构组.md)、[RAG](plan/01-RAG组.md)、[Agent](plan/02-Agent组.md)、[Vanna](plan/03-Vanna组.md)、[Dify](plan/04-Dify组.md) ｜ 版本 v1.0.0
 > 原则：**本文给出每个文件的方法签名、返回结构、关键代码骨架与验收命令**。复制骨架即可开工，禁止另起命名/结构。
 > 与现有代码冲突时：以 `app/core/*`、`app/config/*`、`app/patterns/registry.py` 为准。
 
@@ -286,7 +286,7 @@ class KnowledgeSearchSkill(BaseSkill):
                  "page": c.page, "score": c.score} for c in chunks]
 ```
 
-`matching_skill` / `resume_skill` / `sql_skill` 同构，工具描述见 `team_sprint_plan.md` 第三节表格。
+`matching_skill` / `resume_skill` / `sql_skill` 同构，工具描述见 [架构组计划 §三](plan/00-架构组.md)。
 
 ### 1.8 `app/ai/agents/base_agent.py`
 
@@ -339,7 +339,7 @@ async def dispatch(agent_type: str, payload: dict, db: AsyncSession) -> dict:
     """取类 → 实例化（注入 db + 当前 context）→ run。未注册抛 NotFoundError 并列出可用类型。"""
 
 def dispatch_stream(agent_type: str, payload: dict) -> AsyncIterator[str]:
-    """按 team_sprint_plan.md 的 SSE 统一格式逐条 yield（event + data 两行 + 空行），正常结束发 done，异常发 error。"""
+    """按 team_sprint_plan.md §四 的 SSE 统一格式逐条 yield（event + data 两行 + 空行），正常结束发 done，异常发 error。"""
 ```
 
 ---

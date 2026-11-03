@@ -54,7 +54,8 @@ python main.py                # http://127.0.0.1:8000/docs
 | [docs/architecture.md](docs/architecture.md) | 六层架构图（**内联 SVG，离线可打开**）、依赖规则、调用链路 |
 | [docs/development.md](docs/development.md) | 开发规范与协作分工 |
 | [docs/api_document.md](docs/api_document.md) | **接口契约（全模块）**：统一响应/错误码/JWT/RBAC 权限矩阵 + 15 个模块的 method/path/权限/请求字段/示例/错误码 |
-| [docs/team_sprint_plan.md](docs/team_sprint_plan.md) | **AI 能力层 5 组分工**：RAG / Agent / Skills / Vanna / Dify 每组每人每天做什么 + 里程碑 + 验收清单 |
+| [docs/team_sprint_plan.md](docs/team_sprint_plan.md) | **AI 能力层分工索引**：5 组职责、里程碑、跨组契约、验收清单、站会节奏 |
+| [docs/plan/](docs/plan/) 各组独立计划 | [架构组](docs/plan/00-架构组.md) ｜ [1 组 RAG](docs/plan/01-RAG组.md) ｜ [2 组 Agent](docs/plan/02-Agent组.md) ｜ [3 组 Vanna](docs/plan/03-Vanna组.md) ｜ [4 组 Dify](docs/plan/04-Dify组.md)：每组人员分工 + D1–D20 每日任务 + 代码清单 |
 | [docs/team_code_spec.md](docs/team_code_spec.md) | **分组代码规范**：每个文件的方法签名、返回结构、代码骨架、验收命令、文件所有权表 |
 | [docs/database_design.md](docs/database_design.md) | **数据库设计（完整明确）**：内联 SVG ER 图 + 25 张表字段字典 + 可直接执行的 MySQL 8 DDL + PgSQL/Milvus/Redis 设计 |
 
