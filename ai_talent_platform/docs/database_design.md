@@ -330,33 +330,34 @@
 
 ## 四、表总览
 
+> 状态说明：✅ 已建 ORM 模型并参与建表；🚧 未实现。
 | # | 表名 | 中文名 | 连接/生命周期 | 状态 |
 | --- | --- | --- | --- | --- |
 | 1 | `organizations` | 组织架构 | 自关联树（`path` 前缀） | ✅ 已实现 |
 | 2 | `users` | 用户账号 | → organizations | ✅ 已实现 |
 | 3 | `roles` | 角色 | 独立枚举表 | ✅ 已实现 |
 | 4 | `user_roles` | 用户角色关联 | 多对多 | ✅ 已实现 |
-| 5 | `positions` | 岗位 | → organizations | 🚧 |
-| 6 | `position_requirements` | 岗位能力模型（多版本） | → positions | 🚧 |
-| 7 | `talents` | 人才档案 | → organizations / resumes | 🚧 |
-| 8 | `talent_portraits` | 人才画像（版本化） | → talents | 🚧 |
-| 9 | `resumes` | 简历 | → talents / files | 🚧 |
-| 10 | `resume_experiences` | 简历工作经历（可选拆表） | → resumes | 🚧 |
-| 11 | `files` | 文件元数据 | 多态关联（biz_type+biz_id） | 🚧 |
-| 12 | `assessments` | 测评任务 | → talents / positions | 🚧 |
-| 13 | `assessment_questions` | 测评题目 | → assessments | 🚧 |
-| 14 | `assessment_answers` | 答题记录 | → assessments / questions | 🚧 |
-| 15 | `assessment_results` | 测评结果 | 1:1 → assessments | 🚧 |
-| 16 | `courses` | 课程 | 独立 | 🚧 |
-| 17 | `training_plans` | 培训计划 | → talents | 🚧 |
-| 18 | `plan_courses` | 计划-课程 | 多对多 | 🚧 |
-| 19 | `learning_records` | 学习记录 | → plans / courses / talents | 🚧 |
-| 20 | `matching_records` | 人岗匹配记录 | → positions / talents | 🚧 |
-| 21 | `knowledge_docs` | 知识文档 | → files | 🚧 |
-| 22 | `knowledge_chunks` | 知识切片 | → knowledge_docs | 🚧 |
-| 23 | `conversations` | AI 会话 | → users | 🚧 |
-| 24 | `chat_messages` | 会话消息 | → conversations | 🚧 |
-| 25 | `audit_logs` | 操作审计 | 只增不改 | 🚧 |
+| 5 | `positions` | 岗位 | → organizations | ✅ |
+| 6 | `position_requirements` | 岗位能力模型（多版本） | → positions | ✅ |
+| 7 | `talents` | 人才档案 | → organizations / resumes | ✅ |
+| 8 | `talent_portraits` | 人才画像（版本化） | → talents | ✅ |
+| 9 | `resumes` | 简历 | → talents / files | ✅ |
+| 10 | `resume_experiences` | 简历工作经历（可选拆表） | → resumes | ✅ |
+| 11 | `files` | 文件元数据 | 多态关联（biz_type+biz_id） | ✅ |
+| 12 | `assessments` | 测评任务 | → talents / positions | ✅ |
+| 13 | `assessment_questions` | 测评题目 | → assessments | ✅ |
+| 14 | `assessment_answers` | 答题记录 | → assessments / questions | ✅ |
+| 15 | `assessment_results` | 测评结果 | 1:1 → assessments | ✅ |
+| 16 | `courses` | 课程 | 独立 | ✅ |
+| 17 | `training_plans` | 培训计划 | → talents | ✅ |
+| 18 | `plan_courses` | 计划-课程 | 多对多 | ✅ |
+| 19 | `learning_records` | 学习记录 | → plans / courses / talents | ✅ |
+| 20 | `matching_records` | 人岗匹配记录 | → positions / talents | ✅ |
+| 21 | `knowledge_docs` | 知识文档 | → files | ✅ |
+| 22 | `knowledge_chunks` | 知识切片 | → knowledge_docs | ✅ |
+| 23 | `conversations` | AI 会话 | → users | ✅ |
+| 24 | `chat_messages` | 会话消息 | → conversations | ✅ |
+| 25 | `audit_logs` | 操作审计 | 只增不改 | ✅ |
 
 ---
 
@@ -432,9 +433,12 @@
 
 <a id="db-business-tables"></a>
 
-## 六、业务表设计 — 🚧 待实现
+## 六、业务表设计 — ✅ ORM 已实现
 
-> 下列表结构已定稿，开发时按此建 ORM 模型即可（字段名/类型/索引/约束不再变更，如需变更需评审）。
+> 表结构已定稿，ORM 模型已全部落地（字段名/类型/索引/约束如需变更需评审，并同步 Alembic 迁移）。
+> 21 张业务表 + 4 张公共表共 25 张表由 `app/models/*` 定义，经 `app/models/__init__.py` 注册进 `Base.metadata`；
+> 执行 `python scripts/init_db.py` 建表，`python scripts/dump_orm_mapping.py --output docs/orm_mapping.md` 导出全局 ORM 映射。
+> 注意：Repository / Service / API 仍是骨架，表结构可用但业务读写逻辑未实现。
 
 ### 6.1 `positions` 岗位
 
@@ -807,6 +811,8 @@ JSON 检索：`skill_tags` 用 `JSON_CONTAINS(skill_tags, '"Python"')`；高频�
 ## 七、分析库 PgSQL 设计
 
 > 库名 `ai_talent_analytics`，schema `public`。只做「分析/时序」，不做业务事务。
+>
+> **实现状态**：6 张表已由 `app/models/analytics.py` 定义，执行 `python scripts/init_pgsql.py` 可建库、建 schema、建表并创建 DEFAULT 分区；`--check` 只读检查结构，`--print-ddl` 离线输出 DDL。当前尚未实现 MySQL → PgSQL 同步，也未实现按月/按天滚动子分区维护。
 
 | 表 | 说明 | 分区 |
 | --- | --- | --- |

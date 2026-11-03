@@ -1,6 +1,6 @@
 """
 脚本：scripts/init_db.py
-职责：数据库初始化脚本（MySQL 业务库建库建表 + PgSQL 分析库建库 + 内置角色）。
+职责：数据库初始化脚本（MySQL 业务库建库建表 + PgSQL 分析库建库建表 + 内置角色）。
 
 前置条件：
     MySQL 8 已启动（默认 127.0.0.1:3306），账号具备 CREATE DATABASE 权限
@@ -22,8 +22,9 @@
    （字符集 utf8mb4 / 排序 utf8mb4_general_ci）；
 3. MySQL：导入 app.models 注册全部模型 -> Base.metadata.create_all 建表；
 4. MySQL：写入内置角色（super_admin / admin / hr / manager / employee）；
-5. PgSQL（PGSQL_ENABLED=True 时）：连接 postgres 库执行 CREATE DATABASE 分析库。
+5. PgSQL（PGSQL_ENABLED=True 时）：创建分析库、schema、6 张分析表及默认分区。
 注意：生产环境请使用 Alembic 迁移，不要用本脚本改表结构。
+只初始化 PgSQL 可执行：python scripts/init_pgsql.py。
 """
 
 from __future__ import annotations
@@ -118,28 +119,23 @@ async def init_roles() -> None:
 
 # ============================================================== PgSQL
 async def create_pgsql_database() -> None:
-    """PgSQL：确保分析库存在。"""
+    """PgSQL：确保分析库、schema、分析表及默认分区存在（兼容旧函数名）。"""
     if not settings.PGSQL_ENABLED:
         print("[4/4] PgSQL 未启用（PGSQL_ENABLED=False），跳过分析库初始化")
         return
 
-    engine = create_async_engine(settings.PGSQL_SERVER_URL, isolation_level="AUTOCOMMIT")
-    try:
-        async with engine.connect() as conn:
-            exists = await conn.scalar(
-                text("SELECT 1 FROM pg_database WHERE datname = :name"),
-                {"name": settings.PGSQL_DB},
-            )
-            if exists:
-                print(f"[4/4] PgSQL 分析库 `{settings.PGSQL_DB}` 已存在")
-            else:
-                await conn.execute(text(f'CREATE DATABASE "{settings.PGSQL_DB}"'))
-                print(
-                    f"[4/4] PgSQL 分析库 `{settings.PGSQL_DB}` 创建成功"
-                    f"（{settings.PGSQL_HOST}:{settings.PGSQL_PORT}）"
-                )
-    finally:
-        await engine.dispose()
+    from app.infrastructure.database.analytics_schema import initialize_pgsql
+
+    report = await initialize_pgsql()
+    state = "创建成功" if report["database_created"] else "已存在"
+    print(
+        f"[4/4] PgSQL 分析库 `{report['database']}` {state}"
+        f"（{settings.PGSQL_HOST}:{settings.PGSQL_PORT}，schema={report['schema']}）"
+    )
+    print(
+        f"      分析表共 {len(report['tables'])} 张，本次新建 {len(report['created_tables'])} 张："
+        f"{', '.join(report['tables'])}"
+    )
 
 
 async def main(drop: bool = False, tables_only: bool = False) -> None:

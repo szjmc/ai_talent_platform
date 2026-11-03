@@ -7,6 +7,10 @@
 > 海量履历/测评历史/分析宽表走 PgSQL（`postgresql+asyncpg`，也是 Vanna NL2SQL 的查询库）。
 
 当前进度：**公共层（P0）已完成并通过验收**，认证、用户、组织三大模块可跑通；
+ORM 层已完整落地：MySQL 25 张业务表 + PgSQL 6 张分析表，全局映射见 `docs/orm_mapping.md`；
+架构组（AI 公共层 + Skills + 集成）已完整落地：LLM 适配器 / LLMManager / Agent 基类与调度 / 上下文 / 记忆 / 存储 / 事件总线 / 匹配策略，
+见 `docs/plan/05-代码标签与优先级总表.md`；全局 ORM 映射由 `python scripts/dump_orm_mapping.py` 自动生成；
+PgSQL 分析库另有独立初始化脚本 `scripts/init_pgsql.py`（含分区父表和 DEFAULT 分区，数据同步/ETL 仍未实现）；
 其余业务模块（人才、岗位、简历、测评、培训、匹配、知识库、分析、Agent、文件）已建好骨架，
 每个文件开头写明实现思路与待写代码，按 TODO 补齐即可。
 
@@ -24,7 +28,10 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 cp .env.example .env          # 按本地实际修改 DB_* / PGSQL_* 账号密码
-python scripts/init_db.py     # MySQL 建库建表 + 内置角色 + PgSQL 建分析库
+python scripts/init_db.py     # MySQL 建库建表 + 内置角色 + PgSQL 建分析库/表
+python scripts/init_pgsql.py  # 可选：只初始化 PgSQL 分析库/表（--check 检查，--print-ddl 看 DDL）
+python scripts/dump_orm_mapping.py --output docs/orm_mapping.md  # 可选：导出全局 ORM 映射关系
+python scripts/demo_ai.py           # 可选：一键演示 AI 能力链路（默认离线，--with-llm 走真实模型）
 python scripts/create_admin.py -u admin -p Admin@12345
 python scripts/seed_data.py   # 可选：演示部门树 + 测试账号（密码 Test@12345）
 
@@ -106,7 +113,7 @@ config    → 配置：settings / logging / prompt
 ai_talent_platform/
 ├── main.py                 # 启动入口
 ├── app/                    # 应用代码（config/core/models/repositories/services/schemas/routers/ai/adapters/infrastructure/patterns/utils）
-├── scripts/                # init_db / create_admin / seed_data
+├── scripts/                # init_db / init_pgsql / dump_orm_mapping / create_admin / seed_data
 ├── tests/                  # conftest + 公共层验收测试（8 个用例）
 ├── docs/                   # 架构 / 手册 / 规范 / 数据库设计
 ├── requirements.txt

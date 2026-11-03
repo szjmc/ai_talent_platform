@@ -4,10 +4,17 @@
 
     mysql.py      MySQL 业务主库引擎（异步 / 连接池 / 连通性检测）
     postgres.py   PgSQL 分析库引擎（分析宽表、Vanna NL2SQL 数据源）
+    analytics_schema.py  PgSQL 分析库建库建表、结构检查、DDL 渲染
     session.py    MySQL 请求级 Session、session_scope、建表、连接总览
     transaction.py 显式事务（SAVEPOINT）与死锁重试
 """
 
+from app.infrastructure.database.analytics_schema import (
+    ensure_pgsql_database,
+    initialize_pgsql,
+    inspect_pgsql_schema,
+    render_pgsql_ddl,
+)
 from app.infrastructure.database.health import check_databases, check_mysql, check_pgsql
 from app.infrastructure.database.mysql import (
     create_async_engine_from_settings,
@@ -57,4 +64,8 @@ __all__ = [
     "check_databases",
     "check_mysql",
     "check_pgsql",
+    "ensure_pgsql_database",
+    "initialize_pgsql",
+    "inspect_pgsql_schema",
+    "render_pgsql_ddl",
 ]

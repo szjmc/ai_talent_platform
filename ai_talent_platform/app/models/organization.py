@@ -24,7 +24,7 @@
 from __future__ import annotations
 
 from sqlalchemy import BigInteger, Boolean, ForeignKey, Integer, String, UniqueConstraint, text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
 
@@ -72,6 +72,17 @@ class Organization(BaseModel):
         Boolean, nullable=False, default=True, server_default=text("1"), comment="是否启用"
     )
     remark: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="备注")
+
+    # ------------------------------------------------------------------ 关系
+    positions: Mapped[list["Position"]] = relationship(  # noqa: F821
+        "Position",
+        back_populates="organization",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+    talents: Mapped[list["Talent"]] = relationship(  # noqa: F821
+        "Talent", back_populates="organization", lazy="select"
+    )
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Organization id={self.id} name={self.name}>"

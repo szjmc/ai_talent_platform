@@ -21,6 +21,8 @@ import logging
 
 from fastapi import APIRouter
 
+from app.ai.agent import ai_runtime_status
+
 from app.routers._stub import placeholder_router
 from app.schemas.common import SuccessResponse
 from app.core.response import success
@@ -70,6 +72,7 @@ async def system_info():
     from app.config.settings import settings
     from app.infrastructure.database.session import check_all_connections
     from app.models import Base
+    from app.models.analytics import ANALYTICS_TABLE_NAMES
 
     return success(
         data={
@@ -81,12 +84,24 @@ async def system_info():
             "connection_status": await check_all_connections(),  # 含失败原因与修复建议
             "orm_tables": sorted(Base.metadata.tables.keys()),
             "pgsql_enabled": settings.PGSQL_ENABLED,
+            "pgsql_schema": settings.PGSQL_SCHEMA,
+            "pgsql_tables": list(ANALYTICS_TABLE_NAMES),
             "redis_enabled": settings.REDIS_ENABLED,
             "milvus_enabled": settings.MILVUS_ENABLED,
+            # AI 运行时状态：LLM 适配器 / 已注册技能 / 已注册 Agent（架构组）
+            "ai_ready": ai_runtime_status(),
             "implemented_modules": ["auth", "users", "organizations"],
         },
         message="OK",
     )
+
+
+@system_router.get("/skills", summary="AI 技能清单", response_model=SuccessResponse[list])
+async def system_skills():
+    """返回已注册的 Skills（名称 / 描述 / 参数 Schema / 依赖 / 所需权限）。"""
+    from app.ai.skills.registry_bootstrap import describe_skills
+
+    return success(data=describe_skills(), message="OK")
 
 
 api_router.include_router(system_router)
