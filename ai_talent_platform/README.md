@@ -52,8 +52,9 @@ python main.py                # http://127.0.0.1:8000/docs
 | --- | --- |
 | [docs/公共层使用手册.md](docs/公共层使用手册.md) | **必读**：响应/异常/数据库/Repository/认证权限/新增模块全流程/FAQ |
 | [docs/architecture.md](docs/architecture.md) | 六层架构图（**内联 SVG，离线可打开**）、依赖规则、调用链路 |
-| [docs/development.md](docs/development.md) | 开发规范与协作分工、接口契约 |
-| [docs/database_design.md](docs/database_design.md) | 数据库设计与表结构约定 |
+| [docs/development.md](docs/development.md) | 开发规范与协作分工 |
+| [docs/api_document.md](docs/api_document.md) | **接口契约（全模块）**：统一响应/错误码/JWT/RBAC 权限矩阵 + 15 个模块的 method/path/权限/请求字段/示例/错误码 |
+| [docs/database_design.md](docs/database_design.md) | **数据库设计（完整明确）**：内联 SVG ER 图 + 25 张表字段字典 + 可直接执行的 MySQL 8 DDL + PgSQL/Milvus/Redis 设计 |
 
 ---
 
