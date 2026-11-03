@@ -1,23 +1,28 @@
 """
 脚本：scripts/init_db.py
-职责：数据库初始化脚本（建库 / 建表 / 初始化基础角色）。
+职责：数据库初始化脚本（MySQL 业务库建库建表 + PgSQL 分析库建库 + 内置角色）。
+
+前置条件：
+    MySQL 8 已启动（默认 127.0.0.1:3306），账号具备 CREATE DATABASE 权限
+    PgSQL 15+ 已启动（默认 127.0.0.1:5432），账号具备 CREATE DATABASE 权限
 
 使用方式：
-    # 建库（MySQL）+ 建表 + 写入基础角色
+    # 全流程：MySQL 建库 + 建表 + 角色初始化 + PgSQL 建库
     python scripts/init_db.py
 
-    # 只建表
+    # 只建表（库已手工创建）
     python scripts/init_db.py --tables-only
 
-    # 危险操作：删除所有表后重建（仅开发环境）
+    # 危险操作：删除 MySQL 所有表后重建（仅开发环境）
     python scripts/init_db.py --drop
 
 执行流程：
 1. 读取 app.config.settings（.env）；
-2. MySQL 场景：先连接服务器（不指定 database）执行 CREATE DATABASE IF NOT EXISTS；
-   SQLite 场景：跳过，aiosqlite 会自动创建文件；
-3. 导入 app.models 注册全部模型 -> Base.metadata.create_all 建表；
-4. 写入内置角色（super_admin / admin / hr / manager / employee）。
+2. MySQL：先连服务器（不指定 database）执行 CREATE DATABASE IF NOT EXISTS
+   （字符集 utf8mb4 / 排序 utf8mb4_general_ci）；
+3. MySQL：导入 app.models 注册全部模型 -> Base.metadata.create_all 建表；
+4. MySQL：写入内置角色（super_admin / admin / hr / manager / employee）；
+5. PgSQL（PGSQL_ENABLED=True 时）：连接 postgres 库执行 CREATE DATABASE 分析库。
 注意：生产环境请使用 Alembic 迁移，不要用本脚本改表结构。
 """
 
@@ -32,7 +37,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
 from sqlalchemy import text  # noqa: E402
-from sqlalchemy.ext.asyncio import create_async_engine  # noqa: E402
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine  # noqa: E402
 
 from app.config.logging_config import setup_logging  # noqa: E402
 from app.config.settings import settings  # noqa: E402
@@ -49,17 +54,10 @@ ROLE_NAMES = {
 }
 
 
-async def create_database_if_needed() -> None:
-    """MySQL：确保数据库存在（SQLite 自动创建文件，无需处理）。"""
-    if settings.DB_DRIVER != "mysql":
-        print(f"[1/3] SQLite 模式，跳过建库（文件：{settings.SQLITE_PATH}）")
-        return
-
-    server_url = (
-        f"mysql+aiomysql://{settings.DB_USER}:{settings.DB_PASSWORD}"
-        f"@{settings.DB_HOST}:{settings.DB_PORT}/?charset={settings.DB_CHARSET}"
-    )
-    engine = create_async_engine(server_url, pool_pre_ping=True)
+# ============================================================== MySQL
+async def create_mysql_database() -> None:
+    """MySQL：确保业务库存在。"""
+    engine = create_async_engine(settings.MYSQL_SERVER_URL, pool_pre_ping=True)
     try:
         async with engine.begin() as conn:
             await conn.execute(
@@ -69,30 +67,28 @@ async def create_database_if_needed() -> None:
                     f"COLLATE {settings.DB_CHARSET}_general_ci"
                 )
             )
-        print(f"[1/3] 数据库 `{settings.DB_NAME}` 已就绪")
+        print(f"[1/4] MySQL 库 `{settings.DB_NAME}` 已就绪（{settings.DB_HOST}:{settings.DB_PORT}）")
     finally:
         await engine.dispose()
 
 
-async def create_tables(drop: bool = False) -> None:
-    """建表（可选先删表）。"""
+async def create_mysql_tables(drop: bool = False) -> None:
+    """MySQL：建表（可选先删表）。"""
     engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
     try:
         async with engine.begin() as conn:
             if drop:
-                print("     [警告] 正在删除所有表……")
+                print("      [警告] 正在删除 MySQL 所有表……")
                 await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
         tables = sorted(Base.metadata.tables)
-        print(f"[2/3] 表结构创建完成，共 {len(tables)} 张表：{', '.join(tables)}")
+        print(f"[2/4] MySQL 表结构创建完成，共 {len(tables)} 张表：{', '.join(tables)}")
     finally:
         await engine.dispose()
 
 
 async def init_roles() -> None:
-    """写入内置角色（幂等）。"""
-    from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
-
+    """MySQL：写入内置角色（幂等）。"""
     engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
     factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     try:
@@ -115,32 +111,59 @@ async def init_roles() -> None:
                 )
                 created += 1
             await db.commit()
-        print(f"[3/3] 角色初始化完成，新增 {created} 个角色")
+        print(f"[3/4] 角色初始化完成，新增 {created} 个角色")
+    finally:
+        await engine.dispose()
+
+
+# ============================================================== PgSQL
+async def create_pgsql_database() -> None:
+    """PgSQL：确保分析库存在。"""
+    if not settings.PGSQL_ENABLED:
+        print("[4/4] PgSQL 未启用（PGSQL_ENABLED=False），跳过分析库初始化")
+        return
+
+    engine = create_async_engine(settings.PGSQL_SERVER_URL, isolation_level="AUTOCOMMIT")
+    try:
+        async with engine.connect() as conn:
+            exists = await conn.scalar(
+                text("SELECT 1 FROM pg_database WHERE datname = :name"),
+                {"name": settings.PGSQL_DB},
+            )
+            if exists:
+                print(f"[4/4] PgSQL 分析库 `{settings.PGSQL_DB}` 已存在")
+            else:
+                await conn.execute(text(f'CREATE DATABASE "{settings.PGSQL_DB}"'))
+                print(
+                    f"[4/4] PgSQL 分析库 `{settings.PGSQL_DB}` 创建成功"
+                    f"（{settings.PGSQL_HOST}:{settings.PGSQL_PORT}）"
+                )
     finally:
         await engine.dispose()
 
 
 async def main(drop: bool = False, tables_only: bool = False) -> None:
-    print("=" * 60)
-    print(" 数据库初始化开始")
-    print("=" * 60)
+    print("=" * 68)
+    print(" 数据库初始化开始（MySQL 业务库 + PgSQL 分析库）")
+    print("=" * 68)
     settings.ensure_dirs()
 
     if not tables_only:
-        await create_database_if_needed()
-    await create_tables(drop=drop)
+        await create_mysql_database()
+    await create_mysql_tables(drop=drop)
     if not tables_only:
         await init_roles()
+        await create_pgsql_database()
 
-    print("=" * 60)
+    print("=" * 68)
     print(" 完成。下一步：python scripts/create_admin.py 创建管理员账号")
-    print("=" * 60)
+    print("=" * 68)
 
 
 if __name__ == "__main__":
     setup_logging()
-    parser = argparse.ArgumentParser(description="初始化数据库")
+    parser = argparse.ArgumentParser(description="初始化 MySQL / PgSQL 数据库")
     parser.add_argument("--drop", action="store_true", help="先删除所有表（危险，仅开发环境）")
-    parser.add_argument("--tables-only", action="store_true", help="只建表，不建库、不初始化角色")
+    parser.add_argument("--tables-only", action="store_true", help="只建表，不建库、不初始化角色、不建分析库")
     args = parser.parse_args()
     asyncio.run(main(drop=args.drop, tables_only=args.tables_only))

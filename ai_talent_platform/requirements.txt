@@ -13,11 +13,14 @@ pydantic-settings>=2.2
 email-validator>=2.1             # EmailStr 校验
 
 # ---------------- 数据库（P0）
+# 数据库方案：MySQL（业务主库）+ PgSQL（分析/时序库）+ Milvus（向量）+ Redis（缓存）
+# 平台不使用 SQLite
 SQLAlchemy[asyncio]>=2.0,<3.0
 greenlet>=3.0
-aiomysql>=0.2.0                  # MySQL 异步驱动
-aiosqlite>=0.20                  # SQLite（本地开发 / 测试）
-pymysql>=1.1.0                   # 同步驱动（Alembic / 初始化脚本）
+aiomysql>=0.2.0                  # MySQL 异步驱动（mysql+aiomysql）
+pymysql>=1.1.0                   # MySQL 同步驱动（Alembic 迁移 / 脚本）
+asyncpg>=0.29                    # PgSQL 异步驱动（postgresql+asyncpg）
+psycopg2-binary>=2.9             # PgSQL 同步驱动（Vanna / 报表脚本）
 alembic>=1.13                    # 数据库迁移
 
 # ---------------- 认证与安全（P0）

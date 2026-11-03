@@ -1,7 +1,10 @@
 # AI 数字化人才平台 · 后端
 
 企业级 AI 原生人才智能平台后端。技术栈：**FastAPI（全异步）+ SQLAlchemy 2.0 ORM（全对象映射，无裸 SQL）
-+ MySQL / SQLite + Redis（可选）+ Milvus（可选）+ LangChain / LangGraph + Dify + Vanna**。
++ MySQL 8（业务主库）+ PgSQL（分析/时序库）+ Redis（缓存）+ Milvus（向量）+ LangChain / LangGraph + Dify + Vanna**。
+
+> 数据库说明：**不使用 SQLite**。业务主数据走 MySQL（`mysql+aiomysql`），
+> 海量履历/测评历史/分析宽表走 PgSQL（`postgresql+asyncpg`，也是 Vanna NL2SQL 的查询库）。
 
 当前进度：**公共层（P0）已完成并通过验收**，认证、用户、组织三大模块可跑通；
 其余业务模块（人才、岗位、简历、测评、培训、匹配、知识库、分析、Agent、文件）已建好骨架，
@@ -12,12 +15,16 @@
 ## 快速开始
 
 ```bash
+# 0. 前置：MySQL 8（127.0.0.1:3306）与 PgSQL 15+（127.0.0.1:5432）已启动
+#    没有本地数据库？一条命令拉起（账号密码与 .env.example 一致）：
+#    docker compose up -d            # MySQL 8 + PgSQL 16
+#    docker compose --profile cache up -d   # 额外启动 Redis
 cd ai_talent_platform
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-cp .env.example .env          # 默认 SQLite，零外部依赖即可启动
-python scripts/init_db.py     # 建表 + 内置角色
+cp .env.example .env          # 按本地实际修改 DB_* / PGSQL_* 账号密码
+python scripts/init_db.py     # MySQL 建库建表 + 内置角色 + PgSQL 建分析库
 python scripts/create_admin.py -u admin -p Admin@12345
 python scripts/seed_data.py   # 可选：演示部门树 + 测试账号（密码 Test@12345）
 
@@ -31,9 +38,11 @@ python main.py                # http://127.0.0.1:8000/docs
 | `/health` `/health/ready` | 存活 / 就绪探针 |
 | `/api/v1/system/info` | 框架装配自检（数据库、ORM 表、已实现模块） |
 
-切换 MySQL：改 `.env` 中 `DB_DRIVER=mysql` 与 `DB_*` 后重跑 `scripts/init_db.py`，代码无需改动。
+数据库连接自检：`GET /health/ready` 会分别返回 MySQL / PgSQL 的状态、失败原因与修复建议
+（例如 `connection_refused` / `auth_failed` / `database_missing`）。
 
-测试：`pytest -q`（临时 SQLite，不污染开发库）。
+测试：`pytest -q`（使用独立的 MySQL 测试库 `ai_talent_platform_test`，不污染开发库；
+库不可用时用例会自动 skip 并打印连接目标）。
 
 ---
 

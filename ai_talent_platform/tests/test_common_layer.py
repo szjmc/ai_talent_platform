@@ -2,7 +2,7 @@
 模块：tests/test_common_layer.py
 职责：公共层验收测试（对应「项目公共层」清单）。
 
-覆盖项：
+覆盖项（需要可用的 MySQL，未启动时整文件 skip）：
     [x] FastAPI 正常启动（应用可创建、路由注册成功）
     [x] 总路由注册完成（/api/v1 前缀下可访问）
     [x] Swagger 正常访问（/docs、/openapi.json 返回 200）
@@ -18,6 +18,12 @@ from __future__ import annotations
 import pytest
 
 pytestmark = pytest.mark.asyncio
+
+
+@pytest.fixture(autouse=True)
+def _require_mysql(mysql_ready):
+    """本文件的用例都需要真实 MySQL（注册/登录/CRUD 全链路）。"""
+    return mysql_ready
 
 
 async def test_health_and_root(client):
@@ -45,9 +51,13 @@ async def test_swagger_available(client):
 
 
 async def test_health_ready(client):
+    """就绪探针：MySQL 必须可用（PgSQL 在测试环境关闭）。"""
     resp = await client.get("/health/ready")
     assert resp.status_code == 200
-    assert resp.json()["data"]["database"] == "up"
+    data = resp.json()["data"]
+    assert data["mysql"] == "up"
+    assert data["pgsql"] == "disabled"
+    assert data["status"] == "up"
 
 
 async def test_404_unified_response(client):

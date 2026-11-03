@@ -28,7 +28,7 @@ from app.core.exception_handlers import register_exception_handlers
 from app.core.lifespan import lifespan
 from app.core.middleware import register_middlewares
 from app.core.response import success
-from app.infrastructure.database.session import check_connection
+from app.infrastructure.database.session import check_all_connections
 
 logger = get_logger(__name__)
 
@@ -138,23 +138,45 @@ def create_application() -> FastAPI:
     async def health():
         """存活探针：只表示进程可用，不检查下游依赖。"""
         return success(
-            data={"status": "up", "version": settings.APP_VERSION, "env": settings.APP_ENV},
+            data={
+                "status": "up",
+                "version": settings.APP_VERSION,
+                "env": settings.APP_ENV,
+                "databases": settings.database_summary(),
+            },
             message="OK",
         )
 
     @app.get("/health/ready", tags=["系统"], summary="健康检查（就绪）")
     async def readiness():
-        """就绪探针：检查数据库等关键依赖。"""
-        db_ok = await check_connection()
+        """就绪探针：检查 MySQL / PgSQL 等关键依赖。
+
+        MySQL 是业务主库，不可用时返回 503；
+        PgSQL 为分析库，不可用时状态为 degraded（业务接口仍可用，分析类功能降级）。
+        """
+        report = await check_all_connections()
         payload = {
-            "status": "up" if db_ok else "degraded",
-            "database": "up" if db_ok else "down",
-            "redis": "enabled" if settings.REDIS_ENABLED else "disabled",
-            "milvus": "enabled" if settings.MILVUS_ENABLED else "disabled",
+            **report,
+            "drivers": {
+                "mysql": "mysql+aiomysql",
+                "pgsql": "postgresql+asyncpg" if settings.PGSQL_ENABLED else "disabled",
+            },
         }
-        if db_ok:
-            return success(data=payload, message="OK")
-        return JSONResponse(status_code=503, content={"code": 503, "message": "数据库不可用", "data": payload})
+
+        if report["status"] == "down":
+            # MySQL 是业务主库：不可用时返回 503，并给出可读原因与修复建议
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "code": 503,
+                    "message": f"MySQL 不可用：{report['mysql']['message']}",
+                    "data": payload,
+                },
+            )
+        return success(
+            data=payload,
+            message="OK" if report["status"] == "up" else "MySQL 正常，PgSQL 不可用（分析功能降级）",
+        )
 
     # 4) OpenAPI 定制
     app.openapi = lambda: _custom_openapi(app)  # type: ignore[method-assign]

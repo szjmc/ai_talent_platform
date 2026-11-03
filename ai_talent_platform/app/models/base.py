@@ -20,7 +20,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Integer, MetaData, String, func, text
+from sqlalchemy import BigInteger, Boolean, DateTime, Integer, MetaData, String, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
 
 # 统一的约束命名规则：迁移脚本更可读，也避免 MySQL 索引名冲突
@@ -66,14 +66,16 @@ class TimestampMixin:
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
-        server_default=func.now(),
+        # 用 CURRENT_TIMESTAMP 而不是 now()：MySQL 5.6.5+ 与 8.0 都支持，
+        # 避免低版本 MySQL 对「表达式默认值」的限制
+        server_default=text("CURRENT_TIMESTAMP"),
         default=datetime.now,
         comment="创建时间",
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
-        server_default=func.now(),
+        server_default=text("CURRENT_TIMESTAMP"),
         default=datetime.now,
         onupdate=datetime.now,
         comment="更新时间",
@@ -126,11 +128,10 @@ class BaseModel(Base, TimestampMixin, SoftDeleteMixin, OperatorMixin):
     __abstract__ = True
 
     id: Mapped[int] = mapped_column(
-        BigInteger().with_variant(Integer, "sqlite"),
+        BigInteger,
         primary_key=True,
         autoincrement=True,
-        index=True,
-        comment="主键 ID",
+        comment="主键 ID（BIGINT，主键索引由 PK 提供）",
     )
     version: Mapped[int] = mapped_column(
         Integer,

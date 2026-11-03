@@ -1,8 +1,13 @@
 # 数据库设计约定与核心表
 
-> 使用的技术：**MySQL 8（业务主数据）**、PgSQL（分析/时序，可选）、**Milvus**（向量）、**Redis**（缓存）。
-> 开发环境默认 SQLite，ORM 层与 MySQL 完全兼容（除个别 JSON 函数）。
+> 使用的技术：**MySQL 8（业务主数据）**、**PgSQL（分析/时序）**、**Milvus**（向量）、**Redis**（缓存）。
+> **不使用 SQLite**：开发、测试、生产统一 MySQL；分析类数据统一 PgSQL。
 > 所有表通过 SQLAlchemy 2.0 ORM 定义，禁止裸 SQL。
+
+| 库 | 驱动 | 默认地址 | 存放内容 |
+| --- | --- | --- | --- |
+| MySQL | `mysql+aiomysql` | `127.0.0.1:3306/ai_talent_platform` | 用户、组织、角色、岗位、人才、测评、培训、匹配等业务主数据 |
+| PgSQL | `postgresql+asyncpg` | `127.0.0.1:5432/ai_talent_analytics` | 海量人才履历、测评历史、培训轨迹、行为时序、分析宽表（Vanna NL2SQL 数据源） |
 
 ---
 
@@ -12,7 +17,7 @@
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
-| `id` | BIGINT 自增 | 主键 |
+| `id` | BIGINT 自增 | 主键（`pk_<表名>`，主键索引自带） |
 | `created_at` | DATETIME | 创建时间（DB + ORM 双默认） |
 | `updated_at` | DATETIME | 更新时间（ORM `onupdate`） |
 | `is_deleted` | TINYINT(1) | 逻辑删除标记（索引） |

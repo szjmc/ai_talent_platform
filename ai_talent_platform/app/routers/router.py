@@ -68,7 +68,7 @@ system_router = APIRouter(prefix="/system", tags=["系统"])
 async def system_info():
     """返回当前后端框架装配情况，便于联调时快速确认公共层是否就绪。"""
     from app.config.settings import settings
-    from app.infrastructure.database.session import check_connection
+    from app.infrastructure.database.session import check_all_connections
     from app.models import Base
 
     return success(
@@ -77,9 +77,10 @@ async def system_info():
             "version": settings.APP_VERSION,
             "env": settings.APP_ENV,
             "api_prefix": settings.API_PREFIX,
-            "db_driver": settings.DB_DRIVER,
-            "database_up": await check_connection(),
+            "databases": settings.database_summary(),
+            "connection_status": await check_all_connections(),  # 含失败原因与修复建议
             "orm_tables": sorted(Base.metadata.tables.keys()),
+            "pgsql_enabled": settings.PGSQL_ENABLED,
             "redis_enabled": settings.REDIS_ENABLED,
             "milvus_enabled": settings.MILVUS_ENABLED,
             "implemented_modules": ["auth", "users", "organizations"],

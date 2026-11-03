@@ -7,7 +7,7 @@
    errors, retries, status），节点返回「增量 dict」由 LangGraph 合并；
 2. 节点：每个节点是一个 async 函数，内部只调用 Service / Skill / LLM，不写 SQL；
 3. 边：支持条件路由（route_by_status）、循环（重试节点）、人工介入（interrupt）；
-4. 检查点：使用 LangGraph 的 checkpointer（内存 / SQLite / Redis）实现断点续跑；
+4. 检查点：使用 LangGraph 的 checkpointer（内存 / Redis / MySQL）实现断点续跑；
 5. 失败处理：节点内部捕获异常写入 state["errors"]，由路由决定重试或结束。
 
 对外 API：

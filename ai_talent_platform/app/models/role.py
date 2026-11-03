@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, String, text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -31,7 +31,7 @@ class Role(TimestampMixin, Base):
     __table_args__ = {"comment": "角色表"}
 
     id: Mapped[int] = mapped_column(
-        BigInteger().with_variant(Integer, "sqlite"),
+        BigInteger,
         primary_key=True,
         autoincrement=True,
         comment="角色 ID",

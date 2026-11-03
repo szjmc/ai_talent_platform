@@ -11,7 +11,7 @@
     default_order = "-id"
 
 - requirements 是 JSON 列，MySQL 8 下可用 func.json_contains 查询；
-- SQLite 测试环境对 JSON 函数支持有限，测试时改用 keyword 过滤；
+- 开发/测试环境统一 MySQL 8，json_contains 可用；单测中建议用真实 MySQL 测试库而非内存库；
 - 岗位创建/更新后需触发向量化（在 Service 层做，不放这里）。
 方法清单（按顺序实现，勾选表示已完成）：
     - [ ] list_open_by_org(db, org_id)                   部门在招岗位
