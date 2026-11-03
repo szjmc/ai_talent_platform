@@ -54,6 +54,8 @@ python main.py                # http://127.0.0.1:8000/docs
 | [docs/architecture.md](docs/architecture.md) | 六层架构图（**内联 SVG，离线可打开**）、依赖规则、调用链路 |
 | [docs/development.md](docs/development.md) | 开发规范与协作分工 |
 | [docs/api_document.md](docs/api_document.md) | **接口契约（全模块）**：统一响应/错误码/JWT/RBAC 权限矩阵 + 15 个模块的 method/path/权限/请求字段/示例/错误码 |
+| [docs/team_sprint_plan.md](docs/team_sprint_plan.md) | **AI 能力层 5 组分工**：RAG / Agent / Skills / Vanna / Dify 每组每人每天做什么 + 里程碑 + 验收清单 |
+| [docs/team_code_spec.md](docs/team_code_spec.md) | **分组代码规范**：每个文件的方法签名、返回结构、代码骨架、验收命令、文件所有权表 |
 | [docs/database_design.md](docs/database_design.md) | **数据库设计（完整明确）**：内联 SVG ER 图 + 25 张表字段字典 + 可直接执行的 MySQL 8 DDL + PgSQL/Milvus/Redis 设计 |
 
 ---
