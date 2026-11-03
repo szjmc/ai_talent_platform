@@ -1,0 +1,146 @@
+"""
+脚本：scripts/init_db.py
+职责：数据库初始化脚本（建库 / 建表 / 初始化基础角色）。
+
+使用方式：
+    # 建库（MySQL）+ 建表 + 写入基础角色
+    python scripts/init_db.py
+
+    # 只建表
+    python scripts/init_db.py --tables-only
+
+    # 危险操作：删除所有表后重建（仅开发环境）
+    python scripts/init_db.py --drop
+
+执行流程：
+1. 读取 app.config.settings（.env）；
+2. MySQL 场景：先连接服务器（不指定 database）执行 CREATE DATABASE IF NOT EXISTS；
+   SQLite 场景：跳过，aiosqlite 会自动创建文件；
+3. 导入 app.models 注册全部模型 -> Base.metadata.create_all 建表；
+4. 写入内置角色（super_admin / admin / hr / manager / employee）。
+注意：生产环境请使用 Alembic 迁移，不要用本脚本改表结构。
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import sys
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE_DIR))
+
+from sqlalchemy import text  # noqa: E402
+from sqlalchemy.ext.asyncio import create_async_engine  # noqa: E402
+
+from app.config.logging_config import setup_logging  # noqa: E402
+from app.config.settings import settings  # noqa: E402
+from app.core.permissions import ROLE_PERMISSIONS, RoleEnum  # noqa: E402
+from app.models import Base  # noqa: E402
+from app.models.role import Role  # noqa: E402
+
+ROLE_NAMES = {
+    RoleEnum.SUPER_ADMIN: "超级管理员",
+    RoleEnum.ADMIN: "系统管理员",
+    RoleEnum.HR: "人力资源",
+    RoleEnum.MANAGER: "部门管理者",
+    RoleEnum.EMPLOYEE: "普通员工",
+}
+
+
+async def create_database_if_needed() -> None:
+    """MySQL：确保数据库存在（SQLite 自动创建文件，无需处理）。"""
+    if settings.DB_DRIVER != "mysql":
+        print(f"[1/3] SQLite 模式，跳过建库（文件：{settings.SQLITE_PATH}）")
+        return
+
+    server_url = (
+        f"mysql+aiomysql://{settings.DB_USER}:{settings.DB_PASSWORD}"
+        f"@{settings.DB_HOST}:{settings.DB_PORT}/?charset={settings.DB_CHARSET}"
+    )
+    engine = create_async_engine(server_url, pool_pre_ping=True)
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    f"CREATE DATABASE IF NOT EXISTS `{settings.DB_NAME}` "
+                    f"DEFAULT CHARACTER SET {settings.DB_CHARSET} "
+                    f"COLLATE {settings.DB_CHARSET}_general_ci"
+                )
+            )
+        print(f"[1/3] 数据库 `{settings.DB_NAME}` 已就绪")
+    finally:
+        await engine.dispose()
+
+
+async def create_tables(drop: bool = False) -> None:
+    """建表（可选先删表）。"""
+    engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
+    try:
+        async with engine.begin() as conn:
+            if drop:
+                print("     [警告] 正在删除所有表……")
+                await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
+        tables = sorted(Base.metadata.tables)
+        print(f"[2/3] 表结构创建完成，共 {len(tables)} 张表：{', '.join(tables)}")
+    finally:
+        await engine.dispose()
+
+
+async def init_roles() -> None:
+    """写入内置角色（幂等）。"""
+    from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+
+    engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with factory() as db:
+            created = 0
+            for role_enum in RoleEnum:
+                code = role_enum.value
+                exists = await db.scalar(
+                    text("SELECT COUNT(1) FROM roles WHERE code = :code"), {"code": code}
+                )
+                if exists:
+                    continue
+                db.add(
+                    Role(
+                        code=code,
+                        name=ROLE_NAMES.get(role_enum, code),
+                        description=f"内置角色，权限 {len(ROLE_PERMISSIONS.get(role_enum, set()))} 项",
+                        is_active=True,
+                    )
+                )
+                created += 1
+            await db.commit()
+        print(f"[3/3] 角色初始化完成，新增 {created} 个角色")
+    finally:
+        await engine.dispose()
+
+
+async def main(drop: bool = False, tables_only: bool = False) -> None:
+    print("=" * 60)
+    print(" 数据库初始化开始")
+    print("=" * 60)
+    settings.ensure_dirs()
+
+    if not tables_only:
+        await create_database_if_needed()
+    await create_tables(drop=drop)
+    if not tables_only:
+        await init_roles()
+
+    print("=" * 60)
+    print(" 完成。下一步：python scripts/create_admin.py 创建管理员账号")
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    setup_logging()
+    parser = argparse.ArgumentParser(description="初始化数据库")
+    parser.add_argument("--drop", action="store_true", help="先删除所有表（危险，仅开发环境）")
+    parser.add_argument("--tables-only", action="store_true", help="只建表，不建库、不初始化角色")
+    args = parser.parse_args()
+    asyncio.run(main(drop=args.drop, tables_only=args.tables_only))
