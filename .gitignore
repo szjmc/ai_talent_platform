@@ -1,0 +1,8 @@
+# 仓库根目录忽略（venv 位于仓库根下）
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
