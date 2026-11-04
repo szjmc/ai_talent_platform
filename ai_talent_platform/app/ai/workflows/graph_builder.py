@@ -2,6 +2,8 @@
 模块：app/ai/workflows/graph_builder.py
 职责：LangGraph 工作流构建工具（状态定义 + 节点编排 + 检查点）。
 
+标签：[Agent组] [P0]（被全部 workflow 依赖：图构建 / 节点注册 / checkpoint）
+
 ============================ 实现思路与代码要点 ============================
 1. 状态：用 TypedDict 定义 WorkflowState（如 ResumeState：file_path, text, parsed,
    errors, retries, status），节点返回「增量 dict」由 LangGraph 合并；

@@ -2,6 +2,8 @@
 模块：app/routers/router.py
 职责：总路由注册（全平台唯一对外入口聚合点）。
 
+标签：[架构组] [P0]（总路由 /api/v1 + /system 段：ai_ready / skills 清单）
+
 实现思路：
 1. 每个业务模块一个 APIRouter（带自己的 prefix 和 tags）；
 2. 在这里汇总成 api_router，再由 core/application.py 以 settings.API_PREFIX（/api/v1）挂载；
@@ -44,17 +46,20 @@ api_router.include_router(organization_router)
 #      把下面两行替换为 real router 的 include，例如：
 #          from app.routers.talent_router import router as talent_router
 #          api_router.include_router(talent_router)
+# 元组：(路径前缀, 模块中文名, 占位说明)。说明里写明【主责研发组】与实现文件，
+# 全平台只划分 5 个研发组（架构组 / RAG组 / Agent组 / Vanna组 / Dify组），业务模块垂直归口。
 _STUB_MODULES: list[tuple[str, str, str]] = [
-    ("positions", "岗位管理", "岗位 CRUD、岗位说明书 AI 解析、岗位向量化（见 routers/position_router.py）"),
-    ("talents", "人才档案", "人才档案 CRUD、画像查询、语义检索、档案合并（见 routers/talent_router.py）"),
-    ("resumes", "简历管理", "简历上传、AI 解析、解析结果查询（见 routers/resume_router.py）"),
-    ("assessments", "人才测评", "测评创建、答题、提交、结果分析（见 routers/assessment_router.py）"),
-    ("trainings", "培训管理", "课程、培训计划、学习进度（见 routers/training_router.py）"),
-    ("matchings", "人岗匹配", "执行匹配、匹配结果、匹配解释（见 routers/matching_router.py）"),
-    ("knowledge", "知识库", "知识文档上传、RAG 检索、智能问答（见 routers/knowledge_router.py）"),
-    ("analytics", "数据分析", "统计概览、NL2SQL 问数、报告导出（见 routers/analytics_router.py）"),
-    ("agents", "AI 智能体", "Agent 对话、任务执行、SSE 流式输出（见 routers/agent_router.py）"),
-    ("files", "文件管理", "文件上传、下载、预览（见 routers/file_router.py）"),
+    ("positions", "岗位管理", "[Agent组] 岗位 CRUD、岗位说明书 AI 解析、岗位向量化（见 routers/position_router.py）"),
+    ("talents", "人才档案", "[RAG组] 人才档案 CRUD、画像查询、语义检索、档案合并（见 routers/talent_router.py）"),
+    ("resumes", "简历管理", "[RAG组] 简历上传、AI 解析、解析结果查询（见 routers/resume_router.py）"),
+    ("assessments", "人才测评", "[Vanna组] 测评创建、答题、提交、结果分析（见 routers/assessment_router.py）"),
+    ("trainings", "培训管理", "[Dify组] 课程、培训计划、学习进度（见 routers/training_router.py）"),
+    ("matchings", "人岗匹配", "[Agent组] 执行匹配、匹配结果、匹配解释（见 routers/matching_router.py）"),
+    ("knowledge", "知识库", "[RAG组] 知识文档上传、RAG 检索、智能问答（见 routers/knowledge_router.py）"),
+    ("analytics", "数据分析", "[Vanna组] 统计概览、NL2SQL 问数、报告导出（见 routers/analytics_router.py）"),
+    ("agents", "AI 智能体", "[Agent组] Agent 对话、任务执行、SSE 流式输出（见 routers/agent_router.py）"),
+    ("files", "文件管理", "[架构组] 文件上传、下载、预览（见 routers/file_router.py）"),
+    ("audit", "审计日志", "[架构组] 操作与 AI 调用审计查询、统计（见 routers/audit_router.py）"),
 ]
 
 for _prefix, _tag, _desc in _STUB_MODULES:

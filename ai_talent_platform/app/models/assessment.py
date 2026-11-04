@@ -2,6 +2,8 @@
 模块：app/models/assessment.py
 职责：测评任务、测评题目、答题记录、测评结果。
 
+标签：[Vanna组] [P1]（测评表：题库 / 试卷 / 答题 / 结果）
+
 ============================ 实现思路与代码要点 ============================
 表设计：
 1. assessments        测评任务：talent_id、position_id、title、status、deadline、

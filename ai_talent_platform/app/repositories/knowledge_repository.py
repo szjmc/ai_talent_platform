@@ -2,6 +2,8 @@
 模块：app/repositories/knowledge_repository.py
 职责：知识库数据访问层。
 
+标签：[RAG组] [P0]（list_by_permission / save_chunks / update_index_status，被 knowledge_service 依赖）
+
 ============================ 实现思路与代码要点 ============================
 本仓库继承 BaseRepository，只需声明：
     model = <Model>

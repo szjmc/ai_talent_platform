@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 1120" width="1240" height="1120" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#dc2626"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#047857"/>
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#1d4ed8"/>
+    </marker>
+    <marker id="dot" viewBox="0 0 6 6" refX="3" refY="3" markerWidth="5" markerHeight="5">
+      <circle cx="3" cy="3" r="3" fill="#64748b"/>
+    </marker>
+  </defs>
+<rect x="0" y="0" width="1240" height="1120" fill="#f8fafc"/>
+<text x="40.0" y="44.0" font-size="23" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#0f172a" font-weight="700" text-anchor="start">图 2 · 中间件的注册顺序与执行顺序（洋葱模型）</text>
+<text x="40.0" y="70.0" font-size="12.5" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#475569" font-weight="400" text-anchor="start">app/core/middleware.py : register_middlewares(app) —— 后注册者在外层，请求先进入、响应后离开</text>
+<rect x="118.0" y="178.0" width="560.0" height="500.0" rx="18" ry="18" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.6"/>
+<text x="398.0" y="202.0" font-size="12.8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#1d4ed8" font-weight="700" text-anchor="middle">① TraceIdMiddleware</text>
+<rect x="168.0" y="223.0" width="460.0" height="410.0" rx="18" ry="18" fill="#f5f3ff" stroke="#ddd6fe" stroke-width="1.6"/>
+<text x="398.0" y="247.0" font-size="12.8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#7c3aed" font-weight="700" text-anchor="middle">② CORSMiddleware</text>
+<rect x="214.0" y="263.0" width="368.0" height="330.0" rx="18" ry="18" fill="#ecfdf5" stroke="#a7f3d0" stroke-width="1.6"/>
+<text x="398.0" y="287.0" font-size="12.8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#047857" font-weight="700" text-anchor="middle">③ AccessLogMiddleware</text>
+<rect x="258.0" y="299.0" width="280.0" height="258.0" rx="18" ry="18" fill="#fffbeb" stroke="#fde68a" stroke-width="1.6"/>
+<text x="398.0" y="323.0" font-size="12.8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#b45309" font-weight="700" text-anchor="middle">④ SecurityHeadersMiddleware</text>
+<rect x="300.0" y="333.0" width="196.0" height="190.0" rx="18" ry="18" fill="#fff1f2" stroke="#fecdd3" stroke-width="1.6"/>
+<text x="398.0" y="357.0" font-size="12.8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#be123c" font-weight="700" text-anchor="middle">⑤ RateLimitMiddleware</text>
+<rect x="286.0" y="370.0" width="224.0" height="116.0" rx="12" ry="12" fill="#ffffff" stroke="#94a3b8" stroke-width="1.6"/>
+<text x="398.0" y="396.0" font-size="12.6" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#0f172a" font-weight="700" text-anchor="middle">ExceptionMiddleware</text>
+<text x="398.0" y="418.0" font-size="11.4" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#475569" font-weight="400" text-anchor="middle">→ 路由 / 依赖 / 接口</text>
+<text x="398.0" y="442.0" font-size="10.4" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#64748b" font-weight="400" text-anchor="middle">业务与鉴权都在这一层之后</text>
+<text x="398.0" y="462.0" font-size="10.4" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#dc2626" font-weight="400" text-anchor="middle">（鉴权不在中间件里做）</text>
+<line x1="92.0" y1="168.0" x2="92.0" y2="700.0" stroke="#1d4ed8" stroke-width="2.2" marker-end="url(#arrow-blue)"/>
+<text x="80.0" y="200.0" font-size="13" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#1d4ed8" font-weight="700" text-anchor="end">请求</text>
+<text x="80.0" y="220.0" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#1d4ed8" font-weight="400" text-anchor="end">外 → 内</text>
+<line x1="704.0" y1="700.0" x2="704.0" y2="168.0" stroke="#047857" stroke-width="2.2" marker-end="url(#arrow-green)"/>
+<text x="716.0" y="640.0" font-size="13" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#047857" font-weight="700" text-anchor="start">响应</text>
+<text x="716.0" y="660.0" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#047857" font-weight="400" text-anchor="start">内 → 外</text>
+<rect x="760.0" y="96.0" width="440.0" height="250.0" rx="10" ry="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.4"/>
+<text x="778.0" y="122.0" font-size="13" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#0f172a" font-weight="700" text-anchor="start">注册顺序（代码书写顺序）</text>
+<text x="778.0" y="148.0" font-size="10.6" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', 'Courier New', monospace" fill="#475569" font-weight="400" text-anchor="start">add_middleware(RateLimitMiddleware, 300, 60)</text>
+<text x="778.0" y="169.0" font-size="10.6" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', 'Courier New', monospace" fill="#475569" font-weight="400" text-anchor="start">add_middleware(SecurityHeadersMiddleware)</text>
+<text x="778.0" y="190.0" font-size="10.6" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', 'Courier New', monospace" fill="#475569" font-weight="400" text-anchor="start">add_middleware(AccessLogMiddleware)</text>
+<text x="778.0" y="211.0" font-size="10.6" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', 'Courier New', monospace" fill="#475569" font-weight="400" text-anchor="start">add_middleware(CORSMiddleware, …)</text>
+<text x="778.0" y="232.0" font-size="10.6" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', 'Courier New', monospace" fill="#475569" font-weight="400" text-anchor="start">add_middleware(TraceIdMiddleware)   ← 最后注册</text>
+<line x1="778.0" y1="262.0" x2="778.0" y2="282.0" stroke="#64748b" stroke-width="1.8" marker-end="url(#arrow)"/>
+<text x="788.0" y="278.0" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#dc2626" font-weight="400" text-anchor="start">Starlette 把「后注册」放在最外层 → 执行顺序整体反转</text>
+<text x="778.0" y="306.0" font-size="10.6" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#047857" font-weight="700" text-anchor="start">执行：TraceId → CORS → AccessLog → SecurityHeaders → RateLimit → 路由</text>
+<rect x="760.0" y="360.0" width="440.0" height="320.0" rx="10" ry="10" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="1.2"/>
+<text x="778.0" y="386.0" font-size="13" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#0f172a" font-weight="700" text-anchor="start">为什么是这一个顺序</text>
+<text x="778.0" y="414.0" font-size="12" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#1d4ed8" font-weight="700" text-anchor="start">•</text>
+<text x="792.0" y="414.0" font-size="11.6" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#1e293b" font-weight="700" text-anchor="start">TraceId 最外层</text>
+<text x="910.0" y="414.0" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#475569" font-weight="400" text-anchor="start">CORS 预检、限流拒绝、404/401 的日志也带 trace_id</text>
+<text x="778.0" y="442.0" font-size="12" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#1d4ed8" font-weight="700" text-anchor="start">•</text>
+<text x="792.0" y="442.0" font-size="11.6" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#1e293b" font-weight="700" text-anchor="start">CORS 次外层</text>
+<text x="910.0" y="442.0" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#475569" font-weight="400" text-anchor="start">预检 OPTIONS 直接返回，不进入鉴权与业务</text>
+<text x="778.0" y="470.0" font-size="12" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#1d4ed8" font-weight="700" text-anchor="start">•</text>
+<text x="792.0" y="470.0" font-size="11.6" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#1e293b" font-weight="700" text-anchor="start">AccessLog 居中</text>
+<text x="910.0" y="470.0" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#475569" font-weight="400" text-anchor="start">记录最终状态码与耗时，回写耗时响应头</text>
+<text x="778.0" y="498.0" font-size="12" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#1d4ed8" font-weight="700" text-anchor="start">•</text>
+<text x="792.0" y="498.0" font-size="11.6" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#1e293b" font-weight="700" text-anchor="start">SecurityHeaders 靠内</text>
+<text x="910.0" y="498.0" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#475569" font-weight="400" text-anchor="start">所有经过业务的响应都带安全头（含 4xx）</text>
+<text x="778.0" y="526.0" font-size="12" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#1d4ed8" font-weight="700" text-anchor="start">•</text>
+<text x="792.0" y="526.0" font-size="11.6" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#1e293b" font-weight="700" text-anchor="start">RateLimit 最内</text>
+<text x="910.0" y="526.0" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#475569" font-weight="400" text-anchor="start">在鉴权查库之前拦住刷接口，降低数据库压力</text>
+<text x="778.0" y="558.0" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#dc2626" font-weight="400" text-anchor="start">鉴权不放中间件：需要查库 + 依赖缓存 + 按接口声明权限，</text>
+<text x="778.0" y="578.0" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#dc2626" font-weight="400" text-anchor="start">放在 core/dependencies.py 更精确（见 图 4）。</text>
+<rect x="40.0" y="726.0" width="1160.0" height="330.0" rx="10" ry="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.4"/>
+<text x="60.0" y="754.0" font-size="14" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#0f172a" font-weight="700" text-anchor="start">逐层职责与关键实现</text>
+<text x="60.0" y="782.0" font-size="11.6" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#64748b" font-weight="700" text-anchor="start">中间件</text>
+<text x="240.0" y="782.0" font-size="11.6" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#64748b" font-weight="700" text-anchor="start">职责</text>
+<text x="600.0" y="782.0" font-size="11.6" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#64748b" font-weight="700" text-anchor="start">关键实现 / 注意点</text>
+<text x="1010.0" y="782.0" font-size="11.6" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#64748b" font-weight="700" text-anchor="start">失败时</text>
+<path d="M 60 792 L 1180 792" fill="none" stroke="#e2e8f0" stroke-width="1.2"/>
+<rect x="52.0" y="802.0" width="1136.0" height="40.0" rx="6" ry="6" fill="#f8fafc" stroke="none" stroke-width="1.4"/>
+<text x="60.0" y="824.0" font-size="11.2" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', 'Courier New', monospace" fill="#0f172a" font-weight="700" text-anchor="start">TraceIdMiddleware</text>
+<text x="240.0" y="824.0" font-size="11.2" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#1e293b" font-weight="400" text-anchor="start">生成 / 复用请求链路 ID</text>
+<text x="600.0" y="824.0" font-size="10.8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#475569" font-weight="400" text-anchor="start">优先复用 X-Trace-Id；写 contextvar，finally reset；回写响应头</text>
+<text x="1010.0" y="824.0" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#94a3b8" font-weight="400" text-anchor="start">—</text>
+<rect x="52.0" y="844.0" width="1136.0" height="40.0" rx="6" ry="6" fill="#ffffff" stroke="none" stroke-width="1.4"/>
+<text x="60.0" y="866.0" font-size="11.2" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', 'Courier New', monospace" fill="#0f172a" font-weight="700" text-anchor="start">CORSMiddleware</text>
+<text x="240.0" y="866.0" font-size="11.2" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#1e293b" font-weight="400" text-anchor="start">跨域与预检</text>
+<text x="600.0" y="866.0" font-size="10.8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#475569" font-weight="400" text-anchor="start">来源读 settings.cors_origin_list；暴露 trace / 耗时响应头</text>
+<text x="1010.0" y="866.0" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#dc2626" font-weight="400" text-anchor="start">预检失败</text>
+<rect x="52.0" y="886.0" width="1136.0" height="40.0" rx="6" ry="6" fill="#f8fafc" stroke="none" stroke-width="1.4"/>
+<text x="60.0" y="908.0" font-size="11.2" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', 'Courier New', monospace" fill="#0f172a" font-weight="700" text-anchor="start">AccessLogMiddleware</text>
+<text x="240.0" y="908.0" font-size="11.2" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#1e293b" font-weight="400" text-anchor="start">访问日志 + 耗时</text>
+<text x="600.0" y="908.0" font-size="10.8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#475569" font-weight="400" text-anchor="start">method/path/status/耗时/IP；≥1s 记 warning；回写耗时头</text>
+<text x="1010.0" y="908.0" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#dc2626" font-weight="400" text-anchor="start">异常时 status 记 500</text>
+<rect x="52.0" y="928.0" width="1136.0" height="40.0" rx="6" ry="6" fill="#ffffff" stroke="none" stroke-width="1.4"/>
+<text x="60.0" y="950.0" font-size="11.2" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', 'Courier New', monospace" fill="#0f172a" font-weight="700" text-anchor="start">SecurityHeadersMiddleware</text>
+<text x="240.0" y="950.0" font-size="11.2" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#1e293b" font-weight="400" text-anchor="start">安全响应头</text>
+<text x="600.0" y="950.0" font-size="10.8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#475569" font-weight="400" text-anchor="start">nosniff / SAMEORIGIN / Referrer-Policy；setdefault 不覆盖</text>
+<text x="1010.0" y="950.0" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#94a3b8" font-weight="400" text-anchor="start">—</text>
+<rect x="52.0" y="970.0" width="1136.0" height="40.0" rx="6" ry="6" fill="#f8fafc" stroke="none" stroke-width="1.4"/>
+<text x="60.0" y="992.0" font-size="11.2" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', 'Courier New', monospace" fill="#0f172a" font-weight="700" text-anchor="start">RateLimitMiddleware</text>
+<text x="240.0" y="992.0" font-size="11.2" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#1e293b" font-weight="400" text-anchor="start">进程内限流（滑动窗口）</text>
+<text x="600.0" y="992.0" font-size="10.8" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#475569" font-weight="400" text-anchor="start">300 次/60s/IP；OPTIONS 与 /health、/docs 豁免；返回 429</text>
+<text x="1010.0" y="992.0" font-size="11" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#dc2626" font-weight="400" text-anchor="start">429</text>
+<text x="60.0" y="1042.0" font-size="10.6" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif" fill="#dc2626" font-weight="400" text-anchor="start">已知边界：未捕获的 Exception 由更外层的 ServerErrorMiddleware 兜底，该 500 响应不会带 X-Trace-Id / X-Process-Time-Ms；业务异常（BusinessException）在内层被处理，响应头齐全。</text>
+</svg>

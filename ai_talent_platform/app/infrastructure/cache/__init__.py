@@ -1,6 +1,8 @@
 """
 模块：app/infrastructure/cache/__init__.py
 职责：缓存基础设施出口。
+
+标签：[架构组] [P1]（缓存出口）
 """
 
 from app.infrastructure.cache.redis import (

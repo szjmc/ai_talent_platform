@@ -2,6 +2,8 @@
 模块：app/models/__init__.py
 职责：ORM 模型注册中心。
 
+标签：[架构组] [P0]（模型注册中心：create_all / Alembic 依赖全部模型被导入）
+
 实现思路：
 1. 统一在此导出 Base 及所有业务模型，保证 `Base.metadata` 包含全部表；
 2. create_all / Alembic autogenerate 依赖「所有模型模块被 import 一次」，

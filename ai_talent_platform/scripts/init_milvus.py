@@ -1,5 +1,7 @@
 """初始化 Milvus 向量集合（架构组 + RAG 组共用，可重复执行）。
 
+标签：[架构组]+[RAG组] [P1]（4 个向量集合定义与幂等创建）
+
 用法：
     python scripts/init_milvus.py                 # 连接并创建/校验 4 个集合
     python scripts/init_milvus.py --plan          # 只打印集合设计，不连接 Milvus

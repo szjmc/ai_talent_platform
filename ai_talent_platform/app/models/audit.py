@@ -2,6 +2,8 @@
 模块：app/models/audit.py
 职责：操作审计日志表（安全合规必需）。
 
+标签：[架构组] [P1]（审计日志表）
+
 ============================ 实现思路与代码要点 ============================
 表设计：audit_logs
 - user_id、username、action(create/update/delete/login/export/ai_call)、

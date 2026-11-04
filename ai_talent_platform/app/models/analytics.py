@@ -1,5 +1,7 @@
 """PgSQL 分析库 ORM 模型。
 
+标签：[Vanna组] [P1]（PgSQL 6 张分析表 ORM，ETL 与问数依赖；独立 AnalyticsBase）
+
 与 MySQL 业务模型使用不同的 DeclarativeBase / MetaData：
 - MySQL `Base.metadata.create_all()` 不会误建分析表；
 - PgSQL 初始化脚本只创建本文件中的 6 张分析表；

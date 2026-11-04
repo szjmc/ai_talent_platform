@@ -2,6 +2,8 @@
 模块：app/core/exceptions.py
 职责：定义全平台业务异常体系。
 
+标签：[架构组] [P0]（业务异常体系与错误码契约，被所有组依赖）
+
 设计思路：
 1. 所有可预期错误都抛 BusinessException 子类，由 exception_handlers 统一转换为标准响应；
 2. 每个异常携带 code（业务码）、message（提示语）、data（附加信息）三个要素；

@@ -2,6 +2,8 @@
 模块：app/repositories/assessment_repository.py
 职责：测评数据访问层。
 
+标签：[Vanna组] [P1]（答题 / 结果聚合）
+
 ============================ 实现思路与代码要点 ============================
 本仓库继承 BaseRepository，只需声明：
     model = <Model>

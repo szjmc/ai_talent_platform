@@ -2,6 +2,8 @@
 模块：app/models/knowledge.py
 职责：知识库文档元数据 + 切片元数据（向量本体存 Milvus）。
 
+标签：[RAG组] [P0]（knowledge_docs / knowledge_chunks 表，被 knowledge_repository 依赖）
+
 ============================ 实现思路与代码要点 ============================
 表设计：
 1. knowledge_docs

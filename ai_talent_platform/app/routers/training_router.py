@@ -2,6 +2,8 @@
 模块：app/routers/training_router.py
 职责：培训管理接口层（培训管理）。
 
+标签：[Dify组] [P1]（当前 501 占位）
+
 ============================ 实现思路与代码要点 ============================
 统一写法：
     router = APIRouter(prefix="/trainings", tags=["培训管理"], responses=COMMON_ERROR_RESPONSES)

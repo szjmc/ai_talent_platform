@@ -2,6 +2,8 @@
 模块：app/models/base.py
 职责：ORM Base 与所有业务表通用的 Mixin。
 
+标签：[架构组] [P0]（ORM Base + 通用 Mixin，全部模型的地基）
+
 实现思路：
 1. DeclarativeBase 子类 Base，统一 metadata 命名规范（索引/约束名可预测，便于 Alembic 迁移）；
 2. 通用 Mixin：

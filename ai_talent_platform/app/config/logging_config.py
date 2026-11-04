@@ -2,6 +2,8 @@
 模块：app/config/logging_config.py
 职责：统一日志规范（控制台 + 滚动文件 + 请求链路 trace_id）。
 
+标签：[架构组] [P1]（统一格式 + trace_id + 滚动文件）
+
 实现思路：
 1. 使用标准库 logging，定义统一格式：时间 | 级别 | trace_id | 模块 | 消息；
 2. trace_id 由 TraceIdFilter 从 contextvars 注入，缺失时填 "-"，保证日志可串联一次请求；

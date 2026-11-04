@@ -2,6 +2,8 @@
 模块：app/core/middleware.py
 职责：全局中间件（请求追踪、访问日志、耗时统计、跨域、安全响应头、限流）。
 
+标签：[架构组] [P1]（trace_id / 访问日志 / 限流 / 安全响应头）
+
 实现思路：
 1. TraceIdMiddleware：为每个请求生成 trace_id（优先复用请求头 X-Trace-Id），
    写入 contextvar 供日志使用，并回写到响应头；

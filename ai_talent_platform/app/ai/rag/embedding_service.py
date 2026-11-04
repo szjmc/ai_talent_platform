@@ -2,6 +2,8 @@
 模块：app/ai/rag/embedding_service.py
 职责：文本向量化（批量、缓存、维度对齐）。
 
+标签：[RAG组] [P0]  依赖：[架构组] BaseLLM.embed（文本向量化 + Redis 缓存可降级）
+
 ============================ 实现思路与代码要点 ============================
 1. 通过 llm_manager.embed(texts) 调用向量模型（qwen text-embedding-v3 等）；
 2. 批量处理：每批 25-100 条（API 限制），失败重试；

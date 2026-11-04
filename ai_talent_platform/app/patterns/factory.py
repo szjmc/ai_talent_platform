@@ -2,6 +2,8 @@
 模块：app/patterns/factory.py
 职责：工厂模式基础设施。
 
+标签：[架构组] [P2]（基于 Registry 的通用工厂，可选）
+
 典型场景：
 - LLM 工厂：根据 settings.LLM_PROVIDER 创建 qwen / openai / ollama 适配器
 - Agent 工厂：根据 agent_type 创建对应 Agent

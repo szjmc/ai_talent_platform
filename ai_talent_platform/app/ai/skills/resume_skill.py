@@ -2,7 +2,7 @@
 模块：app/ai/skills/resume_skill.py
 职责：简历处理技能（解析 / 技能抽取 / 查重），供 Agent 调用。
 
-标签：[架构组] [P0]  依赖：[业务组] [P0] ResumeService；[RAG组] [P1] 向量查重
+标签：[架构组] [P0]  依赖：[RAG组] [P0] ResumeService + talent_vectors
 
 ============================ 实现思路与代码要点 ============================
 技能方法：
@@ -17,7 +17,7 @@
 已完成：
     - [x] 三个技能 + JSON Schema 工具描述 + 词典版技能抽取（无 LLM 依赖）
 待实现（依赖方）：
-    - [ ] ResumeService.parse_resume / 简历向量查重（业务组 + RAG 组）
+    - [ ] ResumeService.parse_resume / 简历向量查重（RAG 组）
 =========================================================================
 """
 
@@ -178,11 +178,11 @@ class ResumeParseSkill(BaseSkill):
         service_cls = import_dependency(
             "app.services.resume_service",
             "ResumeService",
-            hint="业务组未实现简历解析服务",
+            hint="RAG 组未实现简历解析服务",
         )
         service = service_cls()
         method = getattr(service, "parse_resume", None) or getattr(service, "parse", None)
-        require_dependency(method is not None, "ResumeService.parse_resume", hint="业务组未实现简历解析")
+        require_dependency(method is not None, "ResumeService.parse_resume", hint="RAG 组未实现简历解析")
 
         result = method(file_id=file_id, resume_id=resume_id, context=context)
         if hasattr(result, "__await__"):
@@ -290,14 +290,14 @@ class ResumeDedupeSkill(BaseSkill):
         service_cls = import_dependency(
             "app.services.resume_service",
             "ResumeService",
-            hint="业务组未实现简历查重（依赖 Milvus talent_vectors）",
+            hint="RAG 组未实现简历查重（依赖 Milvus talent_vectors）",
         )
         service = service_cls()
         method = getattr(service, "dedupe_resume", None) or getattr(service, "dedupe", None)
         require_dependency(
             method is not None,
             "ResumeService.dedupe_resume",
-            hint="RAG 组未就绪 talent_vectors 集合，或业务组未实现查重",
+            hint="RAG 组未就绪 talent_vectors 集合或未实现 ResumeService.dedupe_resume",
         )
         result = method(resume_id=resume_id, text=text, threshold=threshold, context=context)
         if hasattr(result, "__await__"):

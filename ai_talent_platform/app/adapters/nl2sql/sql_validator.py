@@ -2,6 +2,8 @@
 模块：app/adapters/nl2sql/sql_validator.py
 职责：SQL 安全校验（NL2SQL 生成的 SQL 必须先过这里再执行）。
 
+标签：[Vanna组] [P0]（安全红线：仅 SELECT / 表白名单 / 强制 LIMIT；被 [架构组] sql_query 技能依赖）
+
 ============================ 实现思路与代码要点 ============================
 校验规则（缺一不可）：
 1. 只允许单条 SELECT（拒绝 INSERT/UPDATE/DELETE/DROP/ALTER/TRUNCATE/CREATE/GRANT 等）；

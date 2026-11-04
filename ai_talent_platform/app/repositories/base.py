@@ -2,6 +2,8 @@
 模块：app/repositories/base.py
 职责：Repository 通用 CRUD 基类（全平台数据访问的唯一底座）。
 
+标签：[架构组] [P0]（BaseRepository 通用 CRUD，全平台数据访问唯一底座）
+
 设计原则：
 1. Repository 只负责「数据库怎么读写」，不做业务判断（业务在 Service）；
 2. 所有方法接收 `db: AsyncSession` 作为第一个参数（由 Service 从依赖注入传入），

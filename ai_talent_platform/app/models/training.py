@@ -2,6 +2,8 @@
 模块：app/models/training.py
 职责：课程、培训计划、计划-课程关联、学习记录。
 
+标签：[Dify组] [P1]（培训表：课程 / 计划 / 进度）
+
 ============================ 实现思路与代码要点 ============================
 表设计：
 1. courses         课程：title、category、level、duration_hours、resource_url、

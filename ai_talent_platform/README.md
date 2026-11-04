@@ -57,14 +57,20 @@ python main.py                # http://127.0.0.1:8000/docs
 
 | 文档 | 内容 |
 | --- | --- |
+| **[docs/group_boundaries_and_tasks.md](docs/group_boundaries_and_tasks.md)** | **★防重复开发必读总纲**：十条防重复铁律、已落地冻结资产表、九大跨组重叠区切分裁定、四库读写权限矩阵、**5 大研发组逐文件详细代码开发说明书（业务模块全部垂直归口各组）** |
+| **[docs/requirements_specification.md](docs/requirements_specification.md)** | **★需求规格说明书（SRS）**：角色与权限、五大 AI 能力量化指标、15 大业务模块功能规格、非功能指标、**需求—研发组唯一归属追踪矩阵（RTM）** |
+| **[docs/system_design_document.md](docs/system_design_document.md)** | **★系统总体与详细设计文档（SDD）**：六层单向依赖架构、四库与 Redis 键空间设计、5 条端到端业务与 AI 调用时序、Skill↔Service 桥接与安全降级设计 |
+| **[docs/数据链路与鉴权实现手册.md](docs/数据链路与鉴权实现手册.md)** | **实现视角全链路**：一次请求的 13 步数据链路、中间件注册/执行顺序、登录与 JWT、RBAC 与数据范围、会话与事务边界、公共组件用法，配 7 张内联 SVG 流程图（另有[单页版 HTML](docs/数据链路与鉴权流程图.html)） |
 | [docs/公共层使用手册.md](docs/公共层使用手册.md) | **必读**：响应/异常/数据库/Repository/认证权限/新增模块全流程/FAQ |
 | [docs/architecture.md](docs/architecture.md) | 六层架构图（**内联 SVG，离线可打开**）、依赖规则、调用链路 |
-| [docs/development.md](docs/development.md) | 开发规范与协作分工 |
+| [docs/development.md](docs/development.md) | 开发规范与五大组协作约定 |
 | [docs/api_document.md](docs/api_document.md) | **接口契约（全模块）**：统一响应/错误码/JWT/RBAC 权限矩阵 + 15 个模块的 method/path/权限/请求字段/示例/错误码 |
-| [docs/team_sprint_plan.md](docs/team_sprint_plan.md) | **AI 能力层分工索引**：5 组职责、里程碑、跨组契约、验收清单、站会节奏 |
-| [docs/plan/](docs/plan/) 各组独立计划 | [架构组](docs/plan/00-架构组.md) ｜ [1 组 RAG](docs/plan/01-RAG组.md) ｜ [2 组 Agent](docs/plan/02-Agent组.md) ｜ [3 组 Vanna](docs/plan/03-Vanna组.md) ｜ [4 组 Dify](docs/plan/04-Dify组.md)：每组人员分工 + D1–D20 每日任务 + 代码清单 |
-| [docs/team_code_spec.md](docs/team_code_spec.md) | **分组代码规范**：每个文件的方法签名、返回结构、代码骨架、验收命令、文件所有权表 |
 | [docs/database_design.md](docs/database_design.md) | **数据库设计（完整明确）**：内联 SVG ER 图 + 25 张表字段字典 + 可直接执行的 MySQL 8 DDL + PgSQL/Milvus/Redis 设计 |
+| [docs/orm_mapping.md](docs/orm_mapping.md) | **全局 ORM 映射字典**：MySQL 25 张表 + PgSQL 6 张表自动导出清单 |
+| [docs/已实现功能清单.md](docs/已实现功能清单.md) | 平台当前实际已落地能力与待开发骨架逐项对照清单 |
+| [docs/team_sprint_plan.md](docs/team_sprint_plan.md) | **5 组协同开发总计划**：职责划分、里程碑、跨组契约、验收清单、站会节奏 |
+| [docs/plan/](docs/plan/) 各组独立计划 | [00 架构组](docs/plan/00-架构组.md) ｜ [01 RAG 组](docs/plan/01-RAG组.md) ｜ [02 Agent 组](docs/plan/02-Agent组.md) ｜ [03 Vanna 组](docs/plan/03-Vanna组.md) ｜ [04 Dify 组](docs/plan/04-Dify组.md) ｜ [05 代码标签总表](docs/plan/05-代码标签与优先级总表.md) |
+| [docs/team_code_spec.md](docs/team_code_spec.md) | **分组代码实现规范**：每个文件的方法签名、返回结构、代码骨架、验收命令、文件唯一所有权表 |
 
 ---
 
@@ -105,7 +111,7 @@ config    → 配置：settings / logging / prompt
 | 组织 | `GET /api/v1/organizations/tree` `GET/POST /api/v1/organizations` `GET/PUT/DELETE /{id}` `PATCH /{id}/move` |
 | 系统 | `GET /api/v1/system/info` |
 
-其余模块当前为占位路由（返回 501 + 负责人提示），实现后替换 `app/routers/router.py` 中的 include 即可。
+其余 11 个模块当前为占位路由（返回 501 + 主责研发组提示，见 `data.owner`），实现后替换 `app/routers/router.py` 中的 include 即可。
 
 ## 目录速览
 

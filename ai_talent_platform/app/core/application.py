@@ -2,6 +2,8 @@
 模块：app/core/application.py
 职责：FastAPI 应用工厂（把公共能力组装成一个可运行的应用）。
 
+标签：[架构组] [P0]（应用工厂：中间件 / 异常 / 路由装配）
+
 实现思路（组装顺序很重要）：
 1. 创建 FastAPI 实例：标题、版本、描述、doc/openapi 地址、lifespan；
 2. 配置 Swagger 的 Bearer 鉴权按钮（Authorize 后可直接调试需登录接口）；

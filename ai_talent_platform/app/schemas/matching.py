@@ -2,6 +2,8 @@
 模块：app/schemas/matching.py
 职责：人岗匹配相关请求 / 响应结构。
 
+标签：[Agent组] [P1]
+
 ============================ 实现思路与代码要点 ============================
 需要定义的 Schema：
 1. MatchRequest        position_id、talent_ids(可空，空则全库检索)、top_k、

@@ -2,6 +2,8 @@
 模块：app/models/position.py
 职责：岗位表 + 岗位能力要求（多版本）。
 
+标签：[Agent组] [P0]（岗位表，被 position_repository / position_search 技能依赖）
+
 ============================ 实现思路与代码要点 ============================
 表设计：
 1. positions（岗位）

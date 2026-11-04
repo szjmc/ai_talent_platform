@@ -2,6 +2,8 @@
 模块：app/core/permissions.py
 职责：RBAC 权限模型与校验工具。
 
+标签：[架构组] [P0]（RBAC + 数据范围，安全红线）
+
 实现思路：
 1. 系统内置角色枚举 RoleEnum；每个角色映射一组权限码 PermissionEnum（字符串常量）；
 2. 权限码命名规范：`模块:动作`，如 talent:create、position:read、analytics:export；
@@ -71,6 +73,10 @@ class PermissionEnum(StrEnum):
     ANALYTICS_READ = "analytics:read"
     ANALYTICS_EXPORT = "analytics:export"
     AGENT_USE = "agent:use"
+    # 文件中心 / 全局审计（[架构组] 平台横向服务）
+    FILE_UPLOAD = "file:upload"
+    FILE_DELETE = "file:delete"
+    AUDIT_READ = "audit:read"
 
 
 class DataScopeEnum(StrEnum):
@@ -99,6 +105,8 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         PermissionEnum.KNOWLEDGE_READ, PermissionEnum.KNOWLEDGE_MANAGE,
         PermissionEnum.ANALYTICS_READ, PermissionEnum.ANALYTICS_EXPORT,
         PermissionEnum.AGENT_USE,
+        PermissionEnum.FILE_UPLOAD, PermissionEnum.FILE_DELETE,
+        PermissionEnum.AUDIT_READ,
     },
     RoleEnum.HR: {
         PermissionEnum.USER_READ,
@@ -113,6 +121,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         PermissionEnum.KNOWLEDGE_READ,
         PermissionEnum.ANALYTICS_READ,
         PermissionEnum.AGENT_USE,
+        PermissionEnum.FILE_UPLOAD,
     },
     RoleEnum.MANAGER: {
         PermissionEnum.USER_READ,

@@ -2,6 +2,8 @@
 模块：app/models/mapping.py
 职责：全局 ORM 映射关系（ORM 类 <-> 表 <-> 字段 <-> 关系）的统一出口。
 
+标签：[架构组] [P1]（全局 ORM 映射统一出口，只读元数据）
+
 实现思路：
 1. 直接从 SQLAlchemy registry（Base.registry / AnalyticsBase.registry）读取映射，
    不手工维护清单，保证「新增模型即自动出现在映射里」，不会出现文档与代码不同步；

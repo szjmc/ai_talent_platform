@@ -1,4 +1,7 @@
-"""PgSQL 分析库结构测试：不依赖真实数据库服务。"""
+"""PgSQL 分析库结构测试：不依赖真实数据库服务。
+
+标签：[架构组]+[Vanna组] [P1]（分析库结构验收，离线）
+"""
 
 from __future__ import annotations
 

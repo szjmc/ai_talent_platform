@@ -2,6 +2,8 @@
 模块：app/schemas/knowledge.py
 职责：知识库相关请求 / 响应结构。
 
+标签：[RAG组] [P1]（文档 / 切片 / 检索响应结构，被 knowledge_router 依赖）
+
 ============================ 实现思路与代码要点 ============================
 需要定义的 Schema：
 1. KnowledgeDocCreate    title、category、permission_scope(public/dept/role)、

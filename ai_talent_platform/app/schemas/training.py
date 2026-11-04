@@ -2,6 +2,8 @@
 模块：app/schemas/training.py
 职责：培训管理相关请求 / 响应结构。
 
+标签：[Dify组] [P1]
+
 ============================ 实现思路与代码要点 ============================
 需要定义的 Schema：
 1. CourseCreate / CourseUpdate   title、category、cover、description、duration_hours、

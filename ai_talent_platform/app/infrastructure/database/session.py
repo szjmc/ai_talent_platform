@@ -2,6 +2,8 @@
 模块：app/infrastructure/database/session.py
 职责：MySQL AsyncSession 生命周期管理（业务写操作唯一入口）。
 
+标签：[架构组] [P0]（AsyncSession / 事务边界，被全部 Repository 依赖）
+
 实现思路：
 1. 引擎与 Session 工厂在模块内惰性单例，首次使用时创建；
 2. get_db()：FastAPI 依赖，按请求创建 Session，请求结束自动提交 / 回滚 / 关闭；

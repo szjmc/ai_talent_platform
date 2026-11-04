@@ -2,6 +2,8 @@
 模块：app/routers/position_router.py
 职责：岗位管理接口层（岗位管理）。
 
+标签：[Agent组] [P1]（当前 501 占位）
+
 ============================ 实现思路与代码要点 ============================
 统一写法：
     router = APIRouter(prefix="/positions", tags=["岗位管理"], responses=COMMON_ERROR_RESPONSES)

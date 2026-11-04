@@ -2,6 +2,8 @@
 模块：app/schemas/position.py
 职责：岗位管理相关请求 / 响应结构。
 
+标签：[Agent组] [P1]
+
 ============================ 实现思路与代码要点 ============================
 需要定义的 Schema：
 1. PositionCreate    title、code、organization_id、level(初/中/高/专家)、

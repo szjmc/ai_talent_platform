@@ -2,6 +2,8 @@
 模块：app/utils/helpers.py
 职责：零散通用小工具（避免落入各业务模块重复实现）。
 
+标签：[架构组] [P2]（零散小工具，避免重复实现）
+
 待补充清单：
     - [ ] camel_to_snake / snake_to_camel（前后端字段风格转换）
     - [ ] deep_merge(dict, dict)

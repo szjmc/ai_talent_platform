@@ -2,6 +2,8 @@
 模块：app/routers/assessment_router.py
 职责：人才测评接口层（人才测评）。
 
+标签：[Vanna组] [P1]（当前 501 占位）
+
 ============================ 实现思路与代码要点 ============================
 统一写法：
     router = APIRouter(prefix="/assessments", tags=["人才测评"], responses=COMMON_ERROR_RESPONSES)

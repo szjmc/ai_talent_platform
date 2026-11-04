@@ -2,6 +2,8 @@
 模块：app/schemas/organization.py
 职责：组织架构相关请求 / 响应结构。
 
+标签：[架构组] [P1]
+
 实现要点：
 - 树形响应使用递归模型，需要在文件末尾 model_rebuild()；
 - 移动部门时只允许指定 new_parent_id，level/path 由 Service 重算。

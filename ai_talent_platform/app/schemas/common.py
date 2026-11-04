@@ -2,6 +2,8 @@
 模块：app/schemas/common.py
 职责：通用数据结构（分页、ID、状态、排序、批量操作等）。
 
+标签：[架构组] [P1]（跨业务通用 Schema：分页 / ID / 排序 / 批量）
+
 实现思路：
 1. 这里只放「跨业务复用」的 Schema，具体业务 Schema 放各自文件；
 2. 所有 Schema 统一 model_config = ConfigDict(from_attributes=True, populate_by_name=True)，

@@ -1,5 +1,7 @@
 """PgSQL 分析库建库、建表、结构检查。
 
+标签：[Vanna组] [P1]（架构组已交付骨架：6 张分析表 + 默认分区，幂等建表 / 检查）
+
 只负责 DDL 初始化，不写入业务数据，也不执行 MySQL -> PgSQL 同步。
 脚本入口：scripts/init_pgsql.py；完整初始化 scripts/init_db.py 也会调用这里。
 """

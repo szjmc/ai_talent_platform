@@ -2,6 +2,8 @@
 模块：app/routers/knowledge_router.py
 职责：知识库接口层（知识库）。
 
+标签：[RAG组] [P1]  依赖：knowledge_service（文档管理 + /retrieve + /ask）
+
 ============================ 实现思路与代码要点 ============================
 统一写法：
     router = APIRouter(prefix="/knowledge", tags=["知识库"], responses=COMMON_ERROR_RESPONSES)

@@ -2,6 +2,8 @@
 模块：app/routers/user_router.py
 职责：用户管理接口（列表、详情、创建、更新、状态、角色、重置密码、删除）。
 
+标签：[架构组] [P1]（用户管理）
+
 实现思路：
 - 所有接口都需要登录 + 对应权限（require_permission）；
 - 分页接口使用 get_page_params 依赖，返回统一分页结构 PageResult；

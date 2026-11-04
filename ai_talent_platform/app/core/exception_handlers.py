@@ -2,6 +2,8 @@
 模块：app/core/exception_handlers.py
 职责：全局异常处理，把各类异常统一转换为 ApiResponse 结构。
 
+标签：[架构组] [P0]（统一错误响应契约）
+
 处理矩阵：
     BusinessException          -> 使用异常自带的 code / status_code / message
     RequestValidationError     -> 422，把 Pydantic 校验错误整理成可读字段列表

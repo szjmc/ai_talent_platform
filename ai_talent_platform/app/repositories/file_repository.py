@@ -2,6 +2,8 @@
 模块：app/repositories/file_repository.py
 职责：文件数据访问层。
 
+标签：[架构组] [P1]（文件元数据）
+
 ============================ 实现思路与代码要点 ============================
 本仓库继承 BaseRepository，只需声明：
     model = <Model>

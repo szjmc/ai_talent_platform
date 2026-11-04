@@ -2,6 +2,8 @@
 模块：app/schemas/user.py
 职责：用户管理相关请求 / 响应结构。
 
+标签：[架构组] [P1]
+
 实现要点：
 - 响应模型不包含 password_hash；
 - 管理员创建用户可直接指定角色；普通注册走 auth 接口（默认 employee）；

@@ -2,6 +2,8 @@
 模块：tests/test_database_health.py
 职责：数据库健康检查的单元测试（不依赖真实 MySQL / PgSQL 服务）。
 
+标签：[架构组] [P1]
+
 覆盖点：
 1. 端口不通时，健康检查返回 down + connection_refused + 中文修复建议，且不抛异常；
 2. MySQL 不可用时 /health/ready 返回 503，且响应体包含可读原因；

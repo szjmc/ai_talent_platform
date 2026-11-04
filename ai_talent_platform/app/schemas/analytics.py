@@ -2,6 +2,8 @@
 模块：app/schemas/analytics.py
 职责：数据分析 / NL2SQL 相关请求 / 响应结构。
 
+标签：[Vanna组] [P1]（NL2SQLResponse / 图表配置结构，被 analytics_router 依赖）
+
 ============================ 实现思路与代码要点 ============================
 需要定义的 Schema：
 1. DashboardOverview     total_talents、active_positions、match_rate、training_completion、

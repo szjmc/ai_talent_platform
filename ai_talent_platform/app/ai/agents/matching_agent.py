@@ -2,6 +2,8 @@
 模块：app/ai/agents/matching_agent.py
 职责：人岗匹配 Agent。
 
+标签：[Agent组] [P1]  依赖：[架构组] BaseAgent + matching_score 技能（人岗匹配解释）
+
 ============================ 实现思路与代码要点 ============================
 执行流程：
 

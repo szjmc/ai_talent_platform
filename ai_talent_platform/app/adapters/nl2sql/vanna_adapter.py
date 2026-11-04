@@ -2,6 +2,8 @@
 模块：app/adapters/nl2sql/vanna_adapter.py
 职责：Vanna.ai 适配（自然语言 -> SQL -> 数据 -> 图表配置）。
 
+标签：[Vanna组] [P0]  依赖：SQLValidator + PgSQL 只读连接（ask -> SQL -> 只读执行 -> 图表）
+
 ============================ 实现思路与代码要点 ============================
 流程：
     用户问题
