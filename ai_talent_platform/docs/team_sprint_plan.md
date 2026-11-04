@@ -1,9 +1,9 @@
-# AI 能力层分组开发计划（按天任务 + 每组代码清单）
+# AI 能力层与业务层分组开发总计划（5 组协同 + 跨组契约）
 
-> 版本：**v1.0.0** ｜ 制定依据：本仓库现有骨架（`app/ai/**`、`app/adapters/**` 全部为 TODO 桩）+ 架构组 5 个方向的分工
-> 适用范围：RAG 组、Agent 组、Skills 组（架构组）、Vanna 组、Dify 组
-> 配套文档：[分组代码实现规范](team_code_spec.md)（每组每个文件的方法签名、返回结构、验收命令）
-> 本文是**索引 + 跨组约定**；每组的详细计划（人员 / D1–D20 每日任务 / 代码清单）已拆分到 `docs/plan/`。
+> 版本：**v3.0.0（5 组垂直闭环版）** ｜ 制定依据：本仓库当前真实基线（公共层、25+6 表 ORM、架构组 AI 底座与 8 大 Skills 均已落地 ✅）+ 五大研发组严格边界划分
+> 适用范围：`[架构组]`、`[RAG组]`、`[Agent组]`、`[Vanna组]`、`[Dify组]`（**全平台严格划分为此 5 组，业务模块按领域垂直归口**）
+> **必读配套**：[五大研发组职责边界与防重复开发总规范](group_boundaries_and_tasks.md) ｜ [需求规格说明书](requirements_specification.md) ｜ [系统总体与详细设计文档](system_design_document.md) ｜ [分组代码实现规范](team_code_spec.md)
+> 本文是**跨组总索引与契约约定**；每组的详细计划（人员 / D1–D20 每日任务 / 逐文件开发清单 / 严禁重复红线）已拆分到 `docs/plan/`。
 
 ---
 
@@ -23,31 +23,32 @@
 
 ## 一、组织与既有资产
 
-### 1.1 分组
+### 1.1 五大研发组划分
 
-| 组别 | 方向 | 人力 | 说明 |
-| --- | --- | --- | --- |
-| 架构组 | 公共层 / 契约 / Skills 组件库 | 2 人 + 4 组长 | 已交付公共层（认证/用户/组织/异常/响应/Repository/健康检查）；后续负责 Skills 体系与跨组契约仲裁 |
-| 1 组 | RAG 检索增强生成（Milvus + LangChain） | 3 人 | 知识库索引、混合检索、引用式问答 |
-| 2 组 | AI Agent 多智能体（LangGraph） | 4 人 | 工作流引擎、6 个业务 Agent、会话与状态持久化 |
-| 3 组 | Vanna.ai NL2SQL 数据分析 | 4 人 | 训练数据、SQL 安全、图表推断、数据权限 |
-| 4 组 | Dify AI 应用中台 | 2 人 | 模型/Prompt/知识库运维统一封装、SSE 转发 |
+> **核心原则：只有 5 个研发组。** 原「岗位 / 人才 / 简历 / 匹配 / 测评 / 培训 / 文件 / 审计」8 个独立业务模块按领域相关性垂直归口到下列 5 个组，由归口组端到端闭环负责 `Model → Repository → Schema → Service → Router → AI 引擎`，杜绝「AI 组等待业务实现方」的跨组扯皮。
 
-### 1.2 已就绪（**不要重写，直接调用**）
+| 组别 | 标签 | 方向 | 人力 | 垂直归口的业务模块 | 当前状态与边界定位 |
+| --- | --- | --- | --- | --- | --- |
+| 架构组 | `[架构组]` | 公共层 / LLM 底座 / 8 大 Skills / 认证组织 / 集成仲裁 | 2 人 + 各组长 | `auth` `user` `role` `organization`（✅）+ `files` 文件中心 + `audit` 全局审计 | **124 个文件已实现冻结（120 个 ✅ + 4 个横向服务骨架 🔧）**；后续负责契约守护、`router.py`/`settings.py` 合入与防重复 Review |
+| 1 组 | `[RAG组]` | RAG 检索增强 + Milvus 四集合适配 + 文档加载切分 | 3 人 | `knowledge` 企业知识库 + `talents` 人才智能档案 + `resumes` 简历管理 | 🔧 独占向量库适配、Embedding 缓存、多格式文档加载与三大业务全链路 |
+| 2 组 | `[Agent组]` | LangGraph 工作流 + 6 个业务 Agent + 会话中心 | 4 人 | `agents` 智能体对话中心 + `positions` 岗位管理 + `matchings` 人岗精准匹配 | 🔧 独占 `graph_builder`、3 条工作流、6 个 `BaseAgent` 子类、`ConversationRepository` 与三大业务全链路 |
+| 3 组 | `[Vanna组]` | Vanna.ai NL2SQL + SQL 安全校验 + 宽表 ETL | 4 人 | `analytics` 数据决策看板 + `assessments` 在线人才智能测评 | 🔧 独占 `sql_validator`、`vanna_adapter`、MySQL→PgSQL 同步脚本与两大业务全链路 |
+| 4 组 | `[Dify组]` | Dify AI 应用中台适配与 SSE 转换 | 2 人 | `trainings` 个性化智能培训与低代码督办 | 🔧 独占 `adapters/dify/*`、同步脚本、`AgentService` 可选双模接入分支与培训督办全链路 |
 
-| 能力 | 位置 | 组外需知 |
+### 1.2 已就绪冻结资产（**严禁任何组重写，一律直接 `import` 调用！**）
+
+| 能力 | 位置 | 组外调用须知 |
 | --- | --- | --- |
-| 统一响应 `success()/api_response()` | `app/core/response.py` | 所有 Router 返回值 |
-| 业务异常体系（code 1001–5003） | `app/core/exceptions.py` | AI 组用 `AIError`(5002) / `ExternalServiceError`(5001) |
-| 权限依赖 `require_permission` | `app/core/dependencies.py` | Router 必须挂 |
-| 分页 `PageParams / build_page_result` | `app/core/pagination.py` | 列表接口 |
-| 注册表 `Registry / agent_registry / skill_registry / llm_registry` | `app/patterns/registry.py` | **三组共用，禁止另起注册表** |
-| 配置单例 `settings` | `app/config/settings.py` | 已有 `LLM_* / DIFY_* / MILVUS_* / REDIS_* / PGSQL_*`，新增配置只能加在这里 |
-| 提示词仓库 `PROMPT_VERSION` + 模板 | `app/config/prompt_config.py` | 提示词禁止写死在业务代码 |
-| 日志 `get_logger` + trace_id | `app/config/logging_config.py` | 禁止 `print` |
-| MySQL 会话 / PgSQL 会话 / 事务 | `app/infrastructure/database/` | `get_db` / `pg_session` / `transaction` |
-| 健康检查 `check_databases()` | `app/infrastructure/database/health.py` | AI 组启动自检 LLM/Milvus/Dify 时参考其返回结构 |
-| Repository 基类 + 13 个业务仓库 | `app/repositories/` | AI 层**禁止直接写 SQL**，只调 Service |
+| 统一响应 / 异常 / 分页 / 权限 | `app/core/{response,exceptions,pagination,dependencies,permissions}.py` | Router 必挂 `require_permission`，返回 `success()`，抛 `BusinessException` 子类 |
+| MySQL / PgSQL / Redis / 健康诊断 | `app/infrastructure/{database,cache}/` | `get_db` / `session_scope` / `pg_session` / `get_pg_session_factory` / `get_json` / `set_json` |
+| 全部 ORM 模型（MySQL 25 表 + PgSQL 6 表） | `app/models/*.py` | **已通过 SQL 约束验收，严禁新建重复 Model 或破坏字段** |
+| 通用 CRUD 基类 `BaseRepository` | `app/repositories/base.py` | 自带 17 个异步方法，子仓库只写业务特有查询 |
+| 注册表与匹配三策略 | `app/patterns/{registry,strategy}.py` | `agent_registry / skill_registry / llm_registry`；人岗匹配必须复用 `MatchStrategyFactory` |
+| AI 安全上下文 `AIContext` | `app/ai/context.py` | `set_context / get_context / context_scope`，全平台唯一 AI 身份权限来源 |
+| 大模型门面与配额 | `app/ai/{core,utils}/*` + `app/adapters/llm/*` | 统一调 `llm_manager.chat / stream / embed`；输出解析用 `parse_json`；重试用 `ai_retry` |
+| 8 大标准 Skills 组件 | `app/ai/skills/*` | 含离线可用的 `compute_match_score` 与 `extract_skills`，依赖业务/RAG/Vanna 实现后自动接通 |
+| Agent 基类、调度器、会话记忆与图状态 | `app/ai/{agent.py,agents/base_agent.py,memory/*}` | **Agent 组直接继承 `BaseAgent`、复用 `ConversationMemory` 与 `state_manager`，严禁重写！** |
+| 物理文件存储与异步事件总线 | `app/adapters/storage/*` + `app/infrastructure/messaging/event_bus.py` | 文件落盘统一调 `get_storage()`，异步审计统一走 `event_bus` |
 
 ### 1.3 本计划的三条硬约束
 
@@ -103,13 +104,15 @@ PGSQL_ENABLED=true             # 3 组 NL2SQL 只读分析库
 
 每个组一份独立文件，可直接发给对应组；组内的人、天、代码清单都在自己那份里。
 
-| 组别 | 独立文档 | 人力 | 负责方向 | 关键交付 |
+| 组别 | 独立文档 | 人力 | 负责方向与垂直业务模块 | 关键交付 |
 | --- | --- | --- | --- | --- |
-| 架构组 | [plan/00-架构组.md](plan/00-架构组.md) | 2 人 + 4 组长 | 契约 / LLM 适配 / Skills / 集成验收 | `AIContext`、`BaseLLM`、`BaseSkill`、`BaseAgent`、`dispatch` |
-| 1 组 | [plan/01-RAG组.md](plan/01-RAG组.md) | 3 人 | RAG 检索增强（Milvus + LangChain） | 文档加载/切片、混合检索、引用式问答 |
-| 2 组 | [plan/02-Agent组.md](plan/02-Agent组.md) | 4 人 | AI Agent 多智能体（LangGraph） | `graph_builder`、3 条工作流、6 个 Agent |
-| 3 组 | [plan/03-Vanna组.md](plan/03-Vanna组.md) | 4 人 | Vanna.ai NL2SQL | `sql_validator`、`vanna_adapter`、图表+解读 |
-| 4 组 | [plan/04-Dify组.md](plan/04-Dify组.md) | 2 人 | Dify AI 应用中台 | `dify_adapter`、SSE 解析、知识库同步 |
+| 架构组 | [plan/00-架构组.md](plan/00-架构组.md) | 2 人 + 组长 | ✅ 公共底座已交付冻结 + 认证/组织 + 文件/审计 | `AIContext`、`LLMManager`、8 大 `Skills`、`BaseAgent`、`dispatch`、`MatchStrategyFactory`、`AuthService`、`/files`、`/audit` |
+| 1 组 | [plan/01-RAG组.md](plan/01-RAG组.md) | 3 人 | RAG 检索增强 + Milvus 四集合网关 + 知识库/人才/简历 | `document_loader/splitter`、`MilvusAdapter`、`EmbeddingService`、`Retriever`、`/knowledge/*`、`/talents/*`、`/resumes/*` |
+| 2 组 | [plan/02-Agent组.md](plan/02-Agent组.md) | 4 人 | AI Agent 多智能体（LangGraph）+ 岗位/匹配 | `graph_builder`、3 条工作流、6 个 `BaseAgent` 子类、`ConversationRepository`、`/agents/*`、`/positions/*`、`/matchings/*` |
+| 3 组 | [plan/03-Vanna组.md](plan/03-Vanna组.md) | 4 人 | Vanna.ai NL2SQL + 宽表同步 ETL + 看板/测评 | `sql_validator`、`vanna_adapter`、`sync_analytics.py`、图表+解读、`/analytics/*`、`/assessments/*` |
+| 4 组 | [plan/04-Dify组.md](plan/04-Dify组.md) | 2 人 | Dify AI 应用中台适配 + 培训督办 | `dify_adapter`、`sse.py`、`health.py`、`sync_dify_workflows.py`、`/trainings/*` |
+
+> **15 大业务模块与 5 组的唯一归属**：`auth/user/role/organization/files/audit` → `[架构组]`；`knowledge/talents/resumes` → `[RAG组]`；`agents/positions/matchings` → `[Agent组]`；`analytics/assessments` → `[Vanna组]`；`trainings` → `[Dify组]`。逐文件方法级契约见 [五大研发组职责边界总规范](group_boundaries_and_tasks.md)。
 
 > 拆分原则：**组内可执行的内容放各组文件**（人员、D1–D20 每日任务、要写的代码）；
 > **跨组内容留在本文**（契约、里程碑、依赖顺序、统一验收、风险、站会节奏），避免同一份内容两处维护。
@@ -248,8 +251,8 @@ data: {"code": 5002, "message": "模型调用超时，请重试"}
 | Milvus 资源不足 | RAG 无法演示 | 降级为内存向量检索（`MILVUS_ENABLED=false` 时走 numpy 余弦） |
 | Vanna 准确率不达标 | NL2SQL 体验差 | 保留「LLM 直出 + 校验器」备用通路；扩大 few-shot |
 | LangGraph 版本 API 变动 | 工作流重写 | `graph_builder` 做薄封装，业务工作流不直接 import langgraph 内部 API |
-| Dify 与自建能力重叠 | 重复建设 | D1–D2 明确边界并签字（Dify 管 Prompt/低代码发布，自建管业务 Agent 与 RAG 精度） |
-| 5 组并行改同一文件 | 冲突频繁 | 文件级分工表 + 每日站会 + 跨组文件 PR 强制 review |
+| Dify 与自建能力重叠 | 重复建设 | D1–D2 明确边界并签字（Dify 管 Prompt/低代码发布，自建管业务 Agent 与 RAG 精度）；Dify 组仅归口 `trainings` 培训督办链路 |
+| 5 组并行改同一文件 | 冲突频繁 | 文件级分工表（`docs/plan/05-代码标签与优先级总表.md`）+ 每日站会 + 跨组文件 PR 强制 review |
 
 ---
 

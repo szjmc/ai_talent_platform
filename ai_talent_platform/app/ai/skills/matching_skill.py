@@ -2,7 +2,7 @@
 模块：app/ai/skills/matching_skill.py
 职责：人岗匹配技能（供 Agent 调用的 3 个工具：打分 / 搜岗位 / 列候选人）。
 
-标签：[架构组] [P0]  依赖：[业务组] [P0] MatchingService / PositionRepository
+标签：[架构组] [P0]  依赖：[Agent组] [P0] MatchingService / PositionRepository
 
 ============================ 实现思路与代码要点 ============================
 技能方法：
@@ -18,8 +18,8 @@
 已完成：
     - [x] 三个技能 + 工具描述（JSON Schema）+ 纯函数打分算法 + 权限校验
 待实现（依赖方）：
-    - [ ] MatchingService.calculate / list_candidates（业务组）
-    - [ ] PositionRepository.search_by_title（业务组）
+    - [ ] MatchingService.calculate / list_candidates（Agent 组）
+    - [ ] PositionRepository.search_by_title（Agent 组）
 =========================================================================
 """
 
@@ -213,7 +213,7 @@ class MatchingScoreSkill(BaseSkill):
         require_dependency(
             calculator is not None,
             "MatchingService.calculate",
-            hint="业务组未实现，可改为直接传 talent/position 数据调用本技能",
+            hint="Agent 组未实现，可改为直接传 talent/position 数据调用本技能",
         )
         result = calculator(talent_id=talent_id, position_id=position_id, context=context)
         if hasattr(result, "__await__"):
@@ -224,7 +224,7 @@ class MatchingScoreSkill(BaseSkill):
         service_cls = import_dependency(
             "app.services.matching_service",
             "MatchingService",
-            hint="业务组未实现 MatchingService",
+            hint="Agent 组未实现 MatchingService",
         )
         return service_cls()
 
@@ -290,7 +290,7 @@ class PositionSearchSkill(BaseSkill):
         repo_cls = import_dependency(
             "app.repositories.position_repository",
             "PositionRepository",
-            hint="业务组未实现岗位检索",
+            hint="Agent 组未实现岗位检索",
         )
         return repo_cls()
 
@@ -309,7 +309,7 @@ class PositionSearchSkill(BaseSkill):
             if hasattr(result, "__await__"):
                 result = await result
             return list(result or [])
-        require_dependency(False, "PositionRepository.search_by_title", hint="业务组未实现岗位检索方法")
+        require_dependency(False, "PositionRepository.search_by_title", hint="Agent 组未实现岗位检索方法")
         return []
 
     @staticmethod
@@ -366,14 +366,14 @@ class CandidateListSkill(BaseSkill):
         service_cls = import_dependency(
             "app.services.matching_service",
             "MatchingService",
-            hint="业务组未实现 MatchingService",
+            hint="Agent 组未实现 MatchingService",
         )
         service = service_cls()
         method = getattr(service, "list_candidates", None) or getattr(service, "get_latest_by_position", None)
         require_dependency(
             method is not None,
             "MatchingService.list_candidates",
-            hint="业务组未实现，可先用 matching_score 逐个打分",
+            hint="Agent 组未实现，可先用 matching_score 逐个打分",
         )
         result = method(position_id=position_id, top_k=top_k, min_score=min_score, context=context)
         if hasattr(result, "__await__"):

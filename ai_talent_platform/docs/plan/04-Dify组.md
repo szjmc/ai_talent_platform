@@ -1,18 +1,24 @@
-# 04. 4 组（Dify AI 应用中台，2 人）— 20 个工作日计划
+# 04. 4 组（Dify AI 应用中台 + 个性化智能培训，2 人）— 20 个工作日计划
 
-> 隶属：[AI 能力层分组开发计划](../team_sprint_plan.md) ｜ 配套：[分组代码实现规范](../team_code_spec.md)
-> 人力：2 人（DF-A 适配器 / DF-B 集成运维）
+> 隶属：[AI 能力层与业务层分组开发总计划](../team_sprint_plan.md) ｜ 配套：[分组代码实现规范](../team_code_spec.md) ｜ **必读边界红线**：[五大研发组职责边界与防重复开发总规范 §6.4](../group_boundaries_and_tasks.md#64-4-组dify-组-dify组dify-低代码网关--个性化智能培训)
+> 人力：2 人（DF-A Dify 适配器/SSE 转换 + 培训计划与进度服务 / DF-B 集成探针/同步脚本 + 培训路由与低代码督办工作流）
 
 ---
 
-## 本组速览
+## 本组速览与严格边界（防重复必读！）
 
-- **组别**：4 组
+- **组别**：4 组 `[Dify组]`（标签：`标签：[Dify组] [P0|P1|P2]`，全仓现存 **7 个 `.py` 文件 + 3 个待新建文件**）
 - **周期**：D1–D20（4 周），阶段划分见 [总计划 §二](../team_sprint_plan.md#sec-time)
-- **每日 15 分钟站会**，每周五集成日；D12 / D20 为大节点验收
-- **跨组契约不可私改**：LLM / Skill / Agent / 向量库 / NL2SQL / SSE 见 [总计划 §八](../team_sprint_plan.md)
-- **代码骨架与验收命令**：[分组代码实现规范](../team_code_spec.md)
-- **组内约定**：每个 PR 描述必须包含「改了什么 / 表结构有无变更 / 需要谁 review / 如何验证」
+- **本组端到端核心边界（Dify 低代码网关 + 个性化培训督办闭环）**：
+  1. 封装 Dify HTTP/SSE 异步适配器 `app/adapters/dify/dify_adapter.py` 与流式协议归一化解析器 `app/adapters/dify/sse.py`；
+  2. 提供可选连通性探针 `app/adapters/dify/health.py` 与工作流/知识库单向镜像同步脚本 `scripts/sync_dify_workflows.py`；
+  3. 配合 `[Agent组]` 在 `app/services/agent_service.py` 中维护唯一的双模路由开关（配置了 `DIFY_APP_ID_*` 优先走 Dify，未配置或故障时无缝回退本地 `BaseAgent`）；
+  4. **个性化智能培训与学习督办闭环（`trainings`）**：`training_{repository,service,router}.py` + `schemas/training.py`（课程与计划 CRUD、学习进度单调递增校验与 `suspicious` 防挂机刷课标记、滞后计划预警 `GET /trainings/warnings`；AI 选课与滞后催办支持优先走 `DifyAdapter.run_workflow`、未启用 Dify 时自动回退 `await dispatch("training", ...)`）。
+- **本组严禁重复开发清单**：
+  - ❌ **严禁**新建 `/api/v1/dify/*` 等业务层重复路由，严禁把 Dify 变成硬依赖（未配 `DIFY_API_KEY` 时 `/api/v1/trainings/*` 与 `/api/v1/agents/*` 必须 100% 正常工作）；
+  - ❌ **严禁**新建或重写 `app/models/training.py`（4 张培训 ORM 表已落地 ✅）或接管 `/api/v1/knowledge/*`；
+  - ❌ **严禁**在 Dify 侧另建绕过 `[Vanna组] sql_validator` 的数据库直连查询，严禁在 `TrainingService` 手写 Prompt 直调大模型；
+  - ❌ **严禁**自写重试与熔断工具（必须直接复用 `[架构组] app.ai.utils.retry_handler` 中的 `ai_retry` 与 `SimpleCircuitBreaker`）。
 
 ---
 
@@ -20,8 +26,8 @@
 
 | 角色 | 负责 |
 | --- | --- |
-| DF-A（适配器） | `dify_adapter`（chat/workflow/dataset）、SSE 解析、重试 |
-| DF-B（集成与运维） | Dify 部署、应用/工作流配置、Prompt 同步、与其余 4 组对接 |
+| DF-A（适配器 + 培训核心） | `dify_adapter.py`、`sse.py`、`training_repository.py`、`training_service.py` |
+| DF-B（集成运维 + 培训接口） | `adapters/dify/health.py`、`scripts/sync_dify_workflows.py`、`schemas/training.py`、`training_router.py`、Dify 培养推荐与滞后督办工作流 DSL |
 
 ## 二、每日任务（D1–D20，每行末尾是当日验收标准）
 
@@ -56,9 +62,10 @@
 | `app/adapters/dify/sse.py` | **新增** | Dify SSE 事件解析器（`event/data` 行），产出 `async Iterator[dict]` |
 | `app/config/settings.py` | 修改 | 补 `DIFY_APP_ID_CHAT/DIFY_APP_ID_RESUME/DIFY_DATASET_ID/DIFY_TIMEOUT/DIFY_MAX_RETRIES` |
 | `app/infrastructure/database/health.py` 或 `app/adapters/dify/health.py` | **新增** | `check_dify()` 返回与 `check_mysql` 同构的 `{status, reason, message, elapsed_ms}` |
-| `app/routers/agent_router.py` | 共用 | SSE 转发（与 2 组同文件，PR 需 2 组 review） |
-| `scripts/sync_dify_kb.py` | **新增** | 本地文档 → Dify dataset 同步 |
-| `tests/test_dify.py` | — | `httpx.MockTransport` 全量 mock，不打真网 |
+| `app/services/agent_service.py` | 跨组协同 | 双模路由分支（与 `[Agent组]` 同文件，PR 须 2 组组长联合 review） |
+| `scripts/sync_dify_workflows.py` | **新增**（P2） | 本地已索引知识文档 → Dify dataset 单向同步与工作流可用性巡检 |
+| `app/repositories/training_repository.py`、`app/schemas/training.py`、`app/services/training_service.py`、`app/routers/training_router.py` | 🔧 本组实现（P1） | **智能培训与督办闭环**：课程/计划管理、学习进度单调递增与 `suspicious` 防刷标记、滞后计划预警、Dify 工作流 / `dispatch("training")` 双模推课，实现 `/trainings` 下 9 个接口 |
+| `tests/test_dify.py`、`tests/test_training.py` | — | `httpx.MockTransport` 全量 mock + 培训防刷进度单测（新增测试文件必须加 `标签：[Dify组] [P1]`） |
 
 ---
 
