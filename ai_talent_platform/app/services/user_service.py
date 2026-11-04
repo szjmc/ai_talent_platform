@@ -2,7 +2,7 @@
 模块：app/services/user_service.py
 职责：用户管理业务（管理员视角的 CRUD、状态、角色）。
 
-标签：[业务组] [P1]
+标签：[架构组] [P1]
 
 实现思路：
 - 所有方法接收 db（Service 由 Router 通过依赖注入构造），返回 ORM 对象或 PageResult；

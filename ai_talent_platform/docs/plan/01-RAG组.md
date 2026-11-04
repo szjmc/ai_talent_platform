@@ -1,28 +1,35 @@
-# 01. 1 组（RAG 检索增强生成，3 人）— 20 个工作日计划
+# 01. 1 组（RAG 引擎 + 知识库 / 人才档案 / 简历管理，3 人）— 20 个工作日计划
 
-> 隶属：[AI 能力层分组开发计划](../team_sprint_plan.md) ｜ 配套：[分组代码实现规范](../team_code_spec.md)
-> 人力：3 人（RAG-A 文档侧 / RAG-B 向量侧 / RAG-C 检索问答）
+> 隶属：[AI 能力层与业务层分组开发总计划](../team_sprint_plan.md) ｜ 配套：[分组代码实现规范](../team_code_spec.md) ｜ **必读边界红线**：[五大研发组职责边界与防重复开发总规范 §6.1](../group_boundaries_and_tasks.md#61-1-组rag-组-rag组rag-引擎--知识库--人才档案--简历管理)
+> 人力：3 人（RAG-A 文档提取 + 简历管理 `resumes` / RAG-B Milvus 向量底座 + 人才档案 `talents` / RAG-C 混合检索问答 + 知识库 `knowledge`）
 
 ---
 
-## 本组速览
+## 本组速览与严格边界（防重复必读）
 
-- **组别**：1 组
+- **组别**：1 组 `[RAG组]`（标签：`标签：[RAG组] [P0|P1]`，全仓现存 **26 个 `.py` 文件**）
 - **周期**：D1–D20（4 周），阶段划分见 [总计划 §二](../team_sprint_plan.md#sec-time)
-- **每日 15 分钟站会**，每周五集成日；D12 / D20 为大节点验收
-- **跨组契约不可私改**：LLM / Skill / Agent / 向量库 / NL2SQL / SSE 见 [总计划 §八](../team_sprint_plan.md)
-- **代码骨架与验收命令**：[分组代码实现规范](../team_code_spec.md)
-- **组内约定**：每个 PR 描述必须包含「改了什么 / 表结构有无变更 / 需要谁 review / 如何验证」
+- **本组端到端负责范围（AI 向量底座 + 3 大业务模块垂直闭环）**：
+  1. **全平台唯一的 Milvus 连接与四集合适配器**：`app/infrastructure/vector/milvus.py` + `app/adapters/vector_store/milvus_adapter.py`（直接支撑本组 `knowledge_vectors` 与 `talent_vectors`，并作为 `[Agent组]` 读写 `position_vectors`、`[Vanna组]` 读写 `question_vectors` 的唯一网关，其他组严禁 `import pymilvus`）。
+  2. **全平台唯一的文本向量化与多格式文档加载器**：`app/ai/rag/embedding_service.py`（调 `[架构组] llm_manager.embed`）+ `app/ai/rag/document_loader.py`（供本组制度索引、本组简历上传、`[Agent组]` 简历工作流与 JD 解析共同复用）。
+  3. **企业知识库全链路（`knowledge`）**：`document_splitter.py` → `retriever.py` → `rag_pipeline.py` → `knowledge_{repository,service,router}.py` + `schemas/knowledge.py`（`/api/v1/knowledge/*` 7 个接口）。
+  4. **人才智能档案与语义搜人全链路（`talents`）**：`talent_{repository,service,router}.py` + `schemas/talent.py`（CRUD、手机号脱敏、基于本组 `talent_vectors` 的语义搜人、重复档案合并；AI 画像生成通过 `await dispatch("talent", ...)` 委托 `[Agent组]`）。
+  5. **简历上传、查重与解析入库全链路（`resumes`）**：`resume_{repository,service,router}.py` + `schemas/resume.py`（SHA-256 秒传、基于 `talent_vectors` 向量查重、触发 `[Agent组] run_resume_workflow` 解析并幂等回写、绑定人才；**`ResumeService` 必须支持 `db=None` 无参构造以对接 `[架构组] resume_skill.py`**）。
+- **本组严禁重复开发清单**：
+  - ❌ **严禁**新建或重写 `app/models/{knowledge,talent,resume}.py`（ORM 模型已完整落地 ✅）及 `app/ai/skills/{knowledge_skill,resume_skill}.py`（`[架构组]` 已实现 ✅）；
+  - ❌ **严禁**自写 HTTP 客户端调大模型或 Embedding（统一调 `llm_manager`），严禁直写本地磁盘（统一调 `[架构组] FileService`）；
+  - ❌ **严禁**在 `ResumeService` 或 `TalentService` 中手写 Prompt 调大模型解析简历或生成画像（一律调 `run_resume_workflow` / `dispatch("talent")`）；
+  - ❌ **严禁**在检索结果为空时调用 LLM 自由作答（必须直接返回 `{"answer": "知识库中未找到依据", "citations": []}`）。
 
 ---
 
 ## 一、人员分工
 
-| 角色 | 负责 |
+| 角色 | 负责模块与文件 |
 | --- | --- |
-| RAG-A（文档侧） | `document_loader` / `document_splitter` / 解析质量 |
-| RAG-B（向量侧） | `embedding_service` / `adapters/vector_store/milvus_adapter` / 索引运维 |
-| RAG-C（检索与问答） | `retriever`（混合检索+rerank）/ `rag_pipeline` / `knowledge_service` / `knowledge_router` |
+| RAG-A（文档侧 + 简历模块） | `document_loader` / `document_splitter` + `resume_{repository,service,router}.py` + `schemas/resume.py` |
+| RAG-B（向量侧 + 人才档案） | `infrastructure/vector/milvus.py` / `milvus_adapter.py` / `embedding_service.py` + `talent_{repository,service,router}.py` + `schemas/talent.py` |
+| RAG-C（检索问答 + 知识库） | `retriever`（混合检索+RRF）/ `rag_pipeline` + `knowledge_{repository,service,router}.py` + `schemas/knowledge.py` |
 
 ## 二、每日任务（D1–D20，每行末尾是当日验收标准）
 
@@ -61,8 +68,10 @@
 | `app/ai/rag/rag_pipeline.py` | `langchain`（可选，纯 httpx 亦可） | `index_document(doc_id)`、`ask(question, user)`、`ask_stream()`；写 `knowledge_docs.status/chunk_count/indexed_at` |
 | `app/services/knowledge_service.py` | — | 上传→建记录（indexing）→触发索引；`retrieve`、`ask`、`list/page`、`delete`（连带删向量）、`retrieve_eval` |
 | `app/routers/knowledge_router.py` | — | 7 个接口（见 `docs/api_document.md` 第十五节），挂 `knowledge:read` / `knowledge:manage` |
-| `app/models/knowledge.py` / `app/repositories/knowledge_repository.py` | — | 现有骨架补全 `knowledge_docs` / `knowledge_chunks` 字段与查询 |
-| `tests/test_rag_loader.py`、`test_rag_splitter.py`、`test_retriever.py` | — | 无 Milvus 时用 fake store；测试不依赖外部服务 |
+| `app/models/{knowledge,talent,resume}.py`（✅ 已实现，只读复用） / `app/repositories/knowledge_repository.py`（🔧 本组实现） | — | 模型已落地严禁重建；在 `KnowledgeRepository(BaseRepository[KnowledgeDoc])` 中实现 `list_accessible_docs / save_chunks / search_chunks_by_keyword / update_index_status` |
+| `app/repositories/talent_repository.py`、`app/schemas/talent.py`、`app/services/talent_service.py`、`app/routers/talent_router.py` | — | **人才档案闭环（P0/P1）**：手机号唯一校验与非管理员脱敏、`talent_vectors` 向量同步与 `/talents/search/semantic` 语义搜人、重复档案事务级合并、画像版本保存与 `dispatch("talent")` 刷新，实现 `/talents` 下 9 个接口 |
+| `app/repositories/resume_repository.py`、`app/schemas/resume.py`、`app/services/resume_service.py`、`app/routers/resume_router.py` | — | **简历管理闭环（P0/P1）**：`ResumeService(db=None)` 无参兼容 `resume_skill.py`；调 `[架构组] FileService` 上传秒传、`dedupe_resume` 向量查重、触发 `[Agent组] run_resume_workflow`、`save_parse_result` 幂等落库、`bind_talent` 绑定人才，实现 `/resumes` 下 6 个接口 |
+| `tests/test_rag_loader.py`、`test_rag_splitter.py`、`test_retriever.py`、`test_talent_resume.py` | — | 无 Milvus 时用 fake store；新增测试文件必须加 `标签：[RAG组] [P1]` |
 | `scripts/init_milvus.py` | `pymilvus` | 4 个集合建库建索引，幂等 |
 
 ---

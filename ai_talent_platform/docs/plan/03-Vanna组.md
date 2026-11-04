@@ -1,18 +1,23 @@
-# 03. 3 组（Vanna.ai NL2SQL，4 人）— 20 个工作日计划
+# 03. 3 组（Vanna NL2SQL / 数据决策 + 在线智能测评，4 人）— 20 个工作日计划
 
-> 隶属：[AI 能力层分组开发计划](../team_sprint_plan.md) ｜ 配套：[分组代码实现规范](../team_code_spec.md)
-> 人力：4 人（NL-A 训练 / NL-B 安全 / NL-C 适配图表 / NL-D 接口宽表）
+> 隶属：[AI 能力层与业务层分组开发总计划](../team_sprint_plan.md) ｜ 配套：[分组代码实现规范](../team_code_spec.md) ｜ **必读边界红线**：[五大研发组职责边界与防重复开发总规范 §6.3](../group_boundaries_and_tasks.md#63-3-组vanna-组-vanna组nl2sql统计看板--在线智能测评)
+> 人力：4 人（NL-A 训练语料 + 在线测评模块 `assessments` / NL-B SQL 安全校验 / NL-C Vanna 适配与图表推断 / NL-D 看板导出接口与 PgSQL 宽表 ETL）
 
 ---
 
-## 本组速览
+## 本组速览与严格边界（防重复必读！）
 
-- **组别**：3 组
+- **组别**：3 组 `[Vanna组]`（标签：`标签：[Vanna组] [P0|P1]`，全仓现存 **16 个 `.py` 文件**）
 - **周期**：D1–D20（4 周），阶段划分见 [总计划 §二](../team_sprint_plan.md#sec-time)
-- **每日 15 分钟站会**，每周五集成日；D12 / D20 为大节点验收
-- **跨组契约不可私改**：LLM / Skill / Agent / 向量库 / NL2SQL / SSE 见 [总计划 §八](../team_sprint_plan.md)
-- **代码骨架与验收命令**：[分组代码实现规范](../team_code_spec.md)
-- **组内约定**：每个 PR 描述必须包含「改了什么 / 表结构有无变更 / 需要谁 review / 如何验证」
+- **⚠️ 已落地冻结底座警告（以下文件已由 `[架构组]` 100% 实现并通过单测，本组直接复用，严禁重写！）**：
+  - ✅ `app/models/{analytics,assessment}.py`（PgSQL 6 张宽表 ORM 与 MySQL 测评 4 张表 ORM 均已落地）
+  - ✅ `app/infrastructure/database/analytics_schema.py`、`scripts/init_pgsql.py`、`app/infrastructure/database/postgres.py`（`pg_session()` / `get_pg_session_factory()`）
+  - ✅ `app/ai/skills/sql_skill.py`（`SqlQuerySkill` 已完成，**严禁修改**！本组 `VannaAdapter.ask(question, *, user_scope=..., max_rows=...)` 对齐其签名即可自动接通）
+- **本组端到端核心边界（NL2SQL 数据决策 + 在线测评两大垂直闭环）**：
+  1. 全平台唯一的 NL2SQL 安全校验器 `sql_validator.py` 与查询适配器 `vanna_adapter.py`；
+  2. 全平台唯一的 MySQL → PgSQL 6 张分析宽表增量同步 ETL 脚本 `scripts/sync_analytics.py`（使用 `get_pg_session_factory()` + `ON CONFLICT DO UPDATE` 幂等提交）；
+  3. 数据决策全模块接口 `analytics_service.py` + `schemas/analytics.py` + `analytics_router.py`（当 `PGSQL_ENABLED=false` 时看板自动降级查 MySQL 聚合；报告导出走 `[架构组] FileService` 落盘）；
+  4. **在线人才智能测评闭环（`assessments`）**：`assessment_{repository,service,router}.py` + `schemas/assessment.py`（题库抽题、防泄密开考剔除 `answer`、超时检测与客观题规则判分、维度得分汇总供给 `fact_assessment_history`，主观题评分与能力报告通过 `await dispatch("assessment", ...)` 委托 `[Agent组]`）。
 
 ---
 
@@ -20,10 +25,10 @@
 
 | 角色 | 负责 |
 | --- | --- |
-| NL-A（训练） | `scripts/train_vanna.py`、DDL/术语/示例 SQL 语料、Vanna 服务化 |
+| NL-A（训练 + 测评模块） | `scripts/train_vanna.py`（≥40 条语料）+ `assessment_{repository,service,router}.py` + `schemas/assessment.py` |
 | NL-B（安全） | `sql_validator`（语法、白名单表、只读、LIMIT、数据范围注入） |
 | NL-C（适配与图表） | `vanna_adapter.ask`、图表推断、insight 生成 |
-| NL-D（业务接口） | `analytics_service`、`analytics_router`、导出、与 PgSQL 宽表 |
+| NL-D（看板接口与宽表 ETL） | `analytics_service`、`analytics_router`、`schemas/analytics.py`、导出、`scripts/sync_analytics.py` |
 
 ## 二、每日任务（D1–D20，每行末尾是当日验收标准）
 
@@ -59,9 +64,10 @@
 | `scripts/train_vanna.py` | `vanna` | 导入 DDL（分析库 6 表）/ 指标口径文档 / 示例 SQL / 业务术语；`--reset` 重建 |
 | `app/services/analytics_service.py` | — | `overview()`、`nl2sql_ask()`、`chart_config()`、`export()`、`dashboard()`；调 Service 层而非直连 SQL |
 | `app/routers/analytics_router.py` | — | 6 个接口：`GET /analytics/overview`、`GET /analytics/distribution`、`GET /analytics/trend`、`POST /analytics/nl2sql`、`POST /analytics/report`、`GET /analytics/reports`，挂 `analytics:read` / `analytics:export` |
-| PgSQL 宽表 DDL + 模型 | — | 6 张分析宽表（见 `docs/database_design.md` 第七节），只读账号 |
-| `app/ai/skills/sql_skill.py` | — | （与架构组共建）`query_database(question)`，内部捕获 `SQLValidationError` → `BusinessRuleError` |
-| `tests/test_nl2sql.py` | — | 校验器 30 条 + 适配器 mock 10 条 |
+| `app/models/analytics.py` + `scripts/init_pgsql.py` | ✅ 已实现 | 6 张分析宽表 ORM 与分区建表已落地（只读复用，严禁重建）；本组新增 `scripts/sync_analytics.py` 实现 MySQL → PgSQL 幂等增量同步 ETL |
+| `app/ai/skills/sql_skill.py` | ✅ 架构组已实现 | `SqlQuerySkill` 已完成，只读无需修改；内部自动动态导入本组 `VannaAdapter.ask(question=..., user_scope=..., max_rows=...)` |
+| `app/repositories/assessment_repository.py`、`app/schemas/assessment.py`、`app/services/assessment_service.py`、`app/routers/assessment_router.py` | — | **在线智能测评闭环（P1）**：`QuestionForCandidateSchema` 物理剔除 `answer` 防泄密、超时标记 `overtime`、单选/多选规则计分、调 `dispatch("assessment")` 生成主观题评分与报告、联动 `[RAG组] TalentService` 更新评级，实现 `/assessments` 下 6 个接口 |
+| `tests/test_nl2sql.py`、`tests/test_assessment.py` | — | 校验器 30 条 + 适配器 mock 10 条 + 测评防泄密与判分单测（新增测试文件必须加 `标签：[Vanna组] [P1]`） |
 
 ---
 

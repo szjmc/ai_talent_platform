@@ -73,6 +73,10 @@ class PermissionEnum(StrEnum):
     ANALYTICS_READ = "analytics:read"
     ANALYTICS_EXPORT = "analytics:export"
     AGENT_USE = "agent:use"
+    # 文件中心 / 全局审计（[架构组] 平台横向服务）
+    FILE_UPLOAD = "file:upload"
+    FILE_DELETE = "file:delete"
+    AUDIT_READ = "audit:read"
 
 
 class DataScopeEnum(StrEnum):
@@ -101,6 +105,8 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         PermissionEnum.KNOWLEDGE_READ, PermissionEnum.KNOWLEDGE_MANAGE,
         PermissionEnum.ANALYTICS_READ, PermissionEnum.ANALYTICS_EXPORT,
         PermissionEnum.AGENT_USE,
+        PermissionEnum.FILE_UPLOAD, PermissionEnum.FILE_DELETE,
+        PermissionEnum.AUDIT_READ,
     },
     RoleEnum.HR: {
         PermissionEnum.USER_READ,
@@ -115,6 +121,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         PermissionEnum.KNOWLEDGE_READ,
         PermissionEnum.ANALYTICS_READ,
         PermissionEnum.AGENT_USE,
+        PermissionEnum.FILE_UPLOAD,
     },
     RoleEnum.MANAGER: {
         PermissionEnum.USER_READ,

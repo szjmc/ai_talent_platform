@@ -2,7 +2,7 @@
 模块：app/repositories/__init__.py
 职责：数据访问层出口。
 
-标签：[业务组] [P0]（数据访问层出口）
+标签：[架构组] [P0]（数据访问层出口）
 
 通用基类：BaseRepository（app/repositories/base.py）
     - 子类只需声明 model + 三个白名单字段，即可获得：

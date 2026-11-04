@@ -2,7 +2,7 @@
 模块：app/services/organization_service.py
 职责：组织架构业务（部门树、层级维护、移动、删除校验）。
 
-标签：[业务组] [P1]
+标签：[架构组] [P1]
 
 实现思路：
 1. 新增：校验 parent 存在 -> 同级重名 -> 插入 -> flush 拿 id -> 回写 level/path；

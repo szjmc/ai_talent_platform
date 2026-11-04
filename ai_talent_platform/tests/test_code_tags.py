@@ -9,7 +9,7 @@
    必须有一行以「标签：」开头，格式：
        「标签：[组] [P0|P1|P2]」（备注可选）
        「标签：[组A]+[组B] [P1]  依赖：……」（跨组共建文件用双标签）
-2. 组标签只允许：架构组 / RAG组 / Agent组 / Vanna组 / Dify组 / 业务组；
+2. 组标签只允许：架构组 / RAG组 / Agent组 / Vanna组 / Dify组（全平台严格分为此 5 组）；
 3. 根目录 4 个配置文件（requirements.txt / docker-compose.yml /
    .env.example / pytest.ini）前 10 行内必须有「# 标签：」注释；
 4. 新增代码文件漏打标签 => 本测试失败，禁止合并。
@@ -25,7 +25,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-GROUPS = ("架构组", "RAG组", "Agent组", "Vanna组", "Dify组", "业务组")
+GROUPS = ("架构组", "RAG组", "Agent组", "Vanna组", "Dify组")
 _GROUP = r"\[(?:" + "|".join(GROUPS) + r")\]"
 TAG_LINE_RE = re.compile(rf"^标签：{_GROUP}(?:\+{_GROUP})* \[P[012]\]")
 
@@ -90,11 +90,11 @@ def test_tag_summary_printable():
         assert tags, f"{path.relative_to(ROOT)} 无标签"
         m = TAG_LINE_RE.match(tags[0])
         assert m, f"{path.relative_to(ROOT)} 标签非法"
-        for group in re.findall(r"\[([^\]]+)\]", tags[0].split("依赖：")[0]):
+        for group in re.findall(r"\[([^\]]+)\]", m.group(0)):
             if group in GROUPS:
                 by_group[group] = by_group.get(group, 0) + 1
         pri = re.search(r"\[(P[012])\]", tags[0]).group(1)
         by_priority[pri] = by_priority.get(pri, 0) + 1
-    # 六个组都应有文件（双标签按两组各计一次）
+    # 五个组都应有文件（双标签按两组各计一次）
     assert set(by_group) == set(GROUPS), f"存在没有任何文件的组：{set(GROUPS) - set(by_group)}"
     assert set(by_priority) == {"P0", "P1", "P2"}
