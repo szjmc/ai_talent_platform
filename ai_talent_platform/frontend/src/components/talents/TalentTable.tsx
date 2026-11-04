@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Button, Pagination, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { DeleteOutlined, EditOutlined, EnvironmentOutlined } from '@ant-design/icons';
@@ -16,9 +17,12 @@ interface Props {
 
 /** 人才表格独立组件，仅通过 props 与页面/API 状态通信。 */
 export default function TalentTable({ talents, loading, province, onPortrait, onEdit, onDelete }: Props) {
+  const [page, setPage] = useState(1);
+  useEffect(() => { setPage(1); }, [talents]);
+  const pageRows = useMemo(() => talents.slice((page - 1) * 20, page * 20), [talents, page]);
   const columns: ColumnsType<Talent> = [
     { title: '人才信息', dataIndex: 'name', width: 220, fixed: 'left', render: (_, record) => <div className="talent-cell"><PersonAvatar name={record.name} size={38} /><div><div className="talent-cell-name">{record.name}<span className="ml-2 text-[10px] font-normal text-[#9aa3b3]">ID {String(record.id).padStart(4, '0')}</span></div><div className="talent-cell-role">{record.current_position} · {record.work_years} 年经验</div></div></div> },
-    { title: '工作地', dataIndex: 'work_city', width: 110, render: (_, record) => <span className="text-[#59667a]"><EnvironmentOutlined className="mr-1.5 text-[#8b96a8]" />{record.work_city || record.province || '—'}</span> },
+    { title: '工作地', dataIndex: 'work_city', width: 110, render: (_, record) => <span className="text-[#59667a]"><EnvironmentOutlined className="mr-1.5 text-[#8b96a8]" />{record.work_city || record.province || record.country || '—'}</span> },
     { title: '所属部门', dataIndex: 'organization_name', width: 125 },
     { title: '学历 / 院校', dataIndex: 'education', width: 155, render: (_, record) => <div>{record.education}<div className="talent-cell-role">{record.school}</div></div> },
     { title: '核心技能', dataIndex: 'skill_tags', render: (value) => <SkillTags tags={value} max={3} /> },
@@ -30,8 +34,8 @@ export default function TalentTable({ talents, loading, province, onPortrait, on
   return (
     <section className="card content-card talent-table-section">
       <div className="table-toolbar"><div className="table-title">人才列表<span className="table-count">{province ? `${province} · ` : ''}共 {talents.length} 条匹配记录</span></div><span className="text-[11px] text-[#8b95a7]">列表与上方简历、地图实时联动</span></div>
-      <Table rowKey="id" columns={columns} dataSource={talents} loading={loading} pagination={false} scroll={{ x: 1370 }} />
-      <div className="table-footer"><Pagination total={talents.length} pageSize={20} showSizeChanger={false} showTotal={(total) => `共 ${total} 条`} /></div>
+      <Table rowKey="id" columns={columns} dataSource={pageRows} loading={loading} pagination={false} scroll={{ x: 1370 }} />
+      <div className="table-footer"><Pagination current={page} onChange={setPage} total={talents.length} pageSize={20} showSizeChanger={false} showTotal={(total) => `共 ${total} 条`} /></div>
     </section>
   );
 }

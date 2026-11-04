@@ -44,7 +44,7 @@ export default function ResumeCoverflow({ talents, province }: Props) {
   return (
     <section className="card resume-coverflow-card">
       <div className="coverflow-header">
-        <div><h3 className="section-card-title">人才简历浏览</h3><p>精选人才档案，点击卡片查看完整简历</p></div>
+        <div><h3 className="section-card-title">人才简历浏览</h3><p>数据库人才档案，点击卡片查看完整简历</p></div>
         <div className="flex items-center gap-3">
           {province && <span className="province-filter-label">已筛选：{province}</span>}
           <span className="coverflow-count"><b>{talents.length ? active + 1 : 0}</b> / {talents.length}</span>
@@ -79,10 +79,10 @@ export default function ResumeCoverflow({ talents, province }: Props) {
                   style={{ zIndex: 20 - distance, pointerEvents: hidden ? 'none' : 'auto' }}
                   initial={false}
                   animate={{
-                    x: offset * 184,
-                    y: distance * 7,
-                    z: -distance * 48,
-                    rotateY: offset * -4,
+                    x: offset * 280,
+                    y: distance * 9,
+                    z: -distance * 70,
+                    rotateY: offset * -6,
                     scale,
                     opacity: hidden ? 0 : Math.max(0.32, 1 - distance * 0.19),
                   }}
@@ -93,7 +93,7 @@ export default function ResumeCoverflow({ talents, province }: Props) {
                 >
                   <div className="resume-cover-preview"><ResumeDocument talent={talent} /></div>
                   <div className="resume-cover-caption">
-                    <div className="min-w-0 text-left"><strong>{talent.name}<span>{talent.potential_level} 级人才</span></strong><p>{talent.current_position}</p><small>{talent.job_level || '专业序列'} · {talent.work_city || talent.province}</small></div>
+                    <div className="min-w-0 text-left"><strong>{talent.name}<span>{talent.potential_level} 级人才</span></strong><p>{talent.current_position}</p><small>{talent.job_level || '专业序列'} · {talent.work_city || talent.province || talent.country || '地域未填写'}</small></div>
                     <ExpandOutlined />
                   </div>
                 </motion.button>

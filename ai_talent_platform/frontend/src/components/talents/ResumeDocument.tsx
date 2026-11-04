@@ -28,10 +28,9 @@ export default function ResumeDocument({ talent, detailed = false }: { talent: T
       <section className="resume-doc-section">
         <h4><span />工作经历</h4>
         <div className="resume-doc-job">
-          <div className="flex items-center justify-between gap-2"><b>{talent.current_company || '云启科技集团'} · {talent.current_position}</b><time>2022.06 — 至今</time></div>
-          <p>负责核心人才业务与重点项目落地，推动跨部门协作及专业能力建设。</p>
+          <div className="flex items-center justify-between gap-2"><b>{talent.current_company || '当前公司未填写'} · {talent.current_position || '职位未填写'}</b><time>{talent.work_years} 年经验</time></div>
+          {talent.self_evaluation && <p>{talent.self_evaluation}</p>}
         </div>
-        {detailed && <div className="resume-doc-job"><div className="flex items-center justify-between gap-2"><b>某科技有限公司 · {talent.current_position}</b><time>2018.07 — 2022.05</time></div><p>参与企业数字化项目建设，负责专业方案设计、项目交付与团队经验沉淀。</p></div>}
       </section>
       <section className="resume-doc-section">
         <h4><span />教育背景</h4>
@@ -41,7 +40,7 @@ export default function ResumeDocument({ talent, detailed = false }: { talent: T
         <h4><span />专业能力</h4>
         <div className="flex flex-wrap gap-1.5">{talent.skill_tags.map((skill) => <em key={skill}>{skill}</em>)}</div>
       </section>
-      <footer className="resume-doc-footer"><span>AI 结构化人才档案</span><span>更新于 2026.11</span></footer>
+      <footer className="resume-doc-footer"><span>AI 结构化人才档案</span><span>{talent.created_at ? `建档于 ${talent.created_at.slice(0, 10)}` : '人才档案预览'}</span></footer>
     </article>
   );
 }

@@ -21,9 +21,15 @@ export interface Talent {
   education: string; school: string; major: string; work_years: number; current_company: string;
   current_position: string; organization_id: number; organization_name: string; skill_tags: string[];
   certificates?: string[]; status: 'active'|'left'|'reserve'; potential_level: 'A'|'B'|'C'|'D';
-  portrait_summary?: string; source?: string; match_score?: number; created_at?: string;
+  portrait_summary?: string; self_evaluation?: string; source?: string; match_score?: number; created_at?: string;
   /** 人才地图扩展字段；后端未返回时不参与地域筛选。 */
-  province?: string; work_city?: string; job_level?: string;
+  country?: string; country_code?: string; province?: string; work_city?: string; job_level?: string;
+  portrait?: TalentPortrait;
+}
+export interface TalentPortrait {
+  talent_id: number; version?: number; dimensions?: Record<string, number>; labels?: string[];
+  strengths?: string[]; weaknesses?: string[]; suggested_positions?: string[];
+  potential_level?: string; model_name?: string; generated_at?: string;
 }
 export interface Position {
   id: number; title: string; code: string; organization_id: number; organization_name: string;

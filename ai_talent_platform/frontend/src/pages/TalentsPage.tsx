@@ -1,170 +1,179 @@
-import { useEffect, useMemo, useState } from 'react';
-import { App, Button, Col, Drawer, Form, Input, Modal, Progress, Row, Select, Tag } from 'antd';
-import { DeleteOutlined, EditOutlined, ExportOutlined, MergeCellsOutlined, PlusOutlined, RobotOutlined, SearchOutlined, ThunderboltOutlined } from '@ant-design/icons';
-import { useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Chart, PageHeader, PersonAvatar, PotentialTag, SkillTags } from '../components/Common';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, Button, Drawer, Empty, Form, Input, InputNumber, Modal, Select, Spin, Tag, Upload, message } from 'antd';
+import { ApartmentOutlined, CloudUploadOutlined, DeleteOutlined, DownloadOutlined, GlobalOutlined, PlusOutlined, ReloadOutlined, SearchOutlined, ThunderboltOutlined, UserOutlined } from '@ant-design/icons';
 import ResumeCoverflow from '../components/talents/ResumeCoverflow';
 import TalentMap from '../components/talents/TalentMap';
 import TalentTable from '../components/talents/TalentTable';
 import type { TalentFilterState } from '../components/talents/types';
-import { demoTalents } from '../services/mockData';
-import { formatApiError, request, requestWithFallback } from '../services/api';
-import { downloadText, sleep } from '../utils';
-import { useAuth } from '../store/AuthContext';
-import type { PageResult, Talent } from '../types';
+import { request } from '../services/api';
+import type { OrgNode, PageResult, Talent } from '../types';
+import { downloadText } from '../utils';
 import '../components/talents/talents.css';
 
-const portraitDimensions = [{ name: '专业技能', value: 94 }, { name: '项目经验', value: 88 }, { name: '综合素质', value: 90 }, { name: '发展潜力', value: 96 }, { name: '团队协作', value: 85 }];
-const departments = ['技术研发部', '人力资源部', '数据智能部', '市场品牌部'];
-const departmentIds: Record<string, number> = { 技术研发部: 3, 人力资源部: 2, 数据智能部: 5, 市场品牌部: 4 };
-const emptyFilters: TalentFilterState = {};
+const emptyFilters: TalentFilterState = { keyword: '', status: undefined, organization_id: undefined, country: undefined, province: undefined };
+const flattenOrgNodes = (items: OrgNode[]): OrgNode[] => items.flatMap(item => [item, ...flattenOrgNodes(item.children || [])]);
 
 export default function TalentsPage() {
-  const [data, setData] = useState<Talent[]>(demoTalents);
-  const [loading, setLoading] = useState(false);
-  const [selected, setSelected] = useState<Talent | null>(null);
+  const [talents, setTalents] = useState<Talent[]>([]);
+  const [organizations, setOrgNodes] = useState<OrgNode[]>([]);
+  const [filters, setFilters] = useState<TalentFilterState>(emptyFilters);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [lastSync, setLastSync] = useState('');
+  const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Talent | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [keyword, setKeyword] = useState('');
-  const [appliedKeyword, setAppliedKeyword] = useState('');
-  const [semantic, setSemantic] = useState('');
-  const [semanticLoading, setSemanticLoading] = useState(false);
-  const [draftFilters, setDraftFilters] = useState<TalentFilterState>(emptyFilters);
-  const [appliedFilters, setAppliedFilters] = useState<TalentFilterState>(emptyFilters);
-  const [searchParams] = useSearchParams();
-  const { demo } = useAuth();
-  const { message, modal } = App.useApp();
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [deleting, setDeleting] = useState<Talent | null>(null);
+  const [portraitTalent, setPortraitTalent] = useState<Talent | null>(null);
+  const [portraitLoading, setPortraitLoading] = useState(false);
+  const [portraitError, setPortraitError] = useState('');
   const [form] = Form.useForm();
 
-  useEffect(() => { const query = searchParams.get('keyword'); if (query) { setKeyword(query); setAppliedKeyword(query); } }, [searchParams]);
-
-  const load = async (filters = appliedFilters, search = appliedKeyword) => {
-    setLoading(true);
+  const loadData = useCallback(async () => {
+    setLoading(true); setLoadError('');
     try {
-      const result = await requestWithFallback<PageResult<Talent>>({
-        url: '/talents',
-        params: {
-          page: 1, page_size: 200, keyword: search || undefined,
-          education: filters.education, status: filters.status,
-          organization_id: filters.organization_name ? departmentIds[filters.organization_name] : undefined,
-        },
-      }, { items: demoTalents, total: demoTalents.length, page: 1, page_size: 200, pages: 1 });
-      setData(result.data.items);
-    } catch (error) { message.error(formatApiError(error)); } finally { setLoading(false); }
-  };
-  useEffect(() => { load(emptyFilters, ''); }, []);
+      const [talentPage, organizationTree] = await Promise.all([
+        request<PageResult<Talent>>({ url: '/talents', params: { page: 1, page_size: 100 } }),
+        request<OrgNode[]>({ url: '/organizations/tree' }),
+      ]);
+      setTalents(talentPage.items || []);
+      setOrgNodes(flattenOrgNodes(organizationTree || []));
+      setLastSync(new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
+    } catch (error) {
+      setTalents([]); setOrgNodes([]);
+      setLoadError(error instanceof Error ? error.message : '人才数据加载失败');
+    } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { loadData(); }, [loadData]);
 
-  // 唯一筛选派生数据源：CoverFlow、地图选中态和表格始终消费同一结果。
-  const filteredTalents = useMemo(() => data.filter((talent) => {
-    const keywordMatched = !appliedKeyword || `${talent.name}${talent.current_position}${talent.skill_tags.join('')}`.toLowerCase().includes(appliedKeyword.toLowerCase());
-    return keywordMatched
-      && (!appliedFilters.education || talent.education === appliedFilters.education)
-      && (!appliedFilters.status || talent.status === appliedFilters.status)
-      && (!appliedFilters.organization_name || talent.organization_name === appliedFilters.organization_name)
-      && (!appliedFilters.province || talent.province === appliedFilters.province);
-  }), [data, appliedKeyword, appliedFilters]);
+  const updateFilters = useCallback((patch: Partial<TalentFilterState>) => setFilters(current => ({ ...current, ...patch })), []);
+  const mapTalents = useMemo(() => {
+    const keyword = (filters.keyword || '').trim().toLowerCase();
+    return talents.filter(talent => {
+      const matchesKeyword = !keyword || [talent.name, talent.current_position, talent.current_company, talent.school, ...(talent.skill_tags || [])].join(' ').toLowerCase().includes(keyword);
+      return matchesKeyword && (!filters.status || talent.status === filters.status)
+        && (!filters.organization_id || talent.organization_id === filters.organization_id);
+    });
+  }, [talents, filters.keyword, filters.status, filters.organization_id]);
+  const filteredTalents = useMemo(() => mapTalents.filter(talent =>
+    (!filters.country || talent.country === filters.country) && (!filters.province || talent.province === filters.province)
+  ), [mapTalents, filters.country, filters.province]);
 
-  const applyFilters = () => { setAppliedFilters({ ...draftFilters }); setAppliedKeyword(keyword); load({ ...draftFilters }, keyword); };
-  const resetFilters = () => {
-    setDraftFilters(emptyFilters); setAppliedFilters(emptyFilters); setKeyword(''); setAppliedKeyword(''); setSemantic('');
-    setData(demoTalents); load(emptyFilters, '');
+  const statistics = useMemo(() => ({
+    total: talents.length,
+    active: talents.filter(item => item.status === 'active').length,
+    countries: new Set(talents.map(item => item.country).filter(Boolean)).size,
+    highPotential: talents.filter(item => item.potential_level === 'A').length,
+  }), [talents]);
+  const skillRanking = useMemo(() => {
+    const counts: Record<string, number> = {};
+    talents.forEach(talent => (talent.skill_tags || []).forEach(skill => { counts[skill] = (counts[skill] || 0) + 1; }));
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  }, [talents]);
+  const organizationRanking = useMemo(() => {
+    const counts: Record<string, number> = {};
+    talents.forEach(talent => { const name = talent.organization_name || '未分配组织'; counts[name] = (counts[name] || 0) + 1; });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  }, [talents]);
+
+  const openEditor = (talent?: Talent) => {
+    setEditing(talent || null); setResumeFile(null); setEditorOpen(true);
+    if (talent) form.setFieldsValue(talent);
+    else form.resetFields();
   };
-  const selectProvince = (province?: string) => {
-    const next = { ...appliedFilters, province };
-    setAppliedFilters(next); setDraftFilters(next);
-  };
-  const openEdit = (record?: Talent) => {
-    setEditing(record || null);
-    form.setFieldsValue(record ? { ...record, skill_tags: record.skill_tags } : { gender: 'unknown', status: 'active', work_years: 0, skill_tags: [] });
-    setModalOpen(true);
-  };
-  const save = async () => {
+  const saveTalent = async () => {
     const values = await form.validateFields(); setSaving(true);
     try {
-      if (demo) {
-        await sleep(500);
-        if (editing) setData((old) => old.map((talent) => talent.id === editing.id ? { ...talent, ...values } : talent));
-        else setData((old) => [{ ...demoTalents[0], ...values, id: Date.now() }, ...old]);
-      } else {
-        if (editing) await request({ method: 'PUT', url: `/talents/${editing.id}`, data: values });
-        else await request({ method: 'POST', url: '/talents', data: values });
-        await load();
+      const saved = await request<Talent>({ url: editing ? `/talents/${editing.id}` : '/talents', method: editing ? 'PUT' : 'POST', data: { ...values, skill_tags: values.skill_tags || [] } });
+      if (resumeFile) {
+        const body = new FormData(); body.append('file', resumeFile);
+        await request({ url: `/talents/${saved.id}/resume`, method: 'POST', data: body, headers: { 'Content-Type': 'multipart/form-data' } });
       }
-      message.success(editing ? '人才档案已更新' : '人才档案创建成功，AI 画像生成中'); setModalOpen(false);
-    } catch (error) { message.error(formatApiError(error)); } finally { setSaving(false); }
+      message.success(editing ? '人才档案已更新' : '人才档案已创建');
+      setEditorOpen(false); await loadData();
+    } catch (error) { message.error(error instanceof Error ? error.message : '保存失败'); }
+    finally { setSaving(false); }
   };
-  const semanticSearch = async () => {
-    if (!semantic.trim()) return; setSemanticLoading(true);
+  const deleteTalent = async () => {
+    if (!deleting) return;
+    try { await request({ url: `/talents/${deleting.id}`, method: 'DELETE' }); message.success('人才档案已删除'); setDeleting(null); await loadData(); }
+    catch (error) { message.error(error instanceof Error ? error.message : '删除失败'); }
+  };
+  const openPortrait = async (talent: Talent) => {
+    setPortraitTalent(talent); setPortraitLoading(true); setPortraitError('');
     try {
-      if (!demo) {
-        const result = await request<{ items: { talent_id: number }[] }>({ method: 'POST', url: '/talents/search/semantic', data: { query: semantic, top_k: 20, filters: appliedFilters } });
-        const ids = new Set(result.items.map((item) => item.talent_id));
-        setData((old) => old.filter((talent) => ids.has(talent.id)));
-      } else { await sleep(800); setData(demoTalents.slice(0, 4)); }
-      setAppliedFilters(emptyFilters); setDraftFilters(emptyFilters); setAppliedKeyword('');
-      message.success('AI 语义检索完成，简历与人才列表已同步刷新');
-    } catch (error) { message.error(formatApiError(error)); } finally { setSemanticLoading(false); }
+      const portrait = await request<Talent['portrait']>({ url: `/talents/${talent.id}/portrait` });
+      setPortraitTalent(current => current ? { ...current, portrait: portrait || undefined } : current);
+    } catch (error) { setPortraitError(error instanceof Error ? error.message : '画像加载失败'); }
+    finally { setPortraitLoading(false); }
   };
-  const remove = (record: Talent) => modal.confirm({
-    title: `确认删除「${record.name}」的档案？`, content: '删除后，该人才关联向量将同步清理，历史业务记录保留。', okButtonProps: { danger: true },
-    onOk: async () => { if (!demo) await request({ method: 'DELETE', url: `/talents/${record.id}` }); setData((old) => old.filter((talent) => talent.id !== record.id)); message.success('档案已删除'); },
-  });
-  const exportData = () => {
-    downloadText('人才档案.csv', '姓名,工作地,部门,职位,学历,技能\n' + filteredTalents.map((talent) => `${talent.name},${talent.work_city || talent.province || ''},${talent.organization_name},${talent.current_position},${talent.education},${talent.skill_tags.join('/')}`).join('\n'));
-    message.success('当前筛选结果已导出');
+  const generatePortrait = async () => {
+    if (!portraitTalent) return;
+    setPortraitLoading(true); setPortraitError('');
+    try {
+      await request({ url: `/talents/${portraitTalent.id}/portrait/generate`, method: 'POST' });
+      message.success('画像生成任务已提交'); await openPortrait(portraitTalent);
+    } catch (error) { setPortraitError(error instanceof Error ? error.message : '画像生成失败'); setPortraitLoading(false); }
+  };
+  const exportRows = () => {
+    const escape = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`;
+    const rows = filteredTalents.map(item => [item.name, item.country, item.province, item.work_city, item.organization_name, item.current_position, item.education, (item.skill_tags || []).join('/'), item.status].map(escape).join(','));
+    downloadText('人才档案.csv', '\ufeff姓名,国家,省份,城市,组织,职位,学历,技能,状态\n' + rows.join('\n'));
   };
 
-  return <>
-    <PageHeader title="人才档案" description="统一管理人才主数据，以 AI 数字画像看见每个人的能力与潜力" demo={demo} actions={<><Button icon={<MergeCellsOutlined />} onClick={() => message.info('请选择两份重复档案进行智能合并')}>档案合并</Button><Button icon={<ExportOutlined />} onClick={exportData}>导出</Button><Button type="primary" icon={<PlusOutlined />} onClick={() => openEdit()}>新建档案</Button></>} />
+  return <div className="talents-page talent-archive-page">
+    <header className="archive-page-header">
+      <div><div className="archive-kicker"><span /> TALENT INTELLIGENCE / 人才资产</div><h1>人才档案</h1><p>从全球分布到个人能力画像，让人才信息在同一视图中清晰流动。</p></div>
+      <div className="archive-header-actions"><Button icon={<DownloadOutlined />} onClick={exportRows} disabled={!filteredTalents.length}>导出当前视图</Button><Button type="primary" icon={<PlusOutlined />} onClick={() => openEditor()}>新建人才档案</Button></div>
+    </header>
 
-    <div className="metric-strip">
-      <div className="metric-strip-item"><div className="metric-strip-label">人才总数</div><div className="metric-strip-value">1,286<span className="metric-strip-extra">人</span></div></div>
-      <div className="metric-strip-item"><div className="metric-strip-label">在职人才</div><div className="metric-strip-value">1,168<span className="metric-strip-extra text-success">90.8%</span></div></div>
-      <div className="metric-strip-item"><div className="metric-strip-label">A 级高潜人才</div><div className="metric-strip-value">306<span className="metric-strip-extra">23.8%</span></div></div>
-      <div className="metric-strip-item"><div className="metric-strip-label">本月新增档案</div><div className="metric-strip-value">34<span className="metric-strip-extra text-success">↑ 12.5%</span></div></div>
-    </div>
+    {loadError && <Alert className="talent-load-error" type="error" showIcon message="真实人才数据加载失败" description={loadError} action={<Button size="small" icon={<ReloadOutlined />} onClick={loadData}>重新加载</Button>} />}
+    <section className="archive-metric-grid">
+      <div><span className="metric-icon navy"><UserOutlined /></span><p>人才档案总量</p><strong>{statistics.total}</strong><small>来自人才数据库</small></div>
+      <div><span className="metric-icon green"><ThunderboltOutlined /></span><p>当前在职</p><strong>{statistics.active}</strong><small>{statistics.total ? `${Math.round(statistics.active / statistics.total * 100)}% 在职占比` : '暂无数据'}</small></div>
+      <div><span className="metric-icon blue"><GlobalOutlined /></span><p>覆盖国家 / 地区</p><strong>{statistics.countries}</strong><small>按人才国家字段统计</small></div>
+      <div><span className="metric-icon amber"><ApartmentOutlined /></span><p>A 级高潜人才</p><strong>{statistics.highPotential}</strong><small>基于已生成人才画像</small></div>
+    </section>
 
-    <div className="semantic-search"><div className="search-icon"><ThunderboltOutlined /></div><div className="semantic-body"><div className="semantic-title">AI 语义搜人</div><div className="semantic-sub">无需设置复杂条件，用一句话描述您要找的人</div><div className="flex gap-2 semantic-input"><Input value={semantic} onChange={(event) => setSemantic(event.target.value)} onPressEnter={semanticSearch} prefix={<RobotOutlined className="text-[#6981ce]" />} placeholder="例如：查找有 3 年以上 AI 项目经验、擅长 RAG 的技术骨干" /><Button type="primary" loading={semanticLoading} icon={<SearchOutlined />} onClick={semanticSearch}>智能搜索</Button></div></div></div>
+    <ResumeCoverflow talents={filteredTalents} province={filters.province || filters.country} />
 
-    <div className="card talent-filter-card">
-      <div className="filter-row">
-        <Input allowClear value={keyword} onChange={(event) => setKeyword(event.target.value)} onPressEnter={applyFilters} placeholder="搜索姓名、职位、技能" prefix={<SearchOutlined />} />
-        <Select allowClear placeholder="学历" className="w-[120px]" value={draftFilters.education} onChange={(value) => setDraftFilters((old) => ({ ...old, education: value }))} options={['博士', '硕士', '本科', '大专'].map((value) => ({ value, label: value }))} />
-        <Select allowClear placeholder="人才状态" className="w-[125px]" value={draftFilters.status} onChange={(value) => setDraftFilters((old) => ({ ...old, status: value }))} options={[{ value: 'active', label: '在职' }, { value: 'reserve', label: '人才储备' }, { value: 'left', label: '离职' }]} />
-        <Select allowClear placeholder="所属部门" className="w-[145px]" value={draftFilters.organization_name} onChange={(value) => setDraftFilters((old) => ({ ...old, organization_name: value }))} options={departments.map((value) => ({ value, label: value }))} />
-        <Button type="primary" ghost onClick={applyFilters}>查询</Button><Button onClick={resetFilters}>重置</Button>
-        <div className="filter-spacer" /><div className="talent-filter-summary">{appliedFilters.province ? <><span>地域筛选</span><b>{appliedFilters.province}</b><span>·</span></> : <span>全国人才</span>}<span>当前 {filteredTalents.length} 份档案</span></div>
-      </div>
-    </div>
+    <section className="talent-intelligence-grid">
+      <TalentMap talents={mapTalents} resultCount={filteredTalents.length} filters={filters} onFilterChange={updateFilters} />
+      <aside className="talent-data-panel">
+        <div className="data-panel-heading"><div><div className="section-eyebrow">LIVE DATA PROFILE</div><h2>人才数据切片</h2></div><span className="live-indicator"><i />实时数据</span></div>
+        <p className="data-panel-intro">以下摘要完全由当前数据库档案计算，不使用预设比例。</p>
+        <div className="data-slice-block"><h3>高频技能 <span>TOP {skillRanking.length}</span></h3>{skillRanking.length ? <div className="skill-ranking">{skillRanking.map(([skill, count], index) => <div key={skill}><span className="rank-index">{String(index + 1).padStart(2, '0')}</span><b>{skill}</b><div><i style={{ width: `${count / skillRanking[0][1] * 100}%` }} /></div><strong>{count}</strong></div>)}</div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无技能数据" />}</div>
+        <div className="data-slice-block organization-slice"><h3>组织人才分布 <span>TOP {organizationRanking.length}</span></h3>{organizationRanking.length ? organizationRanking.map(([name, count]) => <div className="organization-rank" key={name}><span>{name}</span><b>{count}<small> 人</small></b></div>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无组织数据" />}</div>
+        <div className="data-source-note"><span>DATA SOURCE</span><b>/api/v1/talents</b><small>{lastSync ? `最近同步 ${lastSync}` : '等待数据同步'}</small></div>
+      </aside>
+    </section>
 
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-      <ResumeCoverflow talents={filteredTalents} province={appliedFilters.province} />
-    </motion.div>
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 }}>
-      <TalentMap selectedProvince={appliedFilters.province} onProvinceChange={selectProvince} />
-    </motion.div>
-    <TalentTable talents={filteredTalents} loading={loading} province={appliedFilters.province} onPortrait={setSelected} onEdit={openEdit} onDelete={remove} />
+    <section className="archive-filter-bar">
+      <div className="archive-filter-title"><SearchOutlined /><div><b>人才检索</b><span>检索结果同步至简历与地图</span></div></div>
+      <Input allowClear prefix={<SearchOutlined />} placeholder="搜索姓名、职位、公司或技能" value={filters.keyword} onChange={event => updateFilters({ keyword: event.target.value })} />
+      <Select allowClear placeholder="所属组织" value={filters.organization_id} onChange={value => updateFilters({ organization_id: value })} options={organizations.map(item => ({ value: item.id, label: item.name }))} />
+      <Select allowClear placeholder="人才状态" value={filters.status} onChange={value => updateFilters({ status: value })} options={[{ value: 'active', label: '在职' }, { value: 'left', label: '离职' }, { value: 'reserve', label: '储备' }]} />
+      {(filters.country || filters.province) && <Tag closable onClose={() => updateFilters({ country: undefined, province: undefined })}>{filters.province || filters.country}</Tag>}
+      <Button type="text" onClick={() => setFilters(emptyFilters)}>重置</Button>
+    </section>
+    <TalentTable talents={filteredTalents} loading={loading} province={filters.province || filters.country} onPortrait={openPortrait} onEdit={openEditor} onDelete={setDeleting} />
 
-    <Drawer width={590} open={!!selected} onClose={() => setSelected(null)} title="人才数字画像" extra={<Button type="primary" size="small" icon={<ThunderboltOutlined />} onClick={() => message.success('AI 画像更新任务已提交')}>更新画像</Button>}>
-      {selected && <><div className="detail-hero"><PersonAvatar name={selected.name} size={68} className="detail-avatar" /><div className="flex-1"><div className="detail-name">{selected.name} <PotentialTag level={selected.potential_level} /></div><div className="detail-meta">{selected.current_position} · {selected.organization_name}</div><div className="mt-2"><SkillTags tags={selected.skill_tags} max={4} /></div></div><div className="text-right"><div className="score-text text-[26px]">{selected.match_score}</div><div className="muted text-[10px]">综合评分</div></div></div>
-        <div className="drawer-section-title">AI 画像摘要 <Tag color="blue" className="text-[9px]">由 Talent Agent 生成</Tag></div><div className="portrait-summary">{selected.portrait_summary}</div>
-        <div className="drawer-section-title">能力维度分析</div><div className="flex items-center"><Chart height={235} option={{ radar: { indicator: portraitDimensions.map((dimension) => ({ name: dimension.name, max: 100 })), radius: '68%', axisName: { color: '#758096', fontSize: 11 }, splitArea: { areaStyle: { color: ['#fafbff', '#f4f6fc'] } }, splitLine: { lineStyle: { color: '#e0e6f1' } }, axisLine: { lineStyle: { color: '#e0e6f1' } } }, series: [{ type: 'radar', data: [{ value: portraitDimensions.map((dimension) => dimension.value), areaStyle: { color: 'rgba(70,105,225,.22)' }, lineStyle: { color: '#496de0', width: 2 }, itemStyle: { color: '#496de0' } }] }] }} /><div className="flex-1">{portraitDimensions.slice(0, 4).map((dimension) => <div key={dimension.name} className="mb-3"><div className="flex justify-between text-[11px] mb-1"><span>{dimension.name}</span><b>{dimension.value}</b></div><Progress percent={dimension.value} showInfo={false} size="small" strokeColor="#5574df" /></div>)}</div></div>
-        <div className="drawer-section-title">档案信息</div><div className="description-list">{[['性别', selected.gender === 'male' ? '男' : '女'], ['手机号码', selected.mobile], ['最高学历', `${selected.education} · ${selected.school}`], ['专业', selected.major], ['工作年限', `${selected.work_years} 年`], ['工作地', selected.work_city || selected.province || '—'], ['电子邮箱', selected.email || '—']].map(([key, value]) => <div key={key}><div className="description-item-label">{key}</div><div className="description-item-value">{value}</div></div>)}</div>
-        <div className="drawer-section-title">AI 发展建议</div><div className="portrait-summary border-l-[#24a082] bg-[#f3faf8]">建议作为「技术专家」序列重点培养对象，参与跨部门 AI 创新项目，补充技术团队管理与业务战略规划经验。</div>
-      </>}
-    </Drawer>
-
-    <Modal title={editing ? '编辑人才档案' : '新建人才档案'} open={modalOpen} onCancel={() => setModalOpen(false)} onOk={save} confirmLoading={saving} width={700} okText="保存档案">
-      <Form form={form} layout="vertical"><Row gutter={16}>
-        <Col span={12}><Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}><Input /></Form.Item></Col><Col span={12}><Form.Item name="mobile" label="手机号" rules={[{ required: true, message: '请输入手机号' }]}><Input /></Form.Item></Col>
-        <Col span={8}><Form.Item name="gender" label="性别"><Select options={[{ value: 'male', label: '男' }, { value: 'female', label: '女' }, { value: 'unknown', label: '未知' }]} /></Form.Item></Col><Col span={8}><Form.Item name="education" label="最高学历"><Select options={['博士', '硕士', '本科', '大专'].map((value) => ({ value, label: value }))} /></Form.Item></Col><Col span={8}><Form.Item name="work_years" label="工作年限"><Input type="number" suffix="年" /></Form.Item></Col>
-        <Col span={12}><Form.Item name="school" label="毕业院校"><Input /></Form.Item></Col><Col span={12}><Form.Item name="major" label="专业"><Input /></Form.Item></Col>
-        <Col span={12}><Form.Item name="current_position" label="当前职位"><Input /></Form.Item></Col><Col span={12}><Form.Item name="organization_name" label="所属部门"><Select options={departments.map((value) => ({ value, label: value }))} /></Form.Item></Col>
-        <Col span={12}><Form.Item name="province" label="工作省份"><Select allowClear options={['北京', '上海', '广东', '浙江', '江苏', '四川', '湖北'].map((value) => ({ value, label: value }))} /></Form.Item></Col><Col span={12}><Form.Item name="work_city" label="工作城市"><Input /></Form.Item></Col>
-        <Col span={24}><Form.Item name="skill_tags" label="技能标签"><Select mode="tags" placeholder="输入技能后回车" /></Form.Item></Col>
-      </Row></Form>
+    <Modal title={editing ? '编辑人才档案' : '新建人才档案'} open={editorOpen} onCancel={() => setEditorOpen(false)} onOk={saveTalent} confirmLoading={saving} okText="保存档案" width={760} destroyOnHidden>
+      <Form form={form} layout="vertical" initialValues={{ gender: 'unknown', status: 'active', work_years: 0 }} className="talent-editor-form">
+        <div className="form-section-label">基本信息</div>
+        <div className="grid grid-cols-3 gap-x-4"><Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }]}><Input /></Form.Item><Form.Item name="gender" label="性别"><Select options={[{ value: 'male', label: '男' }, { value: 'female', label: '女' }, { value: 'unknown', label: '未知' }]} /></Form.Item><Form.Item name="mobile" label="手机号"><Input /></Form.Item><Form.Item name="email" label="邮箱"><Input /></Form.Item><Form.Item name="organization_id" label="所属组织"><Select allowClear options={organizations.map(item => ({ value: item.id, label: item.name }))} /></Form.Item><Form.Item name="status" label="人才状态"><Select options={[{ value: 'active', label: '在职' }, { value: 'left', label: '离职' }, { value: 'reserve', label: '储备' }]} /></Form.Item></div>
+        <div className="form-section-label">职业与教育</div>
+        <div className="grid grid-cols-3 gap-x-4"><Form.Item name="current_company" label="当前公司"><Input /></Form.Item><Form.Item name="current_position" label="当前职位"><Input /></Form.Item><Form.Item name="work_years" label="工作年限"><InputNumber min={0} max={60} className="w-full" /></Form.Item><Form.Item name="education" label="学历"><Select allowClear options={['博士', '硕士', '本科', '大专', '其他'].map(value => ({ value, label: value }))} /></Form.Item><Form.Item name="school" label="毕业院校"><Input /></Form.Item><Form.Item name="major" label="专业"><Input /></Form.Item></div>
+        <Form.Item name="skill_tags" label="核心技能"><Select mode="tags" tokenSeparators={[',', '，']} placeholder="输入技能后回车" /></Form.Item>
+        <Form.Item name="self_evaluation" label="个人评价"><Input.TextArea rows={3} /></Form.Item>
+        <div className="resume-upload-field"><CloudUploadOutlined /><div><b>简历附件</b><span>{resumeFile?.name || '保存档案时一并上传；不上传不会生成模拟简历'}</span></div><Upload maxCount={1} beforeUpload={file => { setResumeFile(file); return false; }} showUploadList={false}><Button>选择文件</Button></Upload></div>
+      </Form>
     </Modal>
-  </>;
+    <Modal open={!!deleting} title="删除人才档案" onCancel={() => setDeleting(null)} onOk={deleteTalent} okText="确认删除" okButtonProps={{ danger: true, icon: <DeleteOutlined /> }}><p>确定删除「{deleting?.name}」的人才档案吗？此操作将直接请求数据库接口。</p></Modal>
+
+    <Drawer title={portraitTalent ? `${portraitTalent.name} · AI 人才画像` : '人才画像'} width={520} open={!!portraitTalent} onClose={() => setPortraitTalent(null)} extra={<Button type="primary" icon={<ThunderboltOutlined />} loading={portraitLoading} onClick={generatePortrait}>生成 / 更新画像</Button>}>
+      <Spin spinning={portraitLoading}>{portraitError && <Alert type="error" showIcon message="画像服务未返回数据" description={portraitError} className="mb-5" />}{portraitTalent?.portrait ? <div className="real-portrait-content"><div className="portrait-version"><span>模型 {portraitTalent.portrait.model_name || '未记录'}</span><b>{portraitTalent.portrait.potential_level || portraitTalent.potential_level} 级潜力</b></div>{Object.keys(portraitTalent.portrait.dimensions || {}).length > 0 && <div className="portrait-dimension-list">{Object.entries(portraitTalent.portrait.dimensions || {}).map(([name, value]) => <div key={name}><span>{name}</span><div><i style={{ width: `${Math.min(100, value)}%` }} /></div><b>{value}</b></div>)}</div>}<h3>优势</h3><div>{(portraitTalent.portrait.strengths || []).map(item => <Tag key={item}>{item}</Tag>)}{!portraitTalent.portrait.strengths?.length && <span className="text-gray-400">暂无数据</span>}</div><h3>待发展方向</h3><div>{(portraitTalent.portrait.weaknesses || []).map(item => <Tag key={item}>{item}</Tag>)}{!portraitTalent.portrait.weaknesses?.length && <span className="text-gray-400">暂无数据</span>}</div><h3>建议岗位</h3><div>{(portraitTalent.portrait.suggested_positions || []).map(item => <Tag key={item}>{item}</Tag>)}{!portraitTalent.portrait.suggested_positions?.length && <span className="text-gray-400">暂无数据</span>}</div></div> : !portraitLoading && !portraitError && <Empty description="数据库中暂无该人才画像，可点击右上角生成" />}</Spin>
+    </Drawer>
+  </div>;
 }
