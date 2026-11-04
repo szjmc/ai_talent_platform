@@ -5,8 +5,9 @@
 ## 技术栈
 
 - React 19 + TypeScript + Vite
-- Ant Design 5 + Ant Design Icons
-- ECharts（驾驶舱、人才画像、测评雷达、数据分析）
+- Ant Design 5 + Ant Design Icons + TailwindCSS（关闭全局 preflight）
+- Framer Motion（人才简历弱透视 CoverFlow、弹簧拖拽交互）
+- ECharts（驾驶舱、人才画像、测评雷达、数据分析、中国人才热力地图）
 - React Router、Axios（JWT 自动刷新、统一错误处理）
 - 按页面懒加载、响应式布局、演示数据降级
 
@@ -42,7 +43,7 @@ npm run preview
 | 登录 / 当前用户 / 修改密码 | `/login` `/profile` | 已对接 `/auth/*`，支持 access token 自动刷新 |
 | 用户与权限 | `/users` | 已对接用户分页、创建、编辑、角色分配、启停、重置密码、删除 |
 | 组织架构 | `/organizations` | 已对接组织树、创建、编辑、移动、删除 |
-| 人才档案 | `/talents` | 按契约对接列表、CRUD、语义搜索；501 时演示 |
+| 人才档案 | `/talents` | 列表、CRUD、语义搜索；独立 CoverFlow / 中国人才地图 / 表格组件与三方联动筛选；501 时演示 |
 | 岗位管理 | `/positions` | 按契约对接 CRUD、状态流转；501 时演示 |
 | 简历解析 | `/resumes` | 按契约对接 multipart 上传与异步解析 |
 | 人岗匹配 | `/matchings` | 按契约对接匹配跑批与解释界面 |

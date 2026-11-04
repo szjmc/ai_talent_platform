@@ -22,6 +22,8 @@ export interface Talent {
   current_position: string; organization_id: number; organization_name: string; skill_tags: string[];
   certificates?: string[]; status: 'active'|'left'|'reserve'; potential_level: 'A'|'B'|'C'|'D';
   portrait_summary?: string; source?: string; match_score?: number; created_at?: string;
+  /** 人才地图扩展字段；后端未返回时不参与地域筛选。 */
+  province?: string; work_city?: string; job_level?: string;
 }
 export interface Position {
   id: number; title: string; code: string; organization_id: number; organization_name: string;

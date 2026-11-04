@@ -7,6 +7,7 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
 import App from './App';
 import { AuthProvider } from './store/AuthContext';
+import './tailwind.css';
 import './styles.css';
 
 dayjs.locale('zh-cn');
