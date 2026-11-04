@@ -72,10 +72,10 @@ INSERT INTO assessments (id, talent_id, position_id, title, status, question_cou
   (900001, 900001, 900001, '测试后端能力测评', 'scored', 2, 85.00, 1),
   (900002, 900002, 900002, '测试算法能力测评', 'pending', 0, NULL, 0);
 INSERT INTO assessment_questions (id, assessment_id, type, content, options, answer, score, dimension, sort) VALUES
-  (900001, 900001, 'single', 'SQL 中用于分组的关键字是？', JSON_ARRAY(JSON_OBJECT('key','A','text','GROUP BY'), JSON_OBJECT('key','B','text','ORDER BY')), 'A', 40.00, 'skill', 1),
+  (900001, 900001, 'single', 'SQL 中用于分组的关键字是？', JSON_ARRAY(JSON_OBJECT('key','A','text','GROUP BY'), JSON_OBJECT('key','B','text','ORDER BY')), JSON_QUOTE('A'), 40.00, 'skill', 1),
   (900002, 900001, 'text',   '简述索引失效的常见场景。', NULL, NULL, 60.00, 'skill', 2);
 INSERT INTO assessment_answers (id, assessment_id, question_id, answer, score, scored_by, scored_at) VALUES
-  (900001, 900001, 900001, 'A', 40.00, 'rule', '2026-10-05 10:00:00'),
+  (900001, 900001, 900001, JSON_QUOTE('A'), 40.00, 'rule', '2026-10-05 10:00:00'),
   (900002, 900001, 900002, JSON_OBJECT('text', '对索引列使用函数会导致失效'), 45.00, 'ai', '2026-10-05 10:01:00');
 INSERT INTO assessment_results (id, assessment_id, total_score, dimension_scores, level, model_name) VALUES
   (900001, 900001, 85.00, JSON_OBJECT('skill', 85, 'logic', 88), '高级', 'sqltest-model');

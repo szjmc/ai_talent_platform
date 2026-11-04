@@ -67,6 +67,15 @@ cat "$DIR/mysql/01_schema_assertions.sql" \
     "$DIR/mysql/04_business_queries.sql" \
     "$DIR/mysql/99_cleanup.sql" > "$SQLTMP"
 
-run_mysql "执行 MySQL SQL 测试（库：$DB）" --database="$DB" "${FORCE_ARGS[@]}" < "$SQLTMP" || exit $?
+run_mysql "执行 MySQL SQL 测试（库：$DB）" --database="$DB" "${FORCE_ARGS[@]}" < "$SQLTMP"
+RC=$?
 
-echo ">> MySQL SQL 测试完成"
+# 失败时把失败用例明细也转成注解（99 在清理前 SIGNAL，故 sqltest_results 仍在）
+if [[ $RC -ne 0 ]]; then
+  "${MYSQL[@]}" --database="$DB" -N -e \
+    "SELECT CONCAT('FAIL ', test_id, ' ', test_name, ' | ', COALESCE(detail, '')) FROM sqltest_results WHERE passed = 0 ORDER BY test_id;" 2>/dev/null \
+    | while IFS= read -r line; do echo "::error::${line}"; done || true
+fi
+
+[[ $RC -eq 0 ]] && echo ">> MySQL SQL 测试完成"
+exit $RC
