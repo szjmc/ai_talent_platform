@@ -52,6 +52,7 @@ jobs:
           MYSQL_PASSWORD: root
           MYSQL_DB: ai_talent_platform_test
           BOOTSTRAP: "1"
+          MYSQL_FORCE: "1"   # 诊断期：遇错继续，一次性收集全部错误（修复后移除）
         run: bash ai_talent_platform/tests/sql/run_mysql_tests.sh
 
   pgsql:
