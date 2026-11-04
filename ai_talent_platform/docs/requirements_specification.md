@@ -68,15 +68,16 @@
 | `manager` | 部门管理者 | 查看本部门及下属部门人才画像、发起匹配、查看团队数据看板与自然语言问数 | `dept_sub`（本部门及所有下级子部门） |
 | `employee` | 普通员工 | 自助查询公开/本角色人才制度（RAG 问答）、参与个人测评、执行个人培训学习计划 | `self`（仅本人关联数据与公开制度） |
 
-### 3.2 25 项操作权限码体系
+### 3.2 28 项操作权限码体系
 
-系统内置以下细粒度权限码，所有业务与 AI 接口必须通过 `Depends(require_permission(...))` 强制拦截：
+系统内置以下细粒度权限码（与 `app/core/permissions.py::PermissionEnum` 逐项一致），所有业务与 AI 接口必须通过 `Depends(require_permission(...))` 强制拦截：
 
-- **用户与组织**：`user:read`、`user:create`、`user:update`、`user:delete`、`organization:read`、`organization:manage`
-- **人才与简历**：`talent:read`、`talent:create`、`talent:update`、`talent:delete`、`resume:upload`、`resume:parse`
-- **岗位与匹配**：`position:read`、`position:manage`、`matching:read`、`matching:run`
-- **测评与培训**：`assessment:read`、`assessment:manage`、`training:read`、`training:manage`
-- **AI 与数据**：`knowledge:read`、`knowledge:manage`、`analytics:read`、`analytics:export`、`agent:use`
+- **用户与组织**（6）：`user:read`、`user:create`、`user:update`、`user:delete`、`organization:read`、`organization:manage`
+- **人才与简历**（6）：`talent:read`、`talent:create`、`talent:update`、`talent:delete`、`resume:upload`、`resume:parse`
+- **岗位与匹配**（4）：`position:read`、`position:manage`、`matching:read`、`matching:run`
+- **测评与培训**（4）：`assessment:read`、`assessment:manage`、`training:read`、`training:manage`
+- **AI 与数据**（5）：`knowledge:read`、`knowledge:manage`、`analytics:read`、`analytics:export`、`agent:use`
+- **文件与审计**（3，`[架构组]` 横向服务）：`file:upload`、`file:delete`、`audit:read`
 
 ### 3.3 AI 场景下的安全红线需求（强制）
 

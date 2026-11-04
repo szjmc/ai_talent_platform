@@ -66,7 +66,7 @@
 | `app/routers/analytics_router.py` | — | 6 个接口：`GET /analytics/overview`、`GET /analytics/distribution`、`GET /analytics/trend`、`POST /analytics/nl2sql`、`POST /analytics/report`、`GET /analytics/reports`，挂 `analytics:read` / `analytics:export` |
 | `app/models/analytics.py` + `scripts/init_pgsql.py` | ✅ 已实现 | 6 张分析宽表 ORM 与分区建表已落地（只读复用，严禁重建）；本组新增 `scripts/sync_analytics.py` 实现 MySQL → PgSQL 幂等增量同步 ETL |
 | `app/ai/skills/sql_skill.py` | ✅ 架构组已实现 | `SqlQuerySkill` 已完成，只读无需修改；内部自动动态导入本组 `VannaAdapter.ask(question=..., user_scope=..., max_rows=...)` |
-| `app/repositories/assessment_repository.py`、`app/schemas/assessment.py`、`app/services/assessment_service.py`、`app/routers/assessment_router.py` | — | **在线智能测评闭环（P1）**：`QuestionForCandidateSchema` 物理剔除 `answer` 防泄密、超时标记 `overtime`、单选/多选规则计分、调 `dispatch("assessment")` 生成主观题评分与报告、联动 `[RAG组] TalentService` 更新评级，实现 `/assessments` 下 5 个接口 |
+| `app/repositories/assessment_repository.py`、`app/schemas/assessment.py`、`app/services/assessment_service.py`、`app/routers/assessment_router.py` | — | **在线智能测评闭环（P1）**：`QuestionForCandidateSchema` 物理剔除 `answer` 防泄密、超时标记 `overtime`、单选/多选规则计分、调 `dispatch("assessment")` 生成主观题评分与报告、联动 `[RAG组] TalentService` 更新评级，实现 `/assessments` 下 6 个接口 |
 | `tests/test_nl2sql.py`、`tests/test_assessment.py` | — | 校验器 30 条 + 适配器 mock 10 条 + 测评防泄密与判分单测（新增测试文件必须加 `标签：[Vanna组] [P1]`） |
 
 ---

@@ -3,6 +3,8 @@
 > 版本：**v1.0.0** ｜ 基础路径：`/api/v1` ｜ 交互式文档：`/docs`（Swagger）、`/redoc`
 > 本文档是前后端联调的**唯一契约来源**。凡与代码冲突，以本文档为准并提 issue 修正。
 > 文档状态标记：`✅ 已实现` / `🚧 待实现（接口契约已定，返回 501 占位）`
+> 待实现模块的主责研发组见第五节「接口清单总览」与各模块章节；全平台只划分 5 个研发组：
+> `[架构组]` / `[RAG组]` / `[Agent组]` / `[Vanna组]` / `[Dify组]`（业务模块垂直归口，不设独立业务组）。
 >
 > 相关文档：[公共层使用手册](公共层使用手册.md) ｜ [数据库设计](database_design.md) ｜ [架构说明](architecture.md) ｜ 在线调试 `/docs`
 
@@ -208,6 +210,9 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 | `analytics:read` | 数据查询 | `GET /analytics/*`、`POST /analytics/nl2sql` |
 | `analytics:export` | 导出报告 | `POST /analytics/report` |
 | `agent:use` | 使用 AI 助手 | `POST /agents/*` |
+| `file:upload` | 上传文件 | `POST /files/upload`、`POST /files/batch-upload` |
+| `file:delete` | 删除文件 | `DELETE /files/{id}` |
+| `audit:read` | 查询审计（仅管理员） | `GET /audit/logs`、`GET /audit/logs/{id}`、`GET /audit/stats` |
 
 ### 4.3 数据范围（行级权限）
 
@@ -224,23 +229,23 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 ## 五、接口清单总览
 
-| 模块 | 前缀 | 状态 | 接口数 |
-| --- | --- | --- | --- |
-| 认证 | `/auth` | ✅ | 6 |
-| 用户 | `/users` | ✅ | 8 |
-| 组织 | `/organizations` | ✅ | 7 |
-| 岗位 | `/positions` | 🚧 | 7 |
-| 人才 | `/talents` | 🚧 | 9 |
-| 简历 | `/resumes` | 🚧 | 6 |
-| 测评 | `/assessments` | 🚧 | 6 |
-| 培训 | `/trainings` | 🚧 | 9 |
-| 匹配 | `/matchings` | 🚧 | 5 |
-| 知识库 | `/knowledge` | 🚧 | 7 |
-| 分析 | `/analytics` | 🚧 | 6 |
-| 智能体 | `/agents` | 🚧 | 6 |
-| 文件 | `/files` | 🚧 | 5 |
-| 审计 | `/audit` | 🚧 | 3 |
-| 系统 | `/system` + 探针 | ✅ | 4 |
+| 模块 | 前缀 | 状态 | 接口数 | 主责研发组 |
+| --- | --- | --- | --- | --- |
+| 认证 | `/auth` | ✅ | 6 | `[架构组]` |
+| 用户 | `/users` | ✅ | 8 | `[架构组]` |
+| 组织 | `/organizations` | ✅ | 7 | `[架构组]` |
+| 岗位 | `/positions` | 🚧 | 7 | `[Agent组]` |
+| 人才 | `/talents` | 🚧 | 9 | `[RAG组]` |
+| 简历 | `/resumes` | 🚧 | 6 | `[RAG组]` |
+| 测评 | `/assessments` | 🚧 | 6 | `[Vanna组]` |
+| 培训 | `/trainings` | 🚧 | 9 | `[Dify组]` |
+| 匹配 | `/matchings` | 🚧 | 5 | `[Agent组]` |
+| 知识库 | `/knowledge` | 🚧 | 7 | `[RAG组]` |
+| 分析 | `/analytics` | 🚧 | 6 | `[Vanna组]` |
+| 智能体 | `/agents` | 🚧 | 6 | `[Agent组]`（含 `[Dify组]` 双模分支） |
+| 文件 | `/files` | 🚧 | 5 | `[架构组]` |
+| 审计 | `/audit` | 🚧 | 3 | `[架构组]` |
+| 系统 | `/system` + 探针 | ✅ | 4 | `[架构组]` |
 
 ---
 
@@ -633,7 +638,7 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 ## 九、岗位模块 Positions — 🚧 待实现
 
-> 负责人：岗位与人才组 ｜ 代码位置：`routers/position_router.py`、`services/position_service.py`、`models/position.py`
+> 主责组：`[Agent组]`（岗位管理垂直归口） ｜ 代码位置：`routers/position_router.py`、`services/position_service.py`、`models/position.py`
 > 当前访问返回 `501`，契约如下（前端可按此先联调 mock）。
 
 ### 数据对象 `PositionResponse`
@@ -714,7 +719,7 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 ## 十、人才模块 Talents — 🚧 待实现
 
-> 负责人：岗位与人才组 ｜ 代码位置：`routers/talent_router.py`、`models/talent.py`
+> 主责组：`[RAG组]`（人才档案垂直归口） ｜ 代码位置：`routers/talent_router.py`、`models/talent.py`
 
 ### 数据对象 `TalentResponse`
 
@@ -891,6 +896,7 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 | POST | `/assessments/{id}/start` | `assessment:read` | 开始测评，返回题目（**不含标准答案**） |
 | POST | `/assessments/{id}/submit` | `assessment:read` | 提交答案，同步规则评分 + 异步 AI 研判 |
 | GET | `/assessments/{id}/result` | `assessment:read` | 结果（总分、维度分、等级、AI 报告） |
+| GET | `/assessments/{id}` | `assessment:read` | 测评任务详情（状态 / 截止时间 / 抽题配置，**不含标准答案**） |
 
 **创建请求**
 
@@ -1247,9 +1253,9 @@ event: error   data: {"code":5002,"message":"模型调用失败"}
 
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
-| GET | `/audit/logs` | `user:read`（管理员） | 分页查询（`user_id` / `module` / `action` / `status` / 时间区间 / `trace_id`） |
-| GET | `/audit/logs/{id}` | `user:read` | 单条详情（含 `before_data` / `after_data` 差异） |
-| GET | `/audit/stats` | `user:read` | 动作分布与失败率统计 |
+| GET | `/audit/logs` | `audit:read` | 分页查询（`user_id` / `module` / `action` / `status` / 时间区间 / `trace_id`） |
+| GET | `/audit/logs/{id}` | `audit:read` | 单条详情（含 `before_data` / `after_data` 差异） |
+| GET | `/audit/stats` | `audit:read` | 动作分布与失败率统计 |
 
 **日志对象**：`id`、`user_id`、`username`、`action`（`create`/`update`/`delete`/`login`/`export`/`ai_call`）、`module`、`target_type`、`target_id`、`request_method`、`request_path`、`request_ip`、`trace_id`、`before_data`、`after_data`、`status`（`success`/`fail`）、`error_message`、`created_at`。
 
