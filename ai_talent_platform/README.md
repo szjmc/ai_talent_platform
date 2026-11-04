@@ -60,6 +60,7 @@ python main.py                # http://127.0.0.1:8000/docs
 | **[docs/group_boundaries_and_tasks.md](docs/group_boundaries_and_tasks.md)** | **★防重复开发必读总纲**：十条防重复铁律、已落地冻结资产表、九大跨组重叠区切分裁定、四库读写权限矩阵、**5 大研发组逐文件详细代码开发说明书（业务模块全部垂直归口各组）** |
 | **[docs/requirements_specification.md](docs/requirements_specification.md)** | **★需求规格说明书（SRS）**：角色与权限、五大 AI 能力量化指标、15 大业务模块功能规格、非功能指标、**需求—研发组唯一归属追踪矩阵（RTM）** |
 | **[docs/system_design_document.md](docs/system_design_document.md)** | **★系统总体与详细设计文档（SDD）**：六层单向依赖架构、四库与 Redis 键空间设计、5 条端到端业务与 AI 调用时序、Skill↔Service 桥接与安全降级设计 |
+| **[docs/数据链路与鉴权实现手册.md](docs/数据链路与鉴权实现手册.md)** | **实现视角全链路**：一次请求的 13 步数据链路、中间件注册/执行顺序、登录与 JWT、RBAC 与数据范围、会话与事务边界、公共组件用法，配 7 张内联 SVG 流程图（另有[单页版 HTML](docs/数据链路与鉴权流程图.html)） |
 | [docs/公共层使用手册.md](docs/公共层使用手册.md) | **必读**：响应/异常/数据库/Repository/认证权限/新增模块全流程/FAQ |
 | [docs/architecture.md](docs/architecture.md) | 六层架构图（**内联 SVG，离线可打开**）、依赖规则、调用链路 |
 | [docs/development.md](docs/development.md) | 开发规范与五大组协作约定 |
