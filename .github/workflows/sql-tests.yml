@@ -1,0 +1,88 @@
+# ============================================================================
+# SQL Tests — 数据库 SQL 测试套件 CI
+# 标签：[架构组] [P1]
+# 触发：改动 tests/sql/** 或 app/models/**（结构变更）时；也可手动 dispatch。
+# 拉起 mysql:8.0 与 postgres:16 服务容器，加载 ORM 渲染的 DDL 快照后执行两套 SQL 测试。
+# 任一失败用例都会让对应 job 非零退出（变红）。
+# ============================================================================
+name: SQL Tests
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "ai_talent_platform/tests/sql/**"
+      - "ai_talent_platform/app/models/**"
+      - ".github/workflows/sql-tests.yml"
+  pull_request:
+    paths:
+      - "ai_talent_platform/tests/sql/**"
+      - "ai_talent_platform/app/models/**"
+      - ".github/workflows/sql-tests.yml"
+  workflow_dispatch:
+
+jobs:
+  mysql:
+    name: MySQL 8.0 业务库
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: ai_talent_platform_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+      - name: 安装 MySQL 客户端
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mysql-client
+      - name: 执行 MySQL SQL 测试
+        env:
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: "3306"
+          MYSQL_USER: root
+          MYSQL_PASSWORD: root
+          MYSQL_DB: ai_talent_platform_test
+          BOOTSTRAP: "1"
+        run: bash ai_talent_platform/tests/sql/run_mysql_tests.sh
+
+  pgsql:
+    name: PostgreSQL 16 分析库
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ai_talent_analytics_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+      - name: 安装 PostgreSQL 客户端
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - name: 执行 PgSQL SQL 测试
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: ai_talent_analytics_test
+          BOOTSTRAP: "1"
+        run: bash ai_talent_platform/tests/sql/run_pgsql_tests.sh
