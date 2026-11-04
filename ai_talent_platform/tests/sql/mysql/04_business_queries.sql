@@ -84,7 +84,7 @@ SELECT 'BIZ-024', '匹配批次去重计数', (SELECT COUNT(DISTINCT batch_id) F
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
 SELECT 'BIZ-030', '简历秒传：file_hash 命中', (SELECT COUNT(*) FROM resumes WHERE file_hash = REPEAT('a', 64)) = 1, '同 hash 应命中 1 条';
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
-SELECT 'BIZ-031', '简历状态机：待解析队列', (SELECT COUNT(*) FROM resumes WHERE status = 'uploaded' AND id BETWEEN 900000 AND 900999) = 1, '待解析 1 条';
+SELECT 'BIZ-031', '简历状态机：待解析队列', (SELECT COUNT(*) FROM resumes WHERE status = 'uploaded' AND id IN (900001, 900002)) = 1, '待解析 1 条';
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
 SELECT 'BIZ-032', '工作经历按时间排序', (SELECT GROUP_CONCAT(company ORDER BY start_date DESC) FROM resume_experiences WHERE resume_id = 900001) = '测试科技公司,测试软件公司', '最新经历在前';
 

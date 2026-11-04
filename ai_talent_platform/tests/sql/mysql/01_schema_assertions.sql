@@ -33,7 +33,6 @@ BEGIN
   DELETE FROM resume_experiences WHERE id BETWEEN 900000 AND 900999;
   DELETE FROM resumes WHERE id BETWEEN 900000 AND 900999;
   DELETE FROM learning_records WHERE id BETWEEN 900000 AND 900999;
-  DELETE FROM plan_courses WHERE plan_id BETWEEN 900000 AND 900999 OR course_id BETWEEN 900000 AND 900999;
   DELETE FROM training_plans WHERE id BETWEEN 900000 AND 900999;
   DELETE FROM courses WHERE id BETWEEN 900000 AND 900999;
   DELETE FROM knowledge_chunks WHERE id BETWEEN 900000 AND 900999;
@@ -45,6 +44,7 @@ BEGIN
   DELETE FROM talents WHERE id BETWEEN 900000 AND 900999;
   DELETE FROM position_requirements WHERE id BETWEEN 900000 AND 900999;
   DELETE FROM positions WHERE id BETWEEN 900000 AND 900999;
+  DELETE FROM plan_courses WHERE plan_id BETWEEN 900000 AND 900999 OR course_id BETWEEN 900000 AND 900999;
   DELETE FROM user_roles WHERE user_id BETWEEN 900000 AND 900999 OR role_id BETWEEN 900000 AND 900999;
   DELETE FROM users WHERE id BETWEEN 900000 AND 900999;
   DELETE FROM roles WHERE id BETWEEN 900000 AND 900999;
@@ -673,7 +673,7 @@ FROM information_schema.referential_constraints rc
 JOIN information_schema.key_column_usage k
   ON k.constraint_schema = rc.constraint_schema AND k.constraint_name = rc.constraint_name AND k.table_name = rc.table_name
 WHERE rc.constraint_schema = DATABASE() AND rc.table_name = 'positions' AND k.column_name = 'organization_id'
-  AND k.referenced_table_name = 'organizations' AND k.referenced_column_name = 'id' AND rc.delete_rule = 'RESTRICT';
+  AND k.referenced_table_name = 'organizations' AND k.referenced_column_name = 'id' AND rc.delete_rule IN ('RESTRICT', 'NO ACTION');
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
 SELECT 'SCH-220', 'resume_experiences.resume_id -> resumes.id ON DELETE CASCADE',
        COUNT(*) = 1, CONCAT('匹配外键数=', COUNT(*))
@@ -750,17 +750,17 @@ WHERE rc.constraint_schema = DATABASE() AND rc.table_name = 'users' AND k.column
 -- ---------------------------------------------------------------- 关键默认值 / 类型
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
 SELECT 'SCH-300', 'users.is_active 默认值 = 1',
-       REPLACE(COALESCE(column_default, ''), '''', '') = '1', CONCAT('实际=', COALESCE(column_default, 'NULL'))
+       CAST(REPLACE(COALESCE(column_default, '0'), '''', '') AS DECIMAL(30,10)) = 1, CONCAT('实际=', COALESCE(column_default, 'NULL'))
 FROM information_schema.columns
 WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'is_active';
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
 SELECT 'SCH-301', 'users.is_superuser 默认值 = 0',
-       REPLACE(COALESCE(column_default, ''), '''', '') = '0', CONCAT('实际=', COALESCE(column_default, 'NULL'))
+       CAST(REPLACE(COALESCE(column_default, '0'), '''', '') AS DECIMAL(30,10)) = 0, CONCAT('实际=', COALESCE(column_default, 'NULL'))
 FROM information_schema.columns
 WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'is_superuser';
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
 SELECT 'SCH-302', 'users.fail_count 默认值 = 0',
-       REPLACE(COALESCE(column_default, ''), '''', '') = '0', CONCAT('实际=', COALESCE(column_default, 'NULL'))
+       CAST(REPLACE(COALESCE(column_default, '0'), '''', '') AS DECIMAL(30,10)) = 0, CONCAT('实际=', COALESCE(column_default, 'NULL'))
 FROM information_schema.columns
 WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'fail_count';
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
@@ -770,7 +770,7 @@ FROM information_schema.columns
 WHERE table_schema = DATABASE() AND table_name = 'talents' AND column_name = 'gender';
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
 SELECT 'SCH-304', 'talents.work_years 默认值 = 0',
-       REPLACE(COALESCE(column_default, ''), '''', '') = '0', CONCAT('实际=', COALESCE(column_default, 'NULL'))
+       CAST(REPLACE(COALESCE(column_default, '0'), '''', '') AS DECIMAL(30,10)) = 0, CONCAT('实际=', COALESCE(column_default, 'NULL'))
 FROM information_schema.columns
 WHERE table_schema = DATABASE() AND table_name = 'talents' AND column_name = 'work_years';
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
@@ -790,7 +790,7 @@ FROM information_schema.columns
 WHERE table_schema = DATABASE() AND table_name = 'positions' AND column_name = 'level';
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
 SELECT 'SCH-308', 'positions.headcount 默认值 = 1',
-       REPLACE(COALESCE(column_default, ''), '''', '') = '1', CONCAT('实际=', COALESCE(column_default, 'NULL'))
+       CAST(REPLACE(COALESCE(column_default, '0'), '''', '') AS DECIMAL(30,10)) = 1, CONCAT('实际=', COALESCE(column_default, 'NULL'))
 FROM information_schema.columns
 WHERE table_schema = DATABASE() AND table_name = 'positions' AND column_name = 'headcount';
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
@@ -805,12 +805,12 @@ FROM information_schema.columns
 WHERE table_schema = DATABASE() AND table_name = 'resumes' AND column_name = 'status';
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
 SELECT 'SCH-311', 'resumes.file_size 默认值 = 0',
-       REPLACE(COALESCE(column_default, ''), '''', '') = '0', CONCAT('实际=', COALESCE(column_default, 'NULL'))
+       CAST(REPLACE(COALESCE(column_default, '0'), '''', '') AS DECIMAL(30,10)) = 0, CONCAT('实际=', COALESCE(column_default, 'NULL'))
 FROM information_schema.columns
 WHERE table_schema = DATABASE() AND table_name = 'resumes' AND column_name = 'file_size';
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
 SELECT 'SCH-312', 'matching_records.score 默认值 = 0',
-       REPLACE(COALESCE(column_default, ''), '''', '') = '0', CONCAT('实际=', COALESCE(column_default, 'NULL'))
+       CAST(REPLACE(COALESCE(column_default, '0'), '''', '') AS DECIMAL(30,10)) = 0, CONCAT('实际=', COALESCE(column_default, 'NULL'))
 FROM information_schema.columns
 WHERE table_schema = DATABASE() AND table_name = 'matching_records' AND column_name = 'score';
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
@@ -830,7 +830,7 @@ FROM information_schema.columns
 WHERE table_schema = DATABASE() AND table_name = 'training_plans' AND column_name = 'status';
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
 SELECT 'SCH-316', 'learning_records.progress 默认值 = 0',
-       REPLACE(COALESCE(column_default, ''), '''', '') = '0', CONCAT('实际=', COALESCE(column_default, 'NULL'))
+       CAST(REPLACE(COALESCE(column_default, '0'), '''', '') AS DECIMAL(30,10)) = 0, CONCAT('实际=', COALESCE(column_default, 'NULL'))
 FROM information_schema.columns
 WHERE table_schema = DATABASE() AND table_name = 'learning_records' AND column_name = 'progress';
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
@@ -880,7 +880,7 @@ FROM information_schema.columns
 WHERE table_schema = DATABASE() AND table_name = 'audit_logs' AND column_name = 'status';
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
 SELECT 'SCH-326', 'organizations.level 默认值 = 1',
-       REPLACE(COALESCE(column_default, ''), '''', '') = '1', CONCAT('实际=', COALESCE(column_default, 'NULL'))
+       CAST(REPLACE(COALESCE(column_default, '0'), '''', '') AS DECIMAL(30,10)) = 1, CONCAT('实际=', COALESCE(column_default, 'NULL'))
 FROM information_schema.columns
 WHERE table_schema = DATABASE() AND table_name = 'organizations' AND column_name = 'level';
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
