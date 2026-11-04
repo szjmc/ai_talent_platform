@@ -122,9 +122,11 @@ async def extract_skills_by_llm(text: str, limit: int = 30) -> list[str] | None:
     """LLM 语义抽取（未配置 / 未实现时返回 None，由调用方静默退化）。"""
     try:
         manager_cls = import_dependency("app.ai.core.llm_manager", "LLMManager", hint="架构组未实现 LLMManager")
+        from app.adapters.llm.provider_config import provider_configured
         from app.config.settings import settings
 
-        if not settings.LLM_API_KEY:
+        # 供应商感知：DeepSeek / OpenAI / 通义各自有专属密钥配置，本地 Ollama 无需密钥
+        if not provider_configured(settings.LLM_PROVIDER):
             return None
         manager = manager_cls()
         result = manager.chat(

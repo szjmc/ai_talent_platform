@@ -2,13 +2,15 @@
 模块：app/adapters/llm/qwen_adapter.py
 职责：通义千问适配器（DashScope OpenAI 兼容模式）。
 
-标签：[架构组] [P0]（默认 provider）
+标签：[架构组] [P0]（内置 provider，默认不写死模型）
 
 ============================ 实现思路与代码要点 ============================
 - DashScope 提供 OpenAI 兼容端点，因此直接复用 OpenAIAdapter 的协议实现，
   只覆盖默认地址与默认模型，避免两套 HTTP 代码漂移；
-- 默认 base_url：https://dashscope.aliyuncs.com/compatible-mode/v1
-- 默认模型：qwen-plus；向量模型：text-embedding-v3（维度 1024，需与 Milvus 集合一致）。
+- 默认 base_url / 模型来自 provider_config.PROVIDER_SPECS["qwen"]，
+  可被 DASHSCOPE_BASE_URL / DASHSCOPE_MODEL 或通用 LLM_BASE_URL / LLM_MODEL 覆盖；
+- 默认模型：qwen-plus；向量模型：text-embedding-v3（维度 1024，需与 Milvus 集合一致），
+  可用 LLM_EMBED_MODEL 换成 text-embedding-v4 等其他向量模型。
 =========================================================================
 """
 
@@ -18,7 +20,7 @@ import logging
 from typing import Any
 
 from app.adapters.llm.openai_adapter import OpenAIAdapter
-from app.config.settings import settings
+from app.adapters.llm.provider_config import provider_configured, resolve_embed_model
 from app.patterns.registry import llm_registry
 
 logger = logging.getLogger(__name__)
@@ -37,19 +39,20 @@ class QwenAdapter(OpenAIAdapter):
     default_base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
     def __init__(self, model: str | None = None, **kwargs: Any) -> None:
-        kwargs.setdefault("base_url", self.default_base_url)
-        # embed_model 默认用向量模型，chat 仍用对话模型
-        kwargs.setdefault("embed_model", DEFAULT_EMBED_MODEL)
-        super().__init__(model or self.default_model, **kwargs)
+        # embed_model 只影响向量调用，chat 仍使用对话模型；可被 LLM_EMBED_MODEL 覆盖
+        kwargs.setdefault("embed_model", resolve_embed_model(self.provider) or DEFAULT_EMBED_MODEL)
+        super().__init__(model, **kwargs)
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
         """向量化：强制走 embedding 模型（避免误用对话模型名导致 400）。"""
-        self.options["embed_model"] = self.options.get("embed_model") or DEFAULT_EMBED_MODEL
+        self.options["embed_model"] = (
+            resolve_embed_model(self.provider) or self.options.get("embed_model") or DEFAULT_EMBED_MODEL
+        )
         return await super().embed(texts)
 
     @property
     def configured(self) -> bool:
-        return bool(self.api_key) and bool(settings.LLM_API_KEY or self.api_key)
+        return provider_configured(self.provider)
 
 
 __all__ = ["DEFAULT_EMBED_DIM", "DEFAULT_EMBED_MODEL", "QwenAdapter"]

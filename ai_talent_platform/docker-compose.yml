@@ -54,6 +54,30 @@ services:
       retries: 20
       start_period: 10s
 
+  # 可选：MinIO（对象存储，STORAGE_BACKEND=minio 时启用）
+  #   docker compose --profile storage up -d
+  #   控制台 http://127.0.0.1:9001（minioadmin / minioadmin），桶名与 .env 的 MINIO_BUCKET 一致
+  minio:
+    image: minio/minio:latest
+    container_name: talent-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: ["server", "/data", "--console-address", ":9001"]
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    profiles: ["storage"]
+
   # 可选：Redis（缓存 / 会话 / 限流）。启用时把 .env 中 REDIS_ENABLED 改为 true
   redis:
     image: redis:7-alpine
@@ -70,3 +94,4 @@ volumes:
   mysql_data:
   pgsql_data:
   redis_data:
+  minio_data:

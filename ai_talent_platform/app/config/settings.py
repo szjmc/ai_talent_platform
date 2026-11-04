@@ -111,9 +111,42 @@ class Settings(BaseSettings):
     LOGIN_LOCK_MINUTES: int = 15
 
     # ------------------------------------------------------------------ 文件存储
+    # 存储后端：local（本地磁盘）/ minio（自建 MinIO）/ oss（阿里云 OSS）/ s3（通用 S3 兼容）
+    # 业务代码统一通过 get_storage() 取用，切换后端只改本配置，不改调用方。
+    STORAGE_BACKEND: Literal["local", "minio", "oss", "s3"] = "local"
+    STORAGE_PUBLIC_URL: str = ""          # 对外访问基址（CDN / 反向代理），空则按各后端规则生成
+    STORAGE_PRESIGN_EXPIRE_SECONDS: int = 3600
+    STORAGE_TIMEOUT: int = 30             # 对象存储 HTTP 超时（秒）
     UPLOAD_DIR: str = os.path.join(BASE_DIR, "data", "uploads")
     MAX_UPLOAD_SIZE_MB: int = 20
     ALLOWED_UPLOAD_EXTENSIONS: str = ".pdf,.doc,.docx,.xls,.xlsx,.txt,.png,.jpg,.jpeg"
+
+    # MinIO（S3 协议，默认 path-style 访问）
+    MINIO_ENDPOINT: str = "127.0.0.1:9000"
+    MINIO_SECURE: bool = False
+    MINIO_ACCESS_KEY: str = "minioadmin"
+    MINIO_SECRET_KEY: str = "minioadmin"
+    MINIO_BUCKET: str = "ai-talent"
+    MINIO_REGION: str = "us-east-1"
+    MINIO_PUBLIC_URL: str = ""            # 例如 https://files.example.com（公共读 / CDN）
+
+    # 阿里云 OSS（Signature V1）
+    OSS_ENDPOINT: str = "oss-cn-hangzhou.aliyuncs.com"
+    OSS_SECURE: bool = True
+    OSS_ACCESS_KEY_ID: str = ""
+    OSS_ACCESS_KEY_SECRET: str = ""
+    OSS_BUCKET: str = ""
+    OSS_PUBLIC_URL: str = ""
+
+    # 通用 S3 兼容存储（AWS S3 / 其他兼容网关；MinIO 建议直接用 minio 后端）
+    S3_ENDPOINT: str = ""
+    S3_SECURE: bool = True
+    S3_PATH_STYLE: bool = False
+    S3_ACCESS_KEY: str = ""
+    S3_SECRET_KEY: str = ""
+    S3_BUCKET: str = ""
+    S3_REGION: str = "us-east-1"
+    S3_PUBLIC_URL: str = ""
 
     # ------------------------------------------------------------------ 日志
     LOG_DIR: str = os.path.join(BASE_DIR, "logs")
@@ -127,12 +160,34 @@ class Settings(BaseSettings):
     MAX_PAGE_SIZE: int = 200
 
     # ------------------------------------------------------------------ AI 能力层
-    LLM_PROVIDER: Literal["qwen", "openai", "ollama"] = "qwen"
-    LLM_MODEL: str = "qwen-plus"
-    LLM_API_KEY: str = ""
-    LLM_BASE_URL: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    # LLM_PROVIDER 不写死枚举：内置 qwen / openai / deepseek / ollama，
+    # 也可通过 llm_registry 注册自定义供应商（名称即注册键）。
+    LLM_PROVIDER: str = "qwen"
+    LLM_MODEL: str = "qwen-plus"          # 默认模型（留空则取供应商默认模型）
+    LLM_API_KEY: str = ""                 # 通用密钥（仅当前供应商生效，专属密钥优先）
+    LLM_BASE_URL: str = ""                # 通用地址（仅当前供应商生效，专属地址优先）
     LLM_TIMEOUT: int = 60
     LLM_MAX_RETRIES: int = 2
+    # 按用途覆盖模型："chat=deepseek-chat,talent=deepseek-reasoner"（支持 JSON 对象）
+    LLM_MODEL_MAP: str = ""
+    # 追加/覆盖模型降级链："deepseek-reasoner:deepseek-chat"
+    LLM_FALLBACK_MODELS: str = ""
+    # 向量模型供应商标识与模型（默认与 LLM_PROVIDER 相同；供应商不提供向量能力时必须指定）
+    LLM_EMBED_PROVIDER: str = ""
+    LLM_EMBED_MODEL: str = ""
+
+    # 各供应商专属配置（语义：专属配置 > LLM_API_KEY / LLM_BASE_URL / LLM_MODEL > 内置默认）
+    DASHSCOPE_API_KEY: str = ""
+    DASHSCOPE_BASE_URL: str = ""
+    DASHSCOPE_MODEL: str = ""
+    DEEPSEEK_API_KEY: str = ""
+    DEEPSEEK_BASE_URL: str = ""
+    DEEPSEEK_MODEL: str = ""
+    OPENAI_API_KEY: str = ""
+    OPENAI_BASE_URL: str = ""
+    OPENAI_MODEL: str = ""
+    OLLAMA_BASE_URL: str = ""
+    OLLAMA_MODEL: str = ""
 
     DIFY_BASE_URL: str = "http://127.0.0.1/v1"
     DIFY_API_KEY: str = ""
@@ -228,6 +283,20 @@ class Settings(BaseSettings):
             "redis": self.REDIS_URL if self.REDIS_ENABLED else "disabled",
             "milvus": self.MILVUS_URI if self.MILVUS_ENABLED else "disabled",
         }
+
+    @property
+    def storage_summary(self) -> dict[str, str]:
+        """文件存储摘要（脱敏，不含密钥），供 /system/info 展示。"""
+        backend = self.STORAGE_BACKEND
+        if backend == "minio":
+            target = f"{self.MINIO_ENDPOINT}/{self.MINIO_BUCKET}"
+        elif backend == "oss":
+            target = f"{self.OSS_ENDPOINT}/{self.OSS_BUCKET or '-'}"
+        elif backend == "s3":
+            target = f"{self.S3_ENDPOINT or '-'}/{self.S3_BUCKET or '-'}"
+        else:
+            target = self.UPLOAD_DIR
+        return {"backend": backend, "target": target}
 
     def ensure_dirs(self) -> None:
         """创建运行期需要的目录（日志、上传）。"""

@@ -390,7 +390,7 @@ ORM 关系：
 | `content_type` | `VARCHAR(128)` | 是 | — |  | — | MIME 类型 |
 | `extension` | `VARCHAR(16)` | 是 | — |  | — | 扩展名（含点） |
 | `file_hash` | `VARCHAR(64)` | 是 | — |  | — | sha256，秒传与查重 |
-| `storage_type` | `VARCHAR(16)` | 否 | 服务器端 'local' |  | — | 存储方式：local/oss |
+| `storage_type` | `VARCHAR(16)` | 否 | 服务器端 'local' |  | — | 存储方式：local/minio/oss/s3 |
 | `biz_type` | `VARCHAR(32)` | 否 | — |  | — | 业务类型：resume/knowledge/avatar/export |
 | `biz_id` | `BIGINT` | 是 | — |  | — | 关联业务 ID（多态） |
 | `uploader_id` | `BIGINT` | 是 | — |  | users.id ON DELETE SET NULL | 上传人（FK -> users.id，SET NULL） |

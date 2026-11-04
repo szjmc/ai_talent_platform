@@ -172,11 +172,12 @@
 
 ```
 adapters/
-├── llm/            base_llm.py（统一接口）→ openai / qwen / ollama 适配器
+├── llm/            base_llm.py（统一接口）+ provider_config（供应商目录）
+│                   → openai / qwen / deepseek / ollama 适配器（模型由配置决定）
 ├── dify/           Dify 工作流与应用调用
 ├── nl2sql/         Vanna 适配 + sql_validator 安全校验（只读、限行、表白名单）
 ├── vector_store/   Milvus 向量库适配（统一向量库接口）
-└── storage/        本地存储适配（后续可扩展 OSS / MinIO）
+└── storage/        BaseStorage 契约 → local / minio（S3 SigV4）/ oss（Signature V1）/ s3
 ```
 
 **职责边界（容易混淆，务必区分）**

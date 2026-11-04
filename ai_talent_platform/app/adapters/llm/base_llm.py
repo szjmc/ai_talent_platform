@@ -20,7 +20,8 @@
     ChatMessage   {role: system/user/assistant, content: str}
     LLMResult     {content, model, prompt_tokens, completion_tokens, elapsed_ms, raw}
 
-子类：openai_adapter（兼容 DashScope compatible-mode）、qwen_adapter、ollama_adapter
+子类：openai_adapter（兼容 DashScope compatible-mode）、qwen_adapter、
+      deepseek_adapter（OpenAI 兼容协议）、ollama_adapter；模型由 provider_config / settings 决定
 实现要点：
 - 统一重试：ai/utils/retry_handler.py（指数退避 + 超时）；
 - 统一异常：core.exceptions.AIError / ExternalServiceError；
@@ -38,6 +39,12 @@ from typing import Any, AsyncIterator, Iterable, Sequence
 
 import httpx
 
+from app.adapters.llm.provider_config import (
+    get_provider_spec,
+    resolve_api_key,
+    resolve_base_url,
+    resolve_model,
+)
 from app.config.settings import settings
 from app.core.exceptions import AIError, ExternalServiceError
 
@@ -154,9 +161,17 @@ class BaseLLM(ABC):
         max_retries: int | None = None,
         **options: Any,
     ) -> None:
-        self.model = model or self.default_model or settings.LLM_MODEL
-        self.api_key = api_key if api_key is not None else settings.LLM_API_KEY
-        self.base_url = (base_url or self.default_base_url or settings.LLM_BASE_URL).rstrip("/")
+        # 模型 / 密钥 / 地址统一走 provider_config：
+        # 显式参数 > 供应商专属配置 > 通用配置 > 目录默认值（不把任何厂商写死在这里）。
+        spec = get_provider_spec(self.provider)
+        if spec is not None:
+            self.model = resolve_model(self.provider, model) or self.default_model
+            self.base_url = (resolve_base_url(self.provider, base_url) or self.default_base_url).rstrip("/")
+        else:
+            # 自定义供应商（仅注册了适配器类）：以类属性默认值为准，LLM_* 作为兜底
+            self.model = model or self.default_model or settings.LLM_MODEL
+            self.base_url = (base_url or self.default_base_url or settings.LLM_BASE_URL).rstrip("/")
+        self.api_key = resolve_api_key(self.provider, api_key)
         self.timeout = float(timeout or settings.LLM_TIMEOUT)
         self.max_retries = settings.LLM_MAX_RETRIES if max_retries is None else max_retries
         self.options: dict[str, Any] = dict(options)
