@@ -7,11 +7,11 @@
 ============================ 实现思路与代码要点 ============================
 表设计：files
 - file_name(原始名)、stored_name(磁盘名/UUID)、file_path、file_size、content_type、
-  extension、file_hash(sha256，秒传与去重)、storage_type(local/oss)、
+  extension、file_hash(sha256，秒传与去重)、storage_type(local/minio/oss/s3)、
   biz_type(resume/knowledge/avatar/export)、biz_id(关联业务 ID)、
   uploader_id、is_public、download_count
 关键思路：
-- 文件本体存磁盘（adapters/storage/local_storage_adapter.py），表里只存元数据；
+- 文件本体存本地磁盘或对象存储（adapters/storage/*，由 STORAGE_BACKEND 决定），表里只存元数据；
 - file_hash 唯一（可选）实现秒传：相同文件不重复落盘；
 - 下载接口必须校验权限（biz_type + 归属人 + 角色）。
 已完成：
@@ -63,7 +63,7 @@ class File(BaseModel):
     )
     storage_type: Mapped[str] = mapped_column(
         String(16), nullable=False, default="local", server_default=text("'local'"),
-        comment="存储方式：local/oss",
+        comment="存储方式：local/minio/oss/s3",
     )
     biz_type: Mapped[str] = mapped_column(
         String(32), nullable=False, comment="业务类型：resume/knowledge/avatar/export"

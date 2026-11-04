@@ -28,6 +28,7 @@ from app.adapters.llm.base_llm import (
     LLMResult,
     LLMRetryableError,
 )
+from app.adapters.llm.provider_config import get_provider_spec
 from app.ai.utils.retry_handler import ai_retry
 from app.core.exceptions import AIError
 from app.patterns.registry import llm_registry
@@ -71,7 +72,7 @@ class OpenAIAdapter(BaseLLM):
             payload["temperature"] = temperature
         if max_tokens is not None:
             payload["max_tokens"] = max_tokens
-        payload.update(self.merge_options(**kwargs))
+        payload.update(self.chat_options(**kwargs))
 
         data = await self._post("/chat/completions", payload)
         choices = data.get("choices") or []
@@ -104,7 +105,7 @@ class OpenAIAdapter(BaseLLM):
             "messages": self.normalize_messages(messages),
             "stream": True,
         }
-        payload.update(self.merge_options(**kwargs))
+        payload.update(self.chat_options(**kwargs))
         url = f"{self.base_url}/chat/completions"
         started = time.perf_counter()
         async with self.client() as client:
@@ -147,7 +148,55 @@ class OpenAIAdapter(BaseLLM):
             raise LLMResponseError(f"向量数量不匹配：期望 {len(texts)}，实际 {len(vectors)}")
         return vectors
 
+    # ---------------------------------------------------------------- 选项
+    def chat_options(self, **kwargs: Any) -> dict[str, Any]:
+        """对话请求的可选参数（过滤 embed_model 等仅内部使用的选项）。"""
+        options = self.merge_options(**kwargs)
+        options.pop("embed_model", None)
+        return options
+
+    # ---------------------------------------------------------------- 模型清单 / 自检
+    @ai_retry()
+    async def list_models(self) -> list[str]:
+        """列出供应商可用模型（GET /models），用于自检与配置校验。"""
+        data = await self._get("/models")
+        return [
+            str(item.get("id"))
+            for item in (data.get("data") or [])
+            if isinstance(item, dict) and item.get("id")
+        ]
+
+    async def health(self) -> dict[str, Any]:
+        """连通性与鉴权自检（不抛异常，返回结构化结果）。"""
+        try:
+            models = await self.list_models()
+        except Exception as exc:  # noqa: BLE001 - 自检接口不应把异常抛给调用方
+            return {
+                "ok": False,
+                "provider": self.provider,
+                "base_url": self.base_url,
+                "model": self.model,
+                "reason": str(exc),
+            }
+        return {
+            "ok": True,
+            "provider": self.provider,
+            "base_url": self.base_url,
+            "model": self.model,
+            "models": models[:50],
+        }
+
     # ---------------------------------------------------------------- 内部
+    async def _get(self, path: str) -> dict[str, Any]:
+        url = f"{self.base_url}{path}"
+        async with self.client() as client:
+            response = await client.get(url)
+            await self._raise_for_status(response)
+            try:
+                return response.json()
+            except ValueError as exc:
+                raise LLMResponseError(f"模型返回不是 JSON：{response.text[:300]}") from exc
+
     async def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         url = f"{self.base_url}{path}"
         started = time.perf_counter()
@@ -173,7 +222,12 @@ class OpenAIAdapter(BaseLLM):
         body = response.text[:500]
         message = f"大模型调用失败（HTTP {response.status_code}）：{body}"
         if response.status_code in (401, 403):
-            raise AIError(f"{message}（请检查 LLM_API_KEY 与模型权限）", data={"status": response.status_code})
+            spec = get_provider_spec(self.provider)
+            key_hint = f"{spec.api_key_attr} 或 LLM_API_KEY" if spec and spec.api_key_attr else "LLM_API_KEY"
+            raise AIError(
+                f"{message}（请检查 {self.provider} 的密钥配置：{key_hint}）",
+                data={"status": response.status_code, "provider": self.provider},
+            )
         if response.status_code in _RETRYABLE_STATUS:
             raise LLMRetryableError(message, data={"status": response.status_code})
         raise AIError(message, data={"status": response.status_code})

@@ -93,6 +93,7 @@ async def system_info():
             "pgsql_tables": list(ANALYTICS_TABLE_NAMES),
             "redis_enabled": settings.REDIS_ENABLED,
             "milvus_enabled": settings.MILVUS_ENABLED,
+            "storage": settings.storage_summary,
             # AI 运行时状态：LLM 适配器 / 已注册技能 / 已注册 Agent（架构组）
             "ai_ready": ai_runtime_status(),
             "implemented_modules": ["auth", "users", "organizations"],

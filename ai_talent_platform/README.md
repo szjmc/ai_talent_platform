@@ -8,8 +8,9 @@
 
 当前进度：**公共层（P0）已完成并通过验收**，认证、用户、组织三大模块可跑通；
 ORM 层已完整落地：MySQL 25 张业务表 + PgSQL 6 张分析表，全局映射见 `docs/orm_mapping.md`；
-架构组（AI 公共层 + Skills + 集成）已完整落地：LLM 适配器 / LLMManager / Agent 基类与调度 / 上下文 / 记忆 / 存储 / 事件总线 / 匹配策略，
-见 `docs/plan/05-代码标签与优先级总表.md`；全局 ORM 映射由 `python scripts/dump_orm_mapping.py` 自动生成；
+架构组（AI 公共层 + Skills + 集成）已完整落地：LLM 适配器（qwen / OpenAI / DeepSeek / Ollama，模型全部配置驱动）
+/ LLMManager / Agent 基类与调度 / 上下文 / 记忆 / 文件存储（本地 / MinIO / 阿里云 OSS / S3）/ 事件总线 / 匹配策略，
+见 `docs/plan/05-代码标签与优先级总表.md` 与 `docs/storage_and_llm_adapters.md`；全局 ORM 映射由 `python scripts/dump_orm_mapping.py` 自动生成；
 PgSQL 分析库另有独立初始化脚本 `scripts/init_pgsql.py`（含分区父表和 DEFAULT 分区，数据同步/ETL 仍未实现）；
 其余业务模块（人才、岗位、简历、测评、培训、匹配、知识库、分析、Agent、文件）已建好骨架，
 每个文件开头写明实现思路与待写代码，按 TODO 补齐即可。
@@ -23,6 +24,7 @@ PgSQL 分析库另有独立初始化脚本 `scripts/init_pgsql.py`（含分区�
 #    没有本地数据库？一条命令拉起（账号密码与 .env.example 一致）：
 #    docker compose up -d            # MySQL 8 + PgSQL 16
 #    docker compose --profile cache up -d   # 额外启动 Redis
+#    docker compose --profile storage up -d # 额外启动 MinIO（STORAGE_BACKEND=minio 时使用）
 cd ai_talent_platform
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
@@ -61,6 +63,7 @@ python main.py                # http://127.0.0.1:8000/docs
 | **[docs/requirements_specification.md](docs/requirements_specification.md)** | **★需求规格说明书（SRS）**：角色与权限、五大 AI 能力量化指标、15 大业务模块功能规格、非功能指标、**需求—研发组唯一归属追踪矩阵（RTM）** |
 | **[docs/system_design_document.md](docs/system_design_document.md)** | **★系统总体与详细设计文档（SDD）**：六层单向依赖架构、四库与 Redis 键空间设计、5 条端到端业务与 AI 调用时序、Skill↔Service 桥接与安全降级设计 |
 | [docs/公共层使用手册.md](docs/公共层使用手册.md) | **必读**：响应/异常/数据库/Repository/认证权限/新增模块全流程/FAQ |
+| **[docs/storage_and_llm_adapters.md](docs/storage_and_llm_adapters.md)** | **对象存储与多模型适配手册**：MinIO / 阿里云 OSS / DeepSeek 配置、预签名下载、模型按用途选择与降级、扩展新厂商 |
 | [docs/architecture.md](docs/architecture.md) | 六层架构图（**内联 SVG，离线可打开**）、依赖规则、调用链路 |
 | [docs/development.md](docs/development.md) | 开发规范与五大组协作约定 |
 | [docs/api_document.md](docs/api_document.md) | **接口契约（全模块）**：统一响应/错误码/JWT/RBAC 权限矩阵 + 15 个模块的 method/path/权限/请求字段/示例/错误码 |

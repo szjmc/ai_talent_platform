@@ -1,21 +1,25 @@
 """
 模块：app/ai/core/model_selector.py
-职责：按任务类型选择合适的大模型。
+职责：按任务类型 + 供应商选择合适的大模型（不把任何模型写死在业务代码里）。
 
 标签：[架构组] [P1]（被 llm_manager 依赖）
 
 ============================ 实现思路与代码要点 ============================
-用途 -> 模型策略（示例，按 settings 可覆盖）：
-    resume_parse   结构化输出稳定（qwen-plus / gpt-4o-mini）
-    talent_portrait 推理能力较强（qwen-max / gpt-4o）
-    matching       长上下文 + 推理（qwen-plus）
-    assistant      成本优先 + 流式（qwen-turbo）
-    embed          向量模型（text-embedding-v3 等，维度需与 Milvus 集合一致）
+选模型优先级（高 -> 低）：
+    1. 环境变量按用途覆盖：LLM_MODEL_<PURPOSE>
+       （供应商级：LLM_MODEL_<PROVIDER>_<PURPOSE>，例如 LLM_MODEL_DEEPSEEK_CHAT）
+    2. LLM_MODEL_MAP 显式映射：'chat=deepseek-chat,talent=deepseek-reasoner'
+       也可写供应商限定 'deepseek.chat=deepseek-reasoner'
+    3. 若 LLM_MODEL 与当前供应商匹配且不是目录默认值（视为用户显式指定）→ 全用途使用
+    4. 供应商目录中的「用途推荐模型」（provider_config.PROVIDER_SPECS）
+    5. LLM_MODEL（与供应商匹配时）
+    6. 供应商目录默认模型
 
-实现要点：
-- 策略表集中定义，不要在业务代码里写模型名；
-- 支持按环境变量覆盖（LLM_MODEL 为默认，特定用途可用 LLM_MODEL_RESUME 等）；
-- 记录「实际使用模型」到结果表，便于效果对比与降级回溯。
+设计要点：
+- 供应商目录（provider_config）是唯一模型来源，新增模型只改配置 / 目录，不改业务；
+- deepseek / qwen / openai / ollama 各有独立默认值与降级链，切换 LLM_PROVIDER 后
+  不会误用上一个厂商的模型名；
+- 温度按用途给默认值，结构化输出低温、闲聊高温；调用方仍可显式覆盖。
 =========================================================================
 """
 
@@ -25,33 +29,37 @@ import logging
 import os
 from typing import Any
 
+from app.adapters.llm.provider_config import (
+    PROVIDER_SPECS,
+    get_provider_spec,
+    model_matches_provider,
+    parse_fallback_overrides,
+    parse_model_overrides,
+    provider_configured,
+    resolve_embed_model,
+    same_provider_models,
+)
 from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-# 用途 -> 模型（默认按通义千问；换厂商时只改这张表 + settings）
+_DEFAULT_SPEC = PROVIDER_SPECS["qwen"]
+
+# 用途 -> 模型（兼容旧引用：默认供应商 qwen 的推荐表，实际选择以 select_model 为准）
 MODEL_BY_PURPOSE: dict[str, str] = {
-    "default": settings.LLM_MODEL,
-    "chat": "qwen-turbo",
-    "assistant": "qwen-turbo",
-    "resume": "qwen-plus",
-    "resume_parse": "qwen-plus",
-    "talent": "qwen-max",
-    "talent_portrait": "qwen-max",
-    "matching": "qwen-plus",
-    "assessment": "qwen-plus",
-    "training": "qwen-plus",
-    "knowledge": "qwen-plus",
-    "sql": "qwen-plus",
-    "summary": "qwen-turbo",
-    "embed": "text-embedding-v3",
+    "default": settings.LLM_MODEL or _DEFAULT_SPEC.default_model,
+    **_DEFAULT_SPEC.models_by_purpose,
+    "embed": _DEFAULT_SPEC.default_embed_model,
 }
 
-# 降级链：主模型不可用（超时 / 限流 / 模型下线）时的备用顺序
+# 降级链：主模型不可用（超时 / 限流 / 模型下线）时的备用顺序。
+# 未列出的模型会按供应商目录自动推导同厂商备选（见 fallback_models）。
 FALLBACK_CHAIN: dict[str, list[str]] = {
     "qwen-max": ["qwen-plus", "qwen-turbo"],
     "qwen-plus": ["qwen-turbo", "qwen-max"],
     "qwen-turbo": ["qwen-plus"],
+    "deepseek-reasoner": ["deepseek-chat"],
+    "deepseek-chat": ["deepseek-reasoner"],
     "gpt-4o": ["gpt-4o-mini"],
     "gpt-4o-mini": ["gpt-4o"],
 }
@@ -73,48 +81,170 @@ TEMPERATURE_BY_PURPOSE: dict[str, float] = {
 }
 
 
-def _env_override(purpose: str) -> str | None:
-    """按用途读取环境变量覆盖：LLM_MODEL_RESUME / LLM_MODEL_SQL ..."""
-    key = f"LLM_MODEL_{purpose.upper()}"
-    value = os.getenv(key)
-    return value.strip() if value and value.strip() else None
+# ------------------------------------------------------------------ 内部工具
+def _provider(provider: str | None = None) -> str:
+    """当前供应商名（统一小写；空值回落到 settings.LLM_PROVIDER）。"""
+    return str(provider or settings.LLM_PROVIDER or "").strip().lower()
 
 
-def select_model(purpose: str | None = None) -> str:
-    """按用途选模型：环境变量 > 策略表 > settings.LLM_MODEL。"""
-    purpose = (purpose or "default").strip()
-    return (
-        _env_override(purpose)
-        or MODEL_BY_PURPOSE.get(purpose)
-        or MODEL_BY_PURPOSE.get("default")
-        or settings.LLM_MODEL
+def _purpose(purpose: str | None) -> str:
+    return str(purpose or "default").strip().lower()
+
+
+def _env_override(purpose: str, provider: str) -> str | None:
+    """按用途读取环境变量覆盖：
+
+        LLM_MODEL_<PURPOSE>                通用
+        LLM_MODEL_<PROVIDER>_<PURPOSE>     供应商级（优先级更高）
+    """
+    keys = (
+        f"LLM_MODEL_{provider.upper()}_{purpose.upper()}" if provider else "",
+        f"LLM_MODEL_{purpose.upper()}",
     )
+    for key in keys:
+        if not key:
+            continue
+        value = os.getenv(key)
+        if value and value.strip():
+            return value.strip()
+    return None
+
+
+def _provider_for_model(model: str) -> str:
+    """根据模型名推断所属供应商（用于自动降级链）。"""
+    for name, spec in PROVIDER_SPECS.items():
+        if spec.model_prefixes and any(
+            model.lower().startswith(prefix.lower()) for prefix in spec.model_prefixes
+        ):
+            return name
+    # Ollama 的模型名没有统一前缀，退化为当前供应商
+    return _provider()
+
+
+# ------------------------------------------------------------------ 模型选择
+def select_model(purpose: str | None = None, provider: str | None = None) -> str:
+    """按用途 + 供应商选模型（优先级见模块 docstring）。"""
+    provider = _provider(provider)
+    purpose = _purpose(purpose)
+    spec = get_provider_spec(provider)
+
+    # 1) 环境变量按用途覆盖
+    env_value = _env_override(purpose, provider)
+    if env_value:
+        return env_value
+
+    # 2) LLM_MODEL_MAP 显式映射（供应商限定优先）
+    overrides = parse_model_overrides()
+    for key in (f"{provider}.{purpose}", purpose, f"{provider}.default", "default"):
+        mapped = overrides.get(key)
+        if mapped:
+            return mapped
+
+    # 3) LLM_MODEL 显式指定（与供应商匹配、且不是该供应商目录默认值）
+    generic_model = str(settings.LLM_MODEL or "").strip()
+    if (
+        spec is not None
+        and generic_model
+        and generic_model != spec.default_model
+        and model_matches_provider(provider, generic_model)
+    ):
+        return generic_model
+
+    # 4) 供应商目录的用途推荐模型
+    if spec is not None and purpose not in ("default", ""):
+        preferred = spec.preferred_model(purpose)
+        if preferred:
+            return preferred
+
+    # 5) 通用 LLM_MODEL（仅当模型名符合当前供应商命名） / 6) 目录默认模型
+    if generic_model and model_matches_provider(provider, generic_model):
+        return generic_model
+    if spec is not None:
+        return spec.default_model
+    return generic_model
+
+
+def select_provider(purpose: str | None = None) -> str:
+    """选择供应商：向量用途可单独指定 LLM_EMBED_PROVIDER，其余用 LLM_PROVIDER。"""
+    if _purpose(purpose) == "embed" and settings.LLM_EMBED_PROVIDER:
+        return str(settings.LLM_EMBED_PROVIDER).strip().lower()
+    return _provider()
 
 
 def select_temperature(purpose: str | None = None) -> float:
     """按用途返回推荐温度。"""
-    return TEMPERATURE_BY_PURPOSE.get((purpose or "default").strip(), TEMPERATURE_BY_PURPOSE["default"])
+    return TEMPERATURE_BY_PURPOSE.get(_purpose(purpose), TEMPERATURE_BY_PURPOSE["default"])
 
 
 def fallback_models(model: str) -> list[str]:
-    """返回该模型的降级序列（不含自身）。"""
-    return list(FALLBACK_CHAIN.get(model, []))
+    """返回该模型的降级序列（不含自身）。
+
+    来源：LLM_FALLBACK_MODELS 配置 > 内置 FALLBACK_CHAIN > 供应商目录自动推导。
+    """
+    if not model:
+        return []
+    overrides = parse_fallback_overrides()
+    chain = list(overrides.get(model) or FALLBACK_CHAIN.get(model) or [])
+
+    if not chain:
+        # 先看当前供应商目录是否含该模型（Ollama 的 qwen2.5:7b 等名称与其他厂商前缀重合），
+        # 再按模型名前缀推断，避免跨厂商降级。
+        provider = _provider()
+        if model not in same_provider_models(provider):
+            provider = _provider_for_model(model)
+        chain = [candidate for candidate in same_provider_models(provider) if candidate != model][:2]
+
+    # 去重且剔除自身，避免降级到同一个模型
+    return [item for item in dict.fromkeys(chain) if item and item != model]
 
 
-def select_embedding_model() -> str:
-    """向量模型（维度需与 Milvus 集合一致）。"""
-    return os.getenv("LLM_EMBED_MODEL") or MODEL_BY_PURPOSE.get("embed") or "text-embedding-v3"
+def select_embedding_model(provider: str | None = None) -> str:
+    """向量模型（维度需与 Milvus 集合一致）；供应商不提供向量能力时返回空串。"""
+    provider = _provider(provider)
+    env_value = os.getenv(f"LLM_EMBED_MODEL_{provider.upper()}") or os.getenv("LLM_EMBED_MODEL")
+    if env_value and env_value.strip():
+        return env_value.strip()
+    return resolve_embed_model(provider)
 
 
-def describe_policies() -> dict[str, Any]:
+def embedding_available(provider: str | None = None) -> bool:
+    """当前配置下是否具备向量化能力（模型名 + 密钥）。"""
+    target = _provider(provider)
+    spec = get_provider_spec(target)
+    if spec is not None and not spec.default_embed_model and not select_embedding_model(target):
+        return False
+    return provider_configured(target)
+
+
+def describe_policies(provider: str | None = None) -> dict[str, Any]:
     """导出策略表（便于 /system/info 展示与排障）。"""
+    target = _provider(provider)
+    spec = get_provider_spec(target)
     return {
-        "model_by_purpose": dict(MODEL_BY_PURPOSE),
+        "provider": target,
+        "default_model": select_model("default", target),
+        "model_by_purpose": {
+            purpose: select_model(purpose, target)
+            for purpose in MODEL_BY_PURPOSE
+            if purpose != "embed"
+        },
+        "provider_catalog": {
+            name: {
+                "default_model": item.default_model,
+                "embed_model": item.default_embed_model,
+                "models_by_purpose": dict(item.models_by_purpose),
+            }
+            for name, item in PROVIDER_SPECS.items()
+        },
+        "model_overrides": parse_model_overrides(),
         "temperature_by_purpose": dict(TEMPERATURE_BY_PURPOSE),
         "fallback_chain": {k: list(v) for k, v in FALLBACK_CHAIN.items()},
-        "embedding_model": select_embedding_model(),
-        "default_model": settings.LLM_MODEL,
-        "provider": settings.LLM_PROVIDER,
+        "fallback_overrides": parse_fallback_overrides(),
+        "embedding_provider": select_provider("embed"),
+        "embedding_model": select_embedding_model(target),
+        "embedding_available": embedding_available(target),
+        "provider_configured": provider_configured(target),
+        "provider_default_model": spec.default_model if spec else settings.LLM_MODEL,
     }
 
 
@@ -123,8 +253,10 @@ __all__ = [
     "MODEL_BY_PURPOSE",
     "TEMPERATURE_BY_PURPOSE",
     "describe_policies",
+    "embedding_available",
     "fallback_models",
     "select_embedding_model",
     "select_model",
+    "select_provider",
     "select_temperature",
 ]

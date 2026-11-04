@@ -5,9 +5,9 @@
 标签：[架构组] [P2]（基于 Registry 的通用工厂，可选）
 
 典型场景：
-- LLM 工厂：根据 settings.LLM_PROVIDER 创建 qwen / openai / ollama 适配器
+- LLM 工厂：根据 settings.LLM_PROVIDER 创建 qwen / openai / deepseek / ollama 适配器
 - Agent 工厂：根据 agent_type 创建对应 Agent
-- 存储工厂：根据 storage_type 创建本地 / 对象存储适配器
+- 存储工厂：根据 storage_type 创建本地 / MinIO / 阿里云 OSS / S3 适配器
 
 使用示例：
     llm = AdapterFactory.create("llm", settings.LLM_PROVIDER, api_key=..., model=...)

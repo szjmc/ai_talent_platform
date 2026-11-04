@@ -15,7 +15,7 @@
 - 落盘目录来自 settings.UPLOAD_DIR，按 `biz_type/yyyy/mm/` 分目录，避免单目录文件过多；
 - 存储文件名 = uuid + 扩展名（utils/file_utils.safe_filename），防路径穿越；
 - 删除采用「先标记后清理」，避免事务回滚后文件已丢；
-- 后续接对象存储（OSS/MinIO）时新增 adapter 实现同一接口即可。
+- 对象存储（MinIO / 阿里云 OSS / S3）已提供同接口实现，见 minio_adapter.py / oss_adapter.py。
 =========================================================================
 """
 

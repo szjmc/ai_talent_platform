@@ -568,7 +568,7 @@ JSON 检索：`skill_tags` 用 `JSON_CONTAINS(skill_tags, '"Python"')`；高频�
 | content_type | VARCHAR(128) | MIME |
 | extension | VARCHAR(16) | 扩展名（含点） |
 | file_hash | CHAR(64) | sha256（秒传，可选唯一） |
-| storage_type | VARCHAR(16) | `local` / `oss` |
+| storage_type | VARCHAR(16) | `local` / `minio` / `oss` / `s3` |
 | biz_type | VARCHAR(32) | `resume/knowledge/avatar/export` |
 | biz_id | BIGINT | 关联业务 ID |
 | uploader_id | BIGINT | 上传人（FK→users.id） |

@@ -6,7 +6,7 @@
 方便在本地无 Key、无 Milvus 的环境验收架构组代码。
 
     python scripts/demo_ai.py                # 离线演示（默认）
-    python scripts/demo_ai.py --with-llm     # 额外跑一次真实大模型调用（需 LLM_API_KEY）
+    python scripts/demo_ai.py --with-llm     # 额外跑一次真实大模型调用（需配置对应供应商密钥）
 
 演示链路：
     1. Skills 注册与清单导出（架构组）
@@ -111,7 +111,7 @@ async def demo_llm() -> None:
         result = await llm_manager.generate("用一句话介绍你自己", purpose="chat")
         print(f"模型输出：{result.content[:200]}")
     except Exception as exc:  # noqa: BLE001
-        print(f"真实调用失败（检查 LLM_API_KEY / 网络）：{exc}")
+        print(f"真实调用失败（检查 {settings.LLM_PROVIDER} 的密钥配置 / 网络）：{exc}")
 
 
 async def main_async(with_llm: bool) -> None:
@@ -139,7 +139,11 @@ def main() -> None:
     parser.add_argument("--with-llm", action="store_true", help="额外执行一次真实大模型调用")
     args = parser.parse_args()
     setup_logging()
-    print(f"环境：LLM={settings.LLM_PROVIDER}/{settings.LLM_MODEL}　Milvus={settings.MILVUS_ENABLED}　Redis={settings.REDIS_ENABLED}　PgSQL={settings.PGSQL_ENABLED}")
+    print(
+        f"环境：LLM={settings.LLM_PROVIDER}/{settings.LLM_MODEL}"
+        f"　存储={settings.STORAGE_BACKEND}"
+        f"　Milvus={settings.MILVUS_ENABLED}　Redis={settings.REDIS_ENABLED}　PgSQL={settings.PGSQL_ENABLED}"
+    )
     asyncio.run(main_async(with_llm=args.with_llm))
 
 
