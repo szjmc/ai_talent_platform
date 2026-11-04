@@ -1,18 +1,23 @@
 # 03. 3 组（Vanna.ai NL2SQL，4 人）— 20 个工作日计划
 
-> 隶属：[AI 能力层分组开发计划](../team_sprint_plan.md) ｜ 配套：[分组代码实现规范](../team_code_spec.md)
-> 人力：4 人（NL-A 训练 / NL-B 安全 / NL-C 适配图表 / NL-D 接口宽表）
+> 隶属：[AI 能力层与业务层分组开发总计划](../team_sprint_plan.md) ｜ 配套：[分组代码实现规范](../team_code_spec.md) ｜ **必读边界红线**：[六大研发组职责边界与防重复开发总规范 §5.3](../group_boundaries_and_tasks.md#53-3-组vanna-组-vanna组)
+> 人力：4 人（NL-A 训练语料 / NL-B SQL 安全 / NL-C Vanna 适配与图表 / NL-D 看板接口与宽表 ETL）
 
 ---
 
-## 本组速览
+## 本组速览与严格边界（防重复必读！）
 
-- **组别**：3 组
+- **组别**：3 组 `[Vanna组]`（标签：`标签：[Vanna组] [P0|P1]`）
 - **周期**：D1–D20（4 周），阶段划分见 [总计划 §二](../team_sprint_plan.md#sec-time)
-- **每日 15 分钟站会**，每周五集成日；D12 / D20 为大节点验收
-- **跨组契约不可私改**：LLM / Skill / Agent / 向量库 / NL2SQL / SSE 见 [总计划 §八](../team_sprint_plan.md)
-- **代码骨架与验收命令**：[分组代码实现规范](../team_code_spec.md)
-- **组内约定**：每个 PR 描述必须包含「改了什么 / 表结构有无变更 / 需要谁 review / 如何验证」
+- **⚠️ 已落地冻结底座警告（以下文件已由 `[架构组]` 100% 实现并通过单测，本组直接复用，严禁重写！）**：
+  - ✅ `app/models/analytics.py`（PgSQL 6 张宽表 ORM：`DimOrganization`、`DimTalentWide`、`FactTalentSnapshot`、`FactAssessmentHistory`、`FactTrainingTrack`、`FactBehaviorEvent`）
+  - ✅ `app/infrastructure/database/analytics_schema.py` 与 `scripts/init_pgsql.py`（分析库建表、RANGE 分区及 `_default` 分区创建已就绪）
+  - ✅ `app/infrastructure/database/postgres.py`（只读查询上下文 `pg_session()` 与 ETL 写会话工厂 `get_pg_session_factory()` 已就绪）
+  - ✅ `app/ai/skills/sql_skill.py`（`SqlQuerySkill` 已完成，**严禁修改**！本组 `VannaAdapter.ask(question, *, user_scope=..., max_rows=...)` 对齐其签名即可自动接通）
+- **本组独占核心边界**：
+  1. 全平台唯一的 NL2SQL 安全校验器 `sql_validator.py` 与查询适配器 `vanna_adapter.py`；
+  2. 全平台唯一的 MySQL → PgSQL 6 张分析宽表增量同步 ETL 脚本 `scripts/sync_analytics.py`（使用 `get_pg_session_factory()` + `ON CONFLICT DO UPDATE` 幂等提交）；
+  3. 数据决策全模块接口 `analytics_service.py` + `schemas/analytics.py` + `analytics_router.py`（当 `PGSQL_ENABLED=false` 时看板自动降级查 MySQL 聚合；报告导出走 `[业务组] FileService` 落盘）。
 
 ---
 
@@ -59,8 +64,8 @@
 | `scripts/train_vanna.py` | `vanna` | 导入 DDL（分析库 6 表）/ 指标口径文档 / 示例 SQL / 业务术语；`--reset` 重建 |
 | `app/services/analytics_service.py` | — | `overview()`、`nl2sql_ask()`、`chart_config()`、`export()`、`dashboard()`；调 Service 层而非直连 SQL |
 | `app/routers/analytics_router.py` | — | 6 个接口：`GET /analytics/overview`、`GET /analytics/distribution`、`GET /analytics/trend`、`POST /analytics/nl2sql`、`POST /analytics/report`、`GET /analytics/reports`，挂 `analytics:read` / `analytics:export` |
-| PgSQL 宽表 DDL + 模型 | — | 6 张分析宽表（见 `docs/database_design.md` 第七节），只读账号 |
-| `app/ai/skills/sql_skill.py` | — | （与架构组共建）`query_database(question)`，内部捕获 `SQLValidationError` → `BusinessRuleError` |
+| `app/models/analytics.py` + `scripts/init_pgsql.py` | ✅ 已实现 | 6 张分析宽表 ORM 与分区建表已落地（只读复用，严禁重建）；本组新增 `scripts/sync_analytics.py` 实现 MySQL → PgSQL 幂等增量同步 ETL |
+| `app/ai/skills/sql_skill.py` | ✅ 架构组已实现 | `SqlQuerySkill` 已完成，只读无需修改；内部自动动态导入本组 `VannaAdapter.ask(question=..., user_scope=..., max_rows=...)` |
 | `tests/test_nl2sql.py` | — | 校验器 30 条 + 适配器 mock 10 条 |
 
 ---

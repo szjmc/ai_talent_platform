@@ -59,17 +59,20 @@ Authorization: Bearer <access_token>
 - 事务边界在 Service；Repository 不 commit；
 - 失败即抛业务异常，返回 `None` 表示「查询未命中」仅限 Repository 层。
 
-## 三、分工建议（三天节奏，按文件划分，避免冲突）
+## 三、六大研发组职责边界（严格按文件标签认领，禁止跨组重复编码）
 
-| 角色 | 负责目录 | 主要产出 |
-| --- | --- | --- |
-| A（公共层，已完成） | `config/ core/ infrastructure/ repositories/base.py models/base.py routers/router.py` | 框架、认证、异常、响应、Repository 基类 |
-| B 人才与岗位 | `models/{talent,position,resume}.py` `repositories/{talent,position,resume}_repository.py` `schemas/*` `services/*` `routers/*` | 人才档案、简历上传解析入口、岗位管理 |
-| C 测评与培训 | `models/{assessment,training}.py` + 对应 repo/service/schema/router | 测评流程、培训计划 |
-| D 匹配与分析 | `models/{matching,knowledge}.py` + matching/analytics/knowledge 全链路 | 人岗匹配、知识库、统计 |
-| E AI 能力 | `ai/**` `adapters/llm/**` `adapters/vector_store/**` | LLM 适配、Agent、RAG、工作流 |
+> **强制执行标准**：全仓库 195 个 `.py` 文件与 4 个根配置文件已全量打上组标签并由 `tests/test_code_tags.py` 实时守门。详细方法级契约与防重复红线见 **[六大研发组职责边界与防重复开发总规范](group_boundaries_and_tasks.md)**。
 
-每个模块的开发顺序固定：**Model → Repository → Schema → Service → Router → 注册 router → 补测试**。
+| 组标签 | 当前状态 | 独占负责目录 / 模块 | 严禁越界与防重复红线 |
+| --- | --- | --- | --- |
+| `[架构组]` | ✅ 已全部交付冻结 | `config/` `core/` `patterns/` `utils/` `ai/{context,core,utils,skills,memory,agent}` `ai/agents/base_agent.py` `adapters/{llm,storage}` `infrastructure/{database,cache,storage,messaging}` | 对外提供冻结底座；其他 5 组只读 `import` 复用，**严禁任何组重写** |
+| `[RAG组]` | 🔧 待开发 | `infrastructure/vector/` `adapters/vector_store/` `ai/rag/` `knowledge` 全链路（Repo/Schema/Service/Router） | 全平台唯一 Milvus 网关、唯一 `EmbeddingService`、唯一 `document_loader`；禁改 `knowledge_skill.py` 与 `models/knowledge.py` |
+| `[Agent组]` | 🔧 待开发 | `ai/workflows/` `ai/agents/*_agent.py`（6 个子类） `conversation_repository` `agent_service` `agent_router` | 继承 `BaseAgent`、复用 `ConversationMemory/StateManager`；**严禁编写 `[业务组]` 的 8 个业务 Service，严禁写 SQL 或重写匹配打分** |
+| `[Vanna组]` | 🔧 待开发 | `adapters/nl2sql/` `analytics` 全链路（Schema/Service/Router） 新增 `scripts/sync_analytics.py` | 全平台唯一 NL2SQL 出口与 MySQL→PgSQL 宽表同步；禁改 `models/analytics.py` 与 `sql_skill.py` |
+| `[Dify组]` | 🔧 待开发 | `adapters/dify/{dify_adapter,sse,health}.py` 新增 `scripts/sync_dify_workflows.py` + `AgentService` 双模分支 | 严禁另建 `/api/v1/dify/*` 重复路由，严禁接管 `/knowledge/*` 或绕过 `sql_validator` |
+| `[业务组]` | ✅ 3 模块已落地<br>🔧 8 模块待开发 | 认证/用户/组织（✅）+ 岗位/人才/简历/匹配/测评/培训/文件/审计的 `Repository → Schema → Service → Router` | 25 张表 ORM 已落地严禁重建；复用 `BaseRepository`、`MatchStrategyFactory`、`get_storage()`，向量调 `[RAG组]`、AI 生成调 `dispatch()` |
+
+每个待开发业务模块的开发顺序固定：**Repository（继承 BaseRepository）→ Schema → Service（兼容 Skill 无参会话桥接）→ Router → 提 PR 注册到 `router.py` → 补带标签测试**。
 
 ## 四、代码质量约定
 

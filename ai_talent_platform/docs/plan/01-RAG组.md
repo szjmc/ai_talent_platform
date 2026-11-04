@@ -1,18 +1,24 @@
 # 01. 1 组（RAG 检索增强生成，3 人）— 20 个工作日计划
 
-> 隶属：[AI 能力层分组开发计划](../team_sprint_plan.md) ｜ 配套：[分组代码实现规范](../team_code_spec.md)
+> 隶属：[AI 能力层与业务层分组开发总计划](../team_sprint_plan.md) ｜ 配套：[分组代码实现规范](../team_code_spec.md) ｜ **必读边界红线**：[六大研发组职责边界与防重复开发总规范 §5.1](../group_boundaries_and_tasks.md#51-1-组rag-组-rag组)
 > 人力：3 人（RAG-A 文档侧 / RAG-B 向量侧 / RAG-C 检索问答）
 
 ---
 
-## 本组速览
+## 本组速览与严格边界（防重复必读）
 
-- **组别**：1 组
+- **组别**：1 组 `[RAG组]`（标签：`标签：[RAG组] [P0|P1]`）
 - **周期**：D1–D20（4 周），阶段划分见 [总计划 §二](../team_sprint_plan.md#sec-time)
-- **每日 15 分钟站会**，每周五集成日；D12 / D20 为大节点验收
-- **跨组契约不可私改**：LLM / Skill / Agent / 向量库 / NL2SQL / SSE 见 [总计划 §八](../team_sprint_plan.md)
-- **代码骨架与验收命令**：[分组代码实现规范](../team_code_spec.md)
-- **组内约定**：每个 PR 描述必须包含「改了什么 / 表结构有无变更 / 需要谁 review / 如何验证」
+- **本组独占核心边界（全平台唯一实现方，供其他组复用）**：
+  1. **全平台唯一的 Milvus 连接与四集合适配器**：`app/infrastructure/vector/milvus.py` + `app/adapters/vector_store/milvus_adapter.py`（不仅支撑本组 `knowledge_vectors`，同时作为 `[业务组]` 读写 `talent_vectors / position_vectors / question_vectors` 的唯一网关，其他组严禁 `import pymilvus`）。
+  2. **全平台唯一的文本向量化封装**：`app/ai/rag/embedding_service.py`（底层必须调用 `[架构组] llm_manager.embed`，附带 Redis/内存缓存）。
+  3. **全平台唯一的多格式文档文本提取器**：`app/ai/rag/document_loader.py`（同时供本组制度索引、`[Agent组]` 简历解析工作流、`[业务组]` JD 解析复用）。
+  4. **知识库业务全链路**：`document_splitter.py` → `retriever.py` → `rag_pipeline.py` → `knowledge_repository.py` → `knowledge_service.py` → `schemas/knowledge.py` → `knowledge_router.py`（`/api/v1/knowledge/*` 7 个接口）。
+- **本组严禁重复开发清单**：
+  - ❌ **严禁**新建或重写 `app/models/knowledge.py`（`KnowledgeDoc` / `KnowledgeChunk` ORM 模型已完整落地 ✅，直接使用）；
+  - ❌ **严禁**修改或重写 `app/ai/skills/knowledge_skill.py`（`[架构组]` 已实现完毕 ✅；本组 `Retriever` 只需支持无参构造 `Retriever()` 并在 `db=None` 时用 `session_scope()`，实现 `hybrid_search(question, top_k=..., scope=...)` 即自动接通）；
+  - ❌ **严禁**自写 OpenAI/DashScope HTTP 客户端调大模型或 Embedding（统一调 `app.ai.core.llm_manager.llm_manager`）；
+  - ❌ **严禁**在检索结果为空时调用 LLM 自由作答（必须直接返回 `{"answer": "知识库中未找到依据", "citations": []}`）。
 
 ---
 
@@ -61,7 +67,7 @@
 | `app/ai/rag/rag_pipeline.py` | `langchain`（可选，纯 httpx 亦可） | `index_document(doc_id)`、`ask(question, user)`、`ask_stream()`；写 `knowledge_docs.status/chunk_count/indexed_at` |
 | `app/services/knowledge_service.py` | — | 上传→建记录（indexing）→触发索引；`retrieve`、`ask`、`list/page`、`delete`（连带删向量）、`retrieve_eval` |
 | `app/routers/knowledge_router.py` | — | 7 个接口（见 `docs/api_document.md` 第十五节），挂 `knowledge:read` / `knowledge:manage` |
-| `app/models/knowledge.py` / `app/repositories/knowledge_repository.py` | — | 现有骨架补全 `knowledge_docs` / `knowledge_chunks` 字段与查询 |
+| `app/models/knowledge.py`（✅ 已实现，只读复用） / `app/repositories/knowledge_repository.py`（🔧 本组实现） | — | 模型已落地严禁重建；在 `KnowledgeRepository(BaseRepository[KnowledgeDoc])` 中实现 `list_accessible_docs / save_chunks / search_chunks_by_keyword / update_index_status` |
 | `tests/test_rag_loader.py`、`test_rag_splitter.py`、`test_retriever.py` | — | 无 Milvus 时用 fake store；测试不依赖外部服务 |
 | `scripts/init_milvus.py` | `pymilvus` | 4 个集合建库建索引，幂等 |
 

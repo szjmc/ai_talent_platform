@@ -1,8 +1,8 @@
 # 分组代码实现规范（每组每个文件写什么、怎么验）
 
-> 配套：[分组开发计划索引](team_sprint_plan.md) ｜ 各组独立计划：[架构组](plan/00-架构组.md)、[RAG](plan/01-RAG组.md)、[Agent](plan/02-Agent组.md)、[Vanna](plan/03-Vanna组.md)、[Dify](plan/04-Dify组.md) ｜ 版本 v1.0.0
-> 原则：**本文给出每个文件的方法签名、返回结构、关键代码骨架与验收命令**。复制骨架即可开工，禁止另起命名/结构。
-> 与现有代码冲突时：以 `app/core/*`、`app/config/*`、`app/patterns/registry.py` 为准。
+> 配套：[分组开发总计划](team_sprint_plan.md) ｜ **防重复边界总表（必读）**：[六大研发组职责边界与防重复开发总规范](group_boundaries_and_tasks.md) ｜ 各组独立计划：[架构组](plan/00-架构组.md)、[RAG](plan/01-RAG组.md)、[Agent](plan/02-Agent组.md)、[Vanna](plan/03-Vanna组.md)、[Dify](plan/04-Dify组.md)、[业务组](plan/06-业务组.md) ｜ 版本 v2.0.0
+> 原则：**本文给出每个待开发文件的方法签名、返回结构、关键代码骨架与验收命令**。复制骨架即可开工，禁止另起命名/结构。
+> **重要基线提示**：第一节「架构组」全部文件以及全部 25+6 张表 ORM 模型**已 100% 实现并通过单测**，此处保留签名仅供其余 5 组 `import` 调用查阅，**严禁任何组重复编写或覆盖已落地文件**！
 
 ---
 
@@ -83,7 +83,7 @@ def ai_bootstrap() -> dict[str, list[str]]:
 
 ---
 
-## 一、架构组代码规范
+## 一、架构组代码规范（✅ 已全部落地冻结，其余 5 组只读调用、严禁重写！）
 
 ### 1.1 `app/ai/context.py`
 
@@ -538,37 +538,38 @@ GRAPH = build_graph(
 
 **硬要求**：节点内只用 Service / Skill / LLM；**禁止**在节点里写 SQL；每个节点必须幂等（同一 `thread_id` 重跑不重复落库，用 `matching_records` 唯一键或先查后写）。
 
-### 3.3 `app/ai/memory/state_manager.py`
+### 3.3 `app/ai/memory/state_manager.py` 与 `conversation_memory.py`（✅ 架构组已实现，直接复用！）
+
+> **防重复提示**：`StateManager`（`state_manager` 单例）与 `ConversationMemory` 已由 `[架构组]` 完整实现并通过单测（支持 Redis + 进程内兜底 + DB 回填摘要）。2 组**严禁重写这两个文件**，只需在 `graph_builder.py` 中 `from app.ai.memory.state_manager import state_manager` 调用 `save/load`，并在 `app/repositories/conversation_repository.py` 实现 `append_message` 与 `get_recent_messages` 即可自动接通长期落库！
+
+### 3.4 `app/ai/agents/*_agent.py`（6 个业务 Agent 子类，统一继承 `BaseAgent`）
 
 ```python
-class StateManager:
-    def __init__(self, backend: str | None = None): ...   # 默认 settings.AGENT_STATE_BACKEND
-    async def save(self, thread_id: str, state: dict) -> None: ...
-    async def load(self, thread_id: str) -> dict | None: ...
-    async def delete(self, thread_id: str) -> None: ...
-    # 序列化：datetime 转 isoformat、Decimal 转 str、set 转 list；读取时原样返回（不做时间反解）
-```
+from app.adapters.llm.base_llm import ChatMessage
+from app.ai.agents.base_agent import BaseAgent, register_agent
+from app.ai.skills.matching_skill import compute_match_score
+from app.ai.utils.output_parser import parse_json
 
-后端优先级：`redis`（REDIS_ENABLED）→ `mysql`（`conversations` JSON 列）→ `memory`（进程内 dict，只用于开发/测试）。
-
-### 3.4 `app/ai/agents/*_agent.py`（6 个，同一模板）
-
-```python
-@agent_registry.register("matching")
+@register_agent("matching")
 class MatchingAgent(BaseAgent):
-    name = "matching"
-    system_prompt = MATCHING_PROMPT          # 来自 app/config/prompt_config.py
+    purpose = "matching"
+    prompt_name = "matching_evaluate"   # 自动从 app/config/prompt_config.py 读取模板
 
-    async def build_prompt(self, payload):
-        position = await PositionService(self.db).get(payload["position_id"])
-        talent = await TalentService(self.db).get(payload["talent_id"])
-        return [ChatMessage("user", f"【岗位要求】{position.requirements}\n【人才画像】{talent.portrait}")]
+    async def build_prompt(self, payload: dict) -> list[ChatMessage]:
+        # 数据读取一律走 [业务组] 公开 Service；确定性打分一律复用架构组纯函数，禁止重写公式！
+        position = await PositionService(self.db).get_detail(payload["position_id"])
+        talent = await TalentService(self.db).get_detail(payload["talent_id"])
+        scored = compute_match_score(talent.model_dump(), position.model_dump())
+        return [ChatMessage.user(f"【岗位要求】{position}\n【人才档案】{talent}\n【确定性得分】{scored}")]
 
-    async def parse_output(self, raw):       return MatchingResult.model_validate(parse_json(raw)).model_dump()
-    async def persist(self, result, payload): await MatchingService(self.db).save_record(payload, result)
+    async def parse_output(self, raw: str) -> dict:
+        return parse_json(raw)
+
+    async def persist(self, result: dict, payload: dict):
+        return await MatchingService(self.db).save_explanation(payload, result)
 ```
 
-6 个 Agent 的 `name`：`assistant / resume / talent / matching / assessment / training`（与 `AGENT_TYPES` 一致）。
+6 个 Agent 的注册名：`assistant / resume / talent / matching / assessment / training`（与 `AGENT_TYPES` 严格一致）。
 
 ### 3.5 `app/routers/agent_router.py` 的 SSE 实现
 
@@ -758,6 +759,68 @@ curl -N -X POST localhost:8000/api/v1/agents/chat/stream -d '{"query":"你好"}'
 
 ---
 
+## 五-B、5 组（业务组）代码与跨组桥接规范
+
+> 8 大待开发模块（岗位、人才、简历、匹配、测评、培训、文件、审计）的逐文件完整方法清单见 [六大研发组职责边界与防重复开发总规范 §5.5](group_boundaries_and_tasks.md#55-5-组业务组-业务组) 与 [06-业务组计划](plan/06-业务组.md)。
+
+### 5B.1 Repository 标准模板（必须继承 `BaseRepository`，禁止重复写基础 CRUD）
+
+```python
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.infrastructure.database.session import session_scope
+from app.models.position import Position
+from app.repositories.base import BaseRepository
+
+class PositionRepository(BaseRepository[Position]):
+    model = Position
+    filterable_fields = {"organization_id", "level", "status", "code"}
+    searchable_fields = {"title", "code", "description"}
+    sortable_fields = {"id", "created_at", "publish_at", "salary_max"}
+    default_order = "-id"
+
+    async def search_by_title(
+        self,
+        db: AsyncSession | None = None,
+        *,
+        keyword: str = "",
+        status: str = "open",
+        limit: int = 10,
+        context=None,
+    ) -> list[Position]:
+        """供 PositionSearchSkill 无参反射调用（db=None 时自动走 session_scope）。"""
+        async def _run(s: AsyncSession) -> list[Position]:
+            return await self.list(s, filters={"status": status}, keyword=keyword, limit=limit)
+        if db is not None:
+            return await _run(db)
+        async with session_scope() as s:
+            return await _run(s)
+```
+
+### 5B.2 Service 双模式会话桥接模板（兼容 Router 注入与 Skill 无参调用）
+
+```python
+from contextlib import asynccontextmanager
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.infrastructure.database.session import session_scope
+from app.patterns.strategy import MatchStrategyFactory
+
+class MatchingService:
+    def __init__(self, db: AsyncSession | None = None) -> None:
+        self.db = db
+        self.repo = MatchingRepository()
+
+    @asynccontextmanager
+    async def _db(self):
+        if self.db is not None:
+            yield self.db
+        else:
+            async with session_scope() as s:
+                yield s
+```
+
+---
+
 ## 六、测试规范（全组统一）
 
 | 类型 | 位置 | 要求 |
@@ -800,24 +863,24 @@ def fake_llm(monkeypatch):
 
 ---
 
-## 八、文件所有权总表（避免并行改同一文件）
+## 八、文件所有权总表（唯一归属，严禁并行跨界改同一文件）
 
-| 文件/目录 | 归属 | 其他组的改动方式 |
-| --- | --- | --- |
-| `app/config/settings.py`、`app/config/prompt_config.py` | 架构组 | 提 PR 由架构组合并 |
-| `app/patterns/registry.py`、`app/core/*` | 架构组 | 只读 |
-| `app/ai/context.py`、`app/ai/core/*`、`app/ai/utils/*` | 架构组 | 只读 |
-| `app/adapters/llm/*` | 架构组 | 只读（新增 provider 走 PR） |
-| `app/ai/skills/*` | 架构组 | 各组只读调用 |
-| `app/ai/agents/base_agent.py`、`app/ai/agent.py` | 架构组 + 2 组 | 双人 review |
-| `app/ai/rag/*`、`app/adapters/vector_store/*` | 1 组 | 只读 |
-| `app/services/knowledge_service.py`、`app/routers/knowledge_router.py` | 1 组 | — |
-| `app/ai/workflows/*`、`app/ai/memory/*`、`app/ai/agents/*_agent.py` | 2 组 | — |
-| `app/services/{resume,talent,matching,assessment,training,agent}_service.py` | 2 组 | 模型字段变更需通知 1/3 组 |
-| `app/adapters/nl2sql/*`、`app/services/analytics_service.py`、`app/routers/analytics_router.py` | 3 组 | 只读 |
-| `app/adapters/dify/*` | 4 组 | 只读 |
-| `app/routers/agent_router.py` | 2 组 + 4 组 | 双方 review |
-| `tests/conftest.py` | 架构组 | 提 PR |
+| 文件/目录 | 唯一主责组 | 状态 | 其他组的访问/改动方式 |
+| --- | --- | --- | --- |
+| `app/config/*`、`app/core/*`、`app/patterns/*`、`app/utils/*` | `[架构组]` | ✅ 已冻结 | 只读调用；新增配置提 PR 由架构组合并 |
+| `app/ai/context.py`、`app/ai/core/*`、`app/ai/utils/*`、`app/adapters/llm/*` | `[架构组]` | ✅ 已冻结 | 只读调用（严禁另写 LLM 客户端） |
+| `app/ai/skills/*`、`app/adapters/storage/*`、`app/infrastructure/*`（除 `vector/`） | `[架构组]` | ✅ 已冻结 | 只读调用 |
+| `app/ai/agents/base_agent.py`、`app/ai/agent.py`、`app/ai/memory/*` | `[架构组]` | ✅ 已冻结 | `[Agent组]` 继承/调用，**严禁覆盖重写** |
+| `app/models/*.py`（MySQL 25 表 + PgSQL 6 表） | `[架构组]`+领域组 | ✅ 已冻结 | 只读复用 ORM 类，禁止重建或破坏字段 |
+| `app/infrastructure/vector/*`、`app/adapters/vector_store/*`、`app/ai/rag/*` | `[RAG组]` | 🔧 待开发 | 全平台唯一向量网关与文档解析入口，他组只调公开方法 |
+| `app/repositories/knowledge_repository.py`、`app/services/knowledge_service.py`、`app/routers/knowledge_router.py`、`app/schemas/knowledge.py` | `[RAG组]` | 🔧 待开发 | 独占负责 |
+| `app/ai/workflows/*`、`app/ai/agents/*_agent.py`（6 个子类）、`app/repositories/conversation_repository.py` | `[Agent组]` | 🔧 待开发 | 独占负责 |
+| `app/services/agent_service.py`、`app/routers/agent_router.py`、新增 `app/schemas/agent.py` | `[Agent组]`（含 `[Dify组]` 分支） | 🔧 待开发 | Dify 路由分支需 `[Agent组]` + `[Dify组]` 联合 Review |
+| `app/adapters/nl2sql/*`、`app/services/analytics_service.py`、`app/routers/analytics_router.py`、`app/schemas/analytics.py`、新增 `scripts/sync_analytics.py` | `[Vanna组]` | 🔧 待开发 | 全平台唯一 NL2SQL 与宽表 ETL 出口 |
+| `app/adapters/dify/*`、新增 `scripts/sync_dify_workflows.py` | `[Dify组]` | 🔧 待开发 | 只读被 `AgentService` 调用 |
+| `app/{repositories,schemas,services,routers}/{auth,user,organization}*` | `[业务组]` | ✅ 已冻结 | 业务参考样板 |
+| `app/{repositories,schemas,services,routers}/{position,talent,resume,matching,assessment,training,file,audit}*` | `[业务组]` | 🔧 待开发 | `[Agent组]` / `[架构组]` Skills 只调公开方法，**严禁代写** |
+| `app/routers/router.py`、`tests/conftest.py` | `[架构组]` | ✅ 共享守门 | 各组模块就绪后提 PR 替换 `_STUB_MODULES` |
 
 ---
 

@@ -1,18 +1,23 @@
 # 04. 4 组（Dify AI 应用中台，2 人）— 20 个工作日计划
 
-> 隶属：[AI 能力层分组开发计划](../team_sprint_plan.md) ｜ 配套：[分组代码实现规范](../team_code_spec.md)
-> 人力：2 人（DF-A 适配器 / DF-B 集成运维）
+> 隶属：[AI 能力层与业务层分组开发总计划](../team_sprint_plan.md) ｜ 配套：[分组代码实现规范](../team_code_spec.md) ｜ **必读边界红线**：[六大研发组职责边界与防重复开发总规范 §5.4](../group_boundaries_and_tasks.md#54-4-组dify-组-dify组)
+> 人力：2 人（DF-A 适配器与 SSE 转换 / DF-B 集成探针与同步脚本）
 
 ---
 
-## 本组速览
+## 本组速览与严格边界（防重复必读！）
 
-- **组别**：4 组
+- **组别**：4 组 `[Dify组]`（标签：`标签：[Dify组] [P0|P1|P2]`）
 - **周期**：D1–D20（4 周），阶段划分见 [总计划 §二](../team_sprint_plan.md#sec-time)
-- **每日 15 分钟站会**，每周五集成日；D12 / D20 为大节点验收
-- **跨组契约不可私改**：LLM / Skill / Agent / 向量库 / NL2SQL / SSE 见 [总计划 §八](../team_sprint_plan.md)
-- **代码骨架与验收命令**：[分组代码实现规范](../team_code_spec.md)
-- **组内约定**：每个 PR 描述必须包含「改了什么 / 表结构有无变更 / 需要谁 review / 如何验证」
+- **本组独占核心边界**：
+  1. 封装 Dify HTTP/SSE 异步适配器 `app/adapters/dify/dify_adapter.py` 与流式协议归一化解析器 `app/adapters/dify/sse.py`；
+  2. 提供可选连通性探针 `app/adapters/dify/health.py` 与工作流/知识库单向镜像同步脚本 `scripts/sync_dify_workflows.py`；
+  3. 配合 `[Agent组]` 在 `app/services/agent_service.py` 中维护唯一的双模路由开关（配置了 `DIFY_APP_ID_*` 优先走 Dify，未配置或 Dify 故障时无缝回退本地 `BaseAgent`）。
+- **本组严禁重复开发清单**：
+  - ❌ **严禁**新建 `/api/v1/dify/*` 等业务层重复路由（对外统一走 `/api/v1/agents/*`）；
+  - ❌ **严禁**接管或重写 `/api/v1/knowledge/*`（企业知识库唯一事实源在 `[RAG组]` 的 MySQL + Milvus，Dify Dataset 仅做单向同步镜像）；
+  - ❌ **严禁**在 Dify 侧另建绕过 `[Vanna组] sql_validator` 的数据库直连查询；
+  - ❌ **严禁**自写重试与熔断工具（必须直接复用 `[架构组] app.ai.utils.retry_handler` 中的 `ai_retry` 与 `SimpleCircuitBreaker`）。
 
 ---
 
