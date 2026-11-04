@@ -44,6 +44,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y mysql-client
+      - name: 等待 MySQL 完成初始化
+        run: |
+          for i in $(seq 1 30); do
+            if mysql -h 127.0.0.1 -P 3306 -uroot -proot -e "SELECT 1" >/dev/null 2>&1; then
+              echo "MySQL 就绪"; exit 0
+            fi
+            echo "等待 MySQL 初始化... ($i/30)"; sleep 3
+          done
+          echo "MySQL 未就绪"; exit 1
       - name: 执行 MySQL SQL 测试
         env:
           MYSQL_HOST: 127.0.0.1
@@ -52,7 +61,6 @@ jobs:
           MYSQL_PASSWORD: root
           MYSQL_DB: ai_talent_platform_test
           BOOTSTRAP: "1"
-          MYSQL_FORCE: "1"   # 诊断期：遇错继续，一次性收集全部错误（修复后移除）
         run: bash ai_talent_platform/tests/sql/run_mysql_tests.sh
 
   pgsql:
@@ -78,6 +86,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-client
+      - name: 等待 PostgreSQL 完成初始化
+        run: |
+          for i in $(seq 1 30); do
+            if PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d ai_talent_analytics_test -c "SELECT 1" >/dev/null 2>&1; then
+              echo "PostgreSQL 就绪"; exit 0
+            fi
+            echo "等待 PostgreSQL 初始化... ($i/30)"; sleep 3
+          done
+          echo "PostgreSQL 未就绪"; exit 1
       - name: 执行 PgSQL SQL 测试
         env:
           PGHOST: 127.0.0.1
