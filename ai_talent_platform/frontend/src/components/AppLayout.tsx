@@ -72,7 +72,7 @@ export default function AppLayout() {
   return <Layout className="app-layout">
     <Sider className="app-sider" width={232} collapsedWidth={80} collapsed={collapsed} trigger={null}>
       <div className="brand"><div className="brand-mark"><i/><i/><i/><i/></div>{!collapsed && <div><div className="brand-name">智才云</div><div className="brand-sub">TALENTOS · AI</div></div>}</div>
-      <div className="side-menu-wrap"><Menu className="side-menu" mode="inline" items={visibleMenu} selectedKeys={[selected]} onClick={({ key }) => navigate(key)} inlineCollapsed={collapsed}/></div>
+      <div className="side-menu-wrap"><Menu className="side-menu" mode="inline" items={visibleMenu} selectedKeys={[selected]} onClick={({ key }) => { if (key === '/talents') { if (location.pathname === '/talents') window.dispatchEvent(new Event('talentos:archive-fullscreen')); else navigate(key, { state: { fullscreen: true } }); } else navigate(key); }} inlineCollapsed={collapsed}/></div>
       <div className="sider-bottom"><div className="system-status"><span className="status-dot"/>{demo ? '演示环境运行中' : '系统服务运行正常'}</div><small>版本 v1.0.0 · 安全连接</small></div>
     </Sider>
     <Layout className={`main-shell ${collapsed ? 'collapsed' : ''}`}>
