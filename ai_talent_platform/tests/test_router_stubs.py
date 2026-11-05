@@ -59,7 +59,7 @@ def test_stub_modules_declare_valid_owner_group():
     problems: list[str] = []
     stubs = _stub_modules()
     prefixes = {p for p, _, _ in stubs}
-    implemented_modules = {"talents", "analytics"}
+    implemented_modules = {"talents", "analytics", "agents"}
     missing = set(EXPECTED_OWNER) - prefixes - implemented_modules
     if missing:
         problems.append(f"router.py 缺少占位模块注册：{sorted(missing)}")

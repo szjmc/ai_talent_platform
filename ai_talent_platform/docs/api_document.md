@@ -242,7 +242,7 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 | 匹配 | `/matchings` | 🚧 | 5 | `[Agent组]` |
 | 知识库 | `/knowledge` | 🚧 | 7 | `[RAG组]` |
 | 分析 | `/analytics` | ✅ | 6 | `[Vanna组]` |
-| 智能体 | `/agents` | 🚧 | 6 | `[Agent组]`（含 `[Dify组]` 双模分支） |
+| 智能体 | `/agents` | ✅ | 7 | `[Agent组]`（含 `[Dify组]` 双模分支） |
 | 文件 | `/files` | 🚧 | 5 | `[架构组]` |
 | 审计 | `/audit` | 🚧 | 3 | `[架构组]` |
 | 系统 | `/system` + 探针 | ✅ | 4 | `[架构组]` |
@@ -1161,10 +1161,11 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 <a id="api-agents"></a>
 
-## 十七、智能体模块 Agents — 🚧 待实现
+## 十七、智能体模块 Agents — ✅ 已实现
 
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
+| GET | `/agents` | `agent:use` | 智能体清单与总路由表（已注册 Agent / 关键词 / 图后端） |
 | POST | `/agents/chat` | `agent:use` | 对话（非流式，返回完整答案 + citations） |
 | POST | `/agents/chat/stream` | `agent:use` | 对话（SSE 流式，`text/event-stream`） |
 | GET | `/agents/conversations` | `agent:use` | 我的会话列表 |

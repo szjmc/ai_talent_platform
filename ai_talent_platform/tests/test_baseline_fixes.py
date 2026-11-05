@@ -510,7 +510,6 @@ _SKELETON_ROUTERS = (
     ("trainings", "app.routers.training_router"),
     ("matchings", "app.routers.matching_router"),
     ("knowledge", "app.routers.knowledge_router"),
-    ("agents", "app.routers.agent_router"),
 )
 
 
@@ -528,7 +527,7 @@ async def test_mounted_stub_returns_501_contract(client):
 
 @pytest.mark.asyncio
 async def test_skeleton_routers_share_stub_contract(client):
-    """issue 15：8 个骨架路由占位端点与挂载占位同契约（501、结构一致、无权限拦截）。"""
+    """issue 15：7 个骨架路由占位端点与挂载占位同契约（501、结构一致、无权限拦截）。"""
     import importlib
 
     skeleton_app = FastAPI()

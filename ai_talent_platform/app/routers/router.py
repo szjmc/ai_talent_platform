@@ -27,6 +27,7 @@ from app.ai.agent import ai_runtime_status
 
 from app.routers._stub import placeholder_router
 from app.core.response import ApiResponse, success
+from app.routers.agent_router import router as agent_router
 from app.routers.auth_router import router as auth_router
 from app.routers.organization_router import router as organization_router
 from app.routers.user_router import router as user_router
@@ -41,6 +42,7 @@ api_router = APIRouter()
 api_router.include_router(auth_router)
 api_router.include_router(user_router)
 api_router.include_router(organization_router)
+api_router.include_router(agent_router)
 api_router.include_router(talent_router)
 api_router.include_router(analytics_router)
 
@@ -48,6 +50,7 @@ IMPLEMENTED_MODULES: list[str] = [
     "auth",
     "users",
     "organizations",
+    "agents",
     "talents",
     "analytics",
 ]
@@ -66,7 +69,6 @@ _STUB_MODULES: list[tuple[str, str, str]] = [
     ("trainings", "培训管理", "[Dify组] 课程、培训计划、学习进度（见 routers/training_router.py）"),
     ("matchings", "人岗匹配", "[Agent组] 执行匹配、匹配结果、匹配解释（见 routers/matching_router.py）"),
     ("knowledge", "知识库", "[RAG组] 知识文档上传、RAG 检索、智能问答（见 routers/knowledge_router.py）"),
-    ("agents", "AI 智能体", "[Agent组] Agent 对话、任务执行、SSE 流式输出（见 routers/agent_router.py）"),
     ("files", "文件管理", "[架构组] 文件上传、下载、预览（待新建 routers/file_router.py）"),
     ("audit", "审计日志", "[架构组] 操作与 AI 调用审计查询、统计（入库链路已通，查询接口待新建 routers/audit_router.py）"),
 ]

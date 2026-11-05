@@ -211,6 +211,14 @@ class Settings(BaseSettings):
 
     DIFY_BASE_URL: str = "http://127.0.0.1/v1"
     DIFY_API_KEY: str = ""
+    # Dify 对话应用 ID（[Agent组]+[Dify组] 共享开关：留空 = 总路由不启用 Dify 分支）
+    DIFY_APP_ID_CHAT: str = ""
+
+    # -------------------------------------------------------- Agent 总路由与调度
+    # [Agent组] 新增配置项（默认值即可离线运行；仅追加，不改已有项）
+    AGENT_MAX_STEPS: int = 8           # 状态图单次运行最大步数（防死循环保护）
+    AGENT_ROUTE_LLM: bool = False      # 总路由是否启用 LLM 意图分类（默认关闭=纯规则路由）
+    CONVERSATION_WINDOW: int = 10      # 对话记忆窗口（条）
 
     # ------------------------------------------------------------------ 校验器
     @field_validator("API_PREFIX")
