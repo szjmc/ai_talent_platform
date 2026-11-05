@@ -84,8 +84,53 @@ class BaseAgent(ABC):
         return None
 
     # ---------------------------------------------------------------- 主流程
+    async def _release_db_before_llm(self) -> None:
+        """build_prompt 之后、LLM 调用之前归还数据库连接。
+
+        请求级事务（Unit of Work）下，长耗时 LLM 调用若持有连接会占满连接池
+        （并发稍高即耗尽）。release_connection 提交当前事务把连接还回池中；
+        session 因 expire_on_commit=False 仍可继续用于 persist，
+        后续写入随请求结束由 get_db 再次提交。
+        """
+        if self.db is None:
+            return
+        try:
+            from app.infrastructure.database.session import release_connection
+
+            await release_connection(self.db)
+        except Exception:  # noqa: BLE001 - 归还失败不阻断 AI 调用
+            logger.warning("LLM 调用前归还数据库连接失败（继续执行）", exc_info=True)
+
+    def _publish_ai_call(
+        self,
+        *,
+        status: str,
+        elapsed_ms: float,
+        model: str = "",
+        tokens: dict[str, Any] | None = None,
+        error_message: str | None = None,
+    ) -> None:
+        """AI 调用审计：发布 EVENT_AI_CALL_FINISHED（AuditService 订阅落库）。"""
+        from app.infrastructure.messaging.event_bus import EVENT_AI_CALL_FINISHED, event_bus
+
+        event_bus.publish(
+            EVENT_AI_CALL_FINISHED,
+            {
+                "status": status,
+                "agent": self.name,
+                "model": model,
+                "prompt_tokens": (tokens or {}).get("prompt", 0),
+                "completion_tokens": (tokens or {}).get("completion", 0),
+                "elapsed_ms": round(elapsed_ms, 2),
+                "user_id": self.context.user_id,
+                "username": self.context.username,
+                "trace_id": self.context.trace_id,
+                "error_message": error_message,
+            },
+        )
+
     async def run(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        """标准执行流程：build -> chat -> parse -> persist -> 埋点。"""
+        """标准执行流程：build -> 归还连接 -> chat -> parse -> persist -> 埋点。"""
         from app.ai.core.llm_manager import llm_manager
         from app.ai.utils.output_parser import parse_json
 
@@ -97,6 +142,8 @@ class BaseAgent(ABC):
 
         messages = await self.build_prompt(payload)
         messages = self._with_system_prompt(messages)
+        # 长外部调用前先归还连接，避免一次 LLM 请求占住池连接几十秒（issue：连接池耗尽）
+        await self._release_db_before_llm()
 
         for attempt in range(1, attempts + 1):
             try:
@@ -116,6 +163,16 @@ class BaseAgent(ABC):
                 persisted = None
                 if self.persist_result:
                     persisted = await self.persist(parsed, payload)
+                elapsed_ms = (time.perf_counter() - started) * 1000
+                self._publish_ai_call(
+                    status="success",
+                    elapsed_ms=elapsed_ms,
+                    model=getattr(result, "model", ""),
+                    tokens={
+                        "prompt": getattr(result, "prompt_tokens", 0),
+                        "completion": getattr(result, "completion_tokens", 0),
+                    },
+                )
                 return {
                     "ok": True,
                     "agent": self.name,
@@ -127,12 +184,16 @@ class BaseAgent(ABC):
                         "prompt": getattr(result, "prompt_tokens", 0),
                         "completion": getattr(result, "completion_tokens", 0),
                     },
-                    "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
+                    "elapsed_ms": round(elapsed_ms, 2),
                     "attempts": attempt,
                 }
             except BusinessException as exc:
                 # 业务异常（权限 / 参数 / 规则）不重试，直接返回结构化错误
-                return self._error_result(exc.message, code=exc.code, elapsed_ms=(time.perf_counter() - started) * 1000)
+                elapsed_ms = (time.perf_counter() - started) * 1000
+                self._publish_ai_call(
+                    status="fail", elapsed_ms=elapsed_ms, error_message=exc.message
+                )
+                return self._error_result(exc.message, code=exc.code, elapsed_ms=elapsed_ms)
             except Exception as exc:  # noqa: BLE001 - 模型/解析异常按次数重试
                 last_error = str(exc)
                 logger.warning(
@@ -145,10 +206,13 @@ class BaseAgent(ABC):
                 if attempt >= attempts:
                     break
 
+        elapsed_ms = (time.perf_counter() - started) * 1000
+        final_error = last_error or "Agent 执行失败"
+        self._publish_ai_call(status="fail", elapsed_ms=elapsed_ms, error_message=final_error)
         return self._error_result(
-            last_error or "Agent 执行失败",
+            final_error,
             code=5002,
-            elapsed_ms=(time.perf_counter() - started) * 1000,
+            elapsed_ms=elapsed_ms,
             raw=raw[:1000],
         )
 
@@ -199,6 +263,8 @@ class BaseAgent(ABC):
 
         payload = payload or {}
         messages = self._with_system_prompt(await self.build_prompt(payload))
+        # 与 run() 相同：长外部调用前归还连接
+        await self._release_db_before_llm()
         async for chunk in llm_manager.stream(
             messages,
             purpose=self.purpose,

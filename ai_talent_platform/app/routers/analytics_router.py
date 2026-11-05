@@ -11,7 +11,7 @@
     def get_service(db: AsyncSession = Depends(get_db)) -> AnalyticsService:
         return AnalyticsService(db)
 
-    @router.get("", summary="...", response_model=SuccessResponse[PageResult[XxxResponse]],
+    @router.get("", summary="...", response_model=ApiResponse[PageResult[XxxResponse]],
                 dependencies=[Depends(require_permission(PermissionEnum.XXX_READ))])
     async def list_xxx(page: PageParams = Depends(), service: AnalyticsService = Depends(get_service)):
         result = await service.page_list(page)
@@ -41,8 +41,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_db, require_permission
 from app.core.pagination import PageParams, build_page_result
 from app.core.permissions import PermissionEnum
-from app.core.response import PageResult, success
-from app.schemas.common import COMMON_ERROR_RESPONSES, SuccessResponse
+from app.core.response import ApiResponse, PageResult, success
+from app.routers._stub import not_implemented_response
+from app.schemas.common import COMMON_ERROR_RESPONSES
 from app.services.analytics_service import AnalyticsService
 
 router = APIRouter(
@@ -60,13 +61,13 @@ def get_service(db: AsyncSession = Depends(get_db)) -> AnalyticsService:
 @router.get(
     "",
     summary="数据分析列表（占位）",
-    dependencies=[Depends(require_permission(PermissionEnum.ANALYTICS_READ))],
 )
-async def list_analytics(page: PageParams = Depends(), service: AnalyticsService = Depends(get_service)):
-    """占位接口：AnalyticsService 实现后替换为真实分页查询。
+async def list_analytics():
+    """占位接口：与 routers/_stub.py 同一 501 契约（未登录也能看到实现位置）。
 
-    替换示例：
+    主责组实现后替换为真实分页查询，并挂回权限依赖：
+        dependencies=[Depends(require_permission(PermissionEnum.XXX_READ))]
         result = await service.page_list(page)
         return success(data=build_page_result(result.items, result.total, page))
     """
-    return success(data=build_page_result([], 0, page), message="数据分析模块待实现")
+    return not_implemented_response("数据分析", "Vanna组", "统计概览、NL2SQL 问数、报告导出（见 routers/analytics_router.py）")

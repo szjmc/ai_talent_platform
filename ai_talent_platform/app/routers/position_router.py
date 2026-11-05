@@ -11,7 +11,7 @@
     def get_service(db: AsyncSession = Depends(get_db)) -> PositionService:
         return PositionService(db)
 
-    @router.get("", summary="...", response_model=SuccessResponse[PageResult[XxxResponse]],
+    @router.get("", summary="...", response_model=ApiResponse[PageResult[XxxResponse]],
                 dependencies=[Depends(require_permission(PermissionEnum.XXX_READ))])
     async def list_xxx(page: PageParams = Depends(), service: PositionService = Depends(get_service)):
         result = await service.page_list(page)
@@ -43,8 +43,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_db, require_permission
 from app.core.pagination import PageParams, build_page_result
 from app.core.permissions import PermissionEnum
-from app.core.response import PageResult, success
-from app.schemas.common import COMMON_ERROR_RESPONSES, SuccessResponse
+from app.core.response import ApiResponse, PageResult, success
+from app.routers._stub import not_implemented_response
+from app.schemas.common import COMMON_ERROR_RESPONSES
 from app.services.position_service import PositionService
 
 router = APIRouter(
@@ -62,13 +63,13 @@ def get_service(db: AsyncSession = Depends(get_db)) -> PositionService:
 @router.get(
     "",
     summary="岗位管理列表（占位）",
-    dependencies=[Depends(require_permission(PermissionEnum.POSITION_READ))],
 )
-async def list_positions(page: PageParams = Depends(), service: PositionService = Depends(get_service)):
-    """占位接口：PositionService 实现后替换为真实分页查询。
+async def list_positions():
+    """占位接口：与 routers/_stub.py 同一 501 契约（未登录也能看到实现位置）。
 
-    替换示例：
+    主责组实现后替换为真实分页查询，并挂回权限依赖：
+        dependencies=[Depends(require_permission(PermissionEnum.XXX_READ))]
         result = await service.page_list(page)
         return success(data=build_page_result(result.items, result.total, page))
     """
-    return success(data=build_page_result([], 0, page), message="岗位管理模块待实现")
+    return not_implemented_response("岗位管理", "Agent组", "岗位 CRUD、岗位说明书 AI 解析、岗位向量化（见 routers/position_router.py）")

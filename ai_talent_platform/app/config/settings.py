@@ -56,7 +56,18 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # 允许跨域的前端来源，逗号分隔；"*" 表示放开（仅调试用）
+    # 注意：通配符模式下自动关闭 allow_credentials（浏览器会拒绝 *+credentials 组合，
+    # 且平台使用 Bearer Token 并不依赖 Cookie，见 core/middleware.py）
     CORS_ORIGINS: str = "*"
+
+    # 启动时是否允许 create_all 自动建表：仅 dev/test 生效，
+    # prod 环境恒为 False（表结构变更一律走 Alembic，见 db_auto_create_tables）
+    DB_AUTO_CREATE_TABLES: bool = True
+
+    # ------------------------------------------------------------------ 限流
+    RATE_LIMIT_ENABLED: bool = True        # 关闭后完全跳过限流中间件逻辑
+    RATE_LIMIT_LIMIT: int = 300            # 窗口内允许的最大请求数（按客户端 IP）
+    RATE_LIMIT_WINDOW_SECONDS: int = 60    # 统计窗口（秒）；Redis 启用时为多实例共享固定窗口
 
     # ================================================================== MySQL（业务主库）
     # 驱动固定为 mysql+aiomysql（异步）。本地默认：127.0.0.1:3306 / root。
@@ -215,14 +226,6 @@ class Settings(BaseSettings):
         )
 
     @property
-    def DATABASE_URL_SYNC(self) -> str:
-        """MySQL 同步驱动 DSN（Alembic 迁移等场景使用）。"""
-        return (
-            f"mysql+pymysql://{self.DB_USER}:{self.DB_PASSWORD}"
-            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset={self.DB_CHARSET}"
-        )
-
-    @property
     def MYSQL_SERVER_URL(self) -> str:
         """不指定 database 的服务器级 DSN（用于 CREATE DATABASE）。"""
         return (
@@ -236,14 +239,6 @@ class Settings(BaseSettings):
         """PgSQL 异步驱动 DSN（分析库）。"""
         return (
             f"postgresql+asyncpg://{self.PGSQL_USER}:{self.PGSQL_PASSWORD}"
-            f"@{self.PGSQL_HOST}:{self.PGSQL_PORT}/{self.PGSQL_DB}"
-        )
-
-    @property
-    def PGSQL_URL_SYNC(self) -> str:
-        """PgSQL 同步驱动 DSN（Vanna / 报表脚本等）。"""
-        return (
-            f"postgresql+psycopg2://{self.PGSQL_USER}:{self.PGSQL_PASSWORD}"
             f"@{self.PGSQL_HOST}:{self.PGSQL_PORT}/{self.PGSQL_DB}"
         )
 
@@ -262,6 +257,27 @@ class Settings(BaseSettings):
         if self.CORS_ORIGINS.strip() == "*":
             return ["*"]
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def cors_allow_credentials(self) -> bool:
+        """CORS 是否允许携带凭证（Cookie / 同源凭据）。
+
+        浏览器规范禁止 `Access-Control-Allow-Origin: *` 与
+        `Access-Control-Allow-Credentials: true` 组合，因此通配符模式必须关闭凭证；
+        本平台鉴权走 Authorization: Bearer，不依赖 Cookie，关闭无影响。
+        """
+        return "*" not in self.cors_origin_list
+
+    @property
+    def db_auto_create_tables(self) -> bool:
+        """启动时是否允许 create_all 自动建表。
+
+        生产环境（APP_ENV=prod）恒为 False —— 表结构变更一律走 Alembic，
+        同时避免多 worker 启动时并发 DDL 竞争；dev/test 由 DB_AUTO_CREATE_TABLES 控制。
+        """
+        if self.is_prod:
+            return False
+        return self.DB_AUTO_CREATE_TABLES
 
     @property
     def allowed_upload_extensions(self) -> set[str]:

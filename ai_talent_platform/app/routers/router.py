@@ -26,8 +26,7 @@ from fastapi import APIRouter
 from app.ai.agent import ai_runtime_status
 
 from app.routers._stub import placeholder_router
-from app.schemas.common import SuccessResponse
-from app.core.response import success
+from app.core.response import ApiResponse, success
 from app.routers.auth_router import router as auth_router
 from app.routers.organization_router import router as organization_router
 from app.routers.user_router import router as user_router
@@ -59,8 +58,8 @@ _STUB_MODULES: list[tuple[str, str, str]] = [
     ("knowledge", "知识库", "[RAG组] 知识文档上传、RAG 检索、智能问答（见 routers/knowledge_router.py）"),
     ("analytics", "数据分析", "[Vanna组] 统计概览、NL2SQL 问数、报告导出（见 routers/analytics_router.py）"),
     ("agents", "AI 智能体", "[Agent组] Agent 对话、任务执行、SSE 流式输出（见 routers/agent_router.py）"),
-    ("files", "文件管理", "[架构组] 文件上传、下载、预览（见 routers/file_router.py）"),
-    ("audit", "审计日志", "[架构组] 操作与 AI 调用审计查询、统计（见 routers/audit_router.py）"),
+    ("files", "文件管理", "[架构组] 文件上传、下载、预览（待新建 routers/file_router.py）"),
+    ("audit", "审计日志", "[架构组] 操作与 AI 调用审计查询、统计（入库链路已通，查询接口待新建 routers/audit_router.py）"),
 ]
 
 for _prefix, _tag, _desc in _STUB_MODULES:
@@ -72,7 +71,7 @@ logger.info("总路由注册完成：已实现 4 个模块 + %s 个占位模块"
 system_router = APIRouter(prefix="/system", tags=["系统"])
 
 
-@system_router.get("/info", summary="后端框架信息", response_model=SuccessResponse[dict])
+@system_router.get("/info", summary="后端框架信息", response_model=ApiResponse[dict])
 async def system_info():
     """返回当前后端框架装配情况，便于联调时快速确认公共层是否就绪。"""
     from app.config.settings import settings
@@ -103,7 +102,7 @@ async def system_info():
     )
 
 
-@system_router.get("/skills", summary="AI 技能清单", response_model=SuccessResponse[list])
+@system_router.get("/skills", summary="AI 技能清单", response_model=ApiResponse[list])
 async def system_skills():
     """返回已注册的 Skills（名称 / 描述 / 参数 Schema / 依赖 / 所需权限）。"""
     from app.ai.skills.registry_bootstrap import describe_skills

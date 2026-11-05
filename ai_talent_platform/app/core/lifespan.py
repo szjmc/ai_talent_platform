@@ -7,16 +7,20 @@
 实现思路：
 1. 使用 asynccontextmanager 定义 lifespan，替代已废弃的 on_event；
 2. 启动阶段：
-     日志初始化 -> 目录准备 -> MySQL 连通性检测 -> （开发环境）自动建表
+     日志初始化 -> 目录准备 -> MySQL 连通性检测 -> （dev/test 且允许时）自动建表
      -> PgSQL 分析库连通性检测（可选依赖，失败仅告警）
+     -> 审计事件订阅（EventBus -> AuditService，幂等注册）
      -> 可选：初始化 Redis / Milvus 客户端（当前关闭） -> 打印启动信息
 3. 关闭阶段：
-     关闭 Redis / Milvus（若启用） -> 释放 MySQL / PgSQL 连接池 -> 打印关闭日志
-4. MySQL 是硬依赖：生产环境（DEBUG=False）连接失败直接抛异常终止启动，
+     等待事件总线任务收尾（drain，保证审计落库） -> 关闭 Redis / Milvus（若启用）
+     -> 释放 MySQL / PgSQL 连接池 -> 打印关闭日志
+4. MySQL 是硬依赖：生产环境（APP_ENV=prod）连接失败直接抛异常终止启动，
    避免「服务起来了但根本不能用」的假可用；开发环境仅告警，便于先排查配置；
 5. PgSQL 是分析类硬依赖：默认启用，连接失败时告警并降级（统计只读 MySQL），
    不阻塞业务接口启动 —— 若要求强一致，可把 PGSQL_ENABLED 设为必需项并在此改为抛错；
-6. 生产环境不自动建表：表结构变更一律走 Alembic。
+6. 生产环境绝不自动建表：settings.db_auto_create_tables 在 APP_ENV=prod 时恒为 False
+   （表结构变更一律走 Alembic），dev/test 可用 DB_AUTO_CREATE_TABLES 关闭，
+   多实例并发启动由 init_db 的 MySQL 命名锁（GET_LOCK）串行化。
 
 扩展位置（其他同学在此接入自己的基础设施）：
     - Redis：`from app.infrastructure.cache.redis import init_redis, close_redis`
@@ -60,12 +64,18 @@ async def _startup() -> None:
     else:
         logger.info("MySQL 连接成功 %s", mysql_report["target"])
 
-    # 2) 开发环境自动建表
-    if mysql_ok and not settings.is_prod:
+    # 2) 自动建表：仅 dev/test 且 DB_AUTO_CREATE_TABLES=true（prod 恒为 False，走 Alembic）
+    if mysql_ok and settings.db_auto_create_tables:
         try:
             await init_db()
         except Exception:  # noqa: BLE001
             logger.exception("自动建表失败（不影响服务启动，可手动执行 scripts/init_db.py）")
+    elif mysql_ok:
+        logger.info(
+            "已跳过启动自动建表（APP_ENV=%s / DB_AUTO_CREATE_TABLES=%s），表结构变更请走 Alembic",
+            settings.APP_ENV,
+            settings.DB_AUTO_CREATE_TABLES,
+        )
 
     # 3) PgSQL（分析 / 时序库）
     pgsql_report = await check_pgsql()
@@ -80,7 +90,15 @@ async def _startup() -> None:
             pgsql_report["message"],
         )
 
-    # 4) 可选基础设施（默认关闭，需要时打开）
+    # 4) 事件总线 -> 审计链路（幂等注册；订阅者用独立 session_scope 落库）
+    try:
+        from app.services.audit_service import register_audit_handlers
+
+        register_audit_handlers()
+    except Exception:  # noqa: BLE001
+        logger.exception("审计事件订阅注册失败（主流程继续，审计可能缺失）")
+
+    # 5) 可选基础设施（默认关闭，需要时打开）
     if settings.REDIS_ENABLED:
         try:
             from app.infrastructure.cache.redis import init_redis
@@ -102,6 +120,15 @@ async def _shutdown() -> None:
     """关闭流程。"""
     logger.info("%s 正在关闭……", settings.APP_NAME)
 
+    # 1) 先等待事件总线（审计等副作用）完成，此时数据库连接仍可用
+    try:
+        from app.infrastructure.messaging.event_bus import event_bus
+
+        await event_bus.drain(timeout=5.0)
+    except Exception:  # noqa: BLE001
+        logger.exception("事件总线收尾失败（忽略）")
+
+    # 2) 关闭可选基础设施
     if settings.REDIS_ENABLED:
         try:
             from app.infrastructure.cache.redis import close_redis
@@ -110,7 +137,8 @@ async def _shutdown() -> None:
         except Exception:  # noqa: BLE001
             logger.exception("Redis 关闭失败")
 
-    await close_db()  # 同时释放 MySQL 与 PgSQL 连接池
+    # 3) 释放连接池（同时重置 MySQL 与 PgSQL 引擎单例）
+    await close_db()
     logger.info("%s 已安全关闭", settings.APP_NAME)
 
 

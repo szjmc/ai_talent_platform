@@ -1538,7 +1538,7 @@ python scripts/seed_data.py # 可选：演示部门树 + 测试账号（Test@123
 ### 13.2 表结构变更流程（生产）
 
 1. 修改 `app/models/*.py`；
-2. `alembic revision --autogenerate -m "add xxx"`（`alembic/env.py` 使用 `settings.DATABASE_URL_SYNC`）；
+2. `alembic revision --autogenerate -m "add xxx"`（`alembic/env.py` 由 `settings.DB_*` 字段拼装同步驱动 DSN，勿在 settings 中新增 `*_URL_SYNC` 死配置）；
 3. 人工审查生成的迁移脚本（特别是索引与默认值）；
 4. `alembic upgrade head`；
 5. 在 `docs/database_design.md` 与 `docs/api_document.md` 对应章节同步更新。

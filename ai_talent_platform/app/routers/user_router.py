@@ -18,8 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import CurrentUser, get_db, require_permission
 from app.core.pagination import PageParams, build_page_result
 from app.core.permissions import PermissionEnum
-from app.core.response import PageResult, success
-from app.schemas.common import COMMON_ERROR_RESPONSES, SuccessResponse
+from app.core.response import ApiResponse, PageResult, success
+from app.schemas.common import COMMON_ERROR_RESPONSES
 from app.schemas.user import (
     AssignRolesRequest,
     ResetPasswordRequest,
@@ -40,19 +40,21 @@ def get_user_service(db: AsyncSession = Depends(get_db)) -> UserService:
 @router.get(
     "",
     summary="用户列表（分页）",
-    response_model=SuccessResponse[PageResult[UserResponse]],
+    response_model=ApiResponse[PageResult[UserResponse]],
     dependencies=[Depends(require_permission(PermissionEnum.USER_READ))],
 )
 async def list_users(
+    user: CurrentUser,
     page: PageParams = Depends(),
     keyword: str | None = Query(None, max_length=64, description="用户名/姓名/手机号/邮箱模糊搜索"),
     organization_id: int | None = Query(None, gt=0, description="按部门筛选"),
     is_active: bool | None = Query(None, description="按启用状态筛选"),
     service: UserService = Depends(get_user_service),
 ):
-    """分页查询用户。"""
+    """分页查询用户（按当前用户数据范围过滤：manager 仅本部门及下级）。"""
     result = await service.page_list(
-        page, keyword=keyword, organization_id=organization_id, is_active=is_active
+        page, keyword=keyword, organization_id=organization_id, is_active=is_active,
+        current_user=user,
     )
     return success(
         data=build_page_result(result.items, result.total, page), message="查询成功"
@@ -62,39 +64,47 @@ async def list_users(
 @router.get(
     "/{user_id}",
     summary="用户详情",
-    response_model=SuccessResponse[UserResponse],
+    response_model=ApiResponse[UserResponse],
     dependencies=[Depends(require_permission(PermissionEnum.USER_READ))],
 )
-async def get_user(user_id: int, service: UserService = Depends(get_user_service)):
-    return success(data=await service.get_detail(user_id))
+async def get_user(
+    user_id: int, user: CurrentUser, service: UserService = Depends(get_user_service)
+):
+    """用户详情（数据范围外的用户返回 403）。"""
+    return success(data=await service.get_detail(user_id, current_user=user))
 
 
 @router.post(
     "",
     summary="创建用户",
-    response_model=SuccessResponse[UserResponse],
+    response_model=ApiResponse[UserResponse],
     dependencies=[Depends(require_permission(PermissionEnum.USER_CREATE))],
 )
-async def create_user(data: UserCreate, service: UserService = Depends(get_user_service)):
-    return success(data=await service.create_user(data), message="创建成功")
+async def create_user(
+    data: UserCreate, operator: CurrentUser, service: UserService = Depends(get_user_service)
+):
+    return success(data=await service.create_user(data, operator=operator), message="创建成功")
 
 
 @router.put(
     "/{user_id}",
     summary="更新用户",
-    response_model=SuccessResponse[UserResponse],
+    response_model=ApiResponse[UserResponse],
     dependencies=[Depends(require_permission(PermissionEnum.USER_UPDATE))],
 )
 async def update_user(
-    user_id: int, data: UserUpdate, service: UserService = Depends(get_user_service)
+    user_id: int,
+    data: UserUpdate,
+    operator: CurrentUser,
+    service: UserService = Depends(get_user_service),
 ):
-    return success(data=await service.update_user(user_id, data), message="更新成功")
+    return success(data=await service.update_user(user_id, data, operator=operator), message="更新成功")
 
 
 @router.patch(
     "/{user_id}/status",
     summary="启用/禁用用户",
-    response_model=SuccessResponse[UserResponse],
+    response_model=ApiResponse[UserResponse],
     dependencies=[Depends(require_permission(PermissionEnum.USER_UPDATE))],
 )
 async def set_user_status(
@@ -111,7 +121,7 @@ async def set_user_status(
 @router.put(
     "/{user_id}/roles",
     summary="分配角色",
-    response_model=SuccessResponse[UserResponse],
+    response_model=ApiResponse[UserResponse],
     dependencies=[Depends(require_permission(PermissionEnum.USER_UPDATE))],
 )
 async def assign_roles(
@@ -126,9 +136,12 @@ async def assign_roles(
     dependencies=[Depends(require_permission(PermissionEnum.USER_UPDATE))],
 )
 async def reset_password(
-    user_id: int, data: ResetPasswordRequest, service: UserService = Depends(get_user_service)
+    user_id: int,
+    data: ResetPasswordRequest,
+    operator: CurrentUser,
+    service: UserService = Depends(get_user_service),
 ):
-    await service.reset_password(user_id, data)
+    await service.reset_password(user_id, data, operator=operator)
     return success(message="密码已重置")
 
 

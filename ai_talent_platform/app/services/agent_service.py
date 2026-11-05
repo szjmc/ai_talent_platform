@@ -26,7 +26,11 @@ Service 的定位：把「校验 + 仓库调用 + 外部能力 + 事务」组织
 - 事务：默认随请求提交；需要局部事务用 infrastructure.database.transaction。
 
 - Agent 不得绕过 Service 直接访问数据库（复用业务能力，保持权限一致）；
-- SSE 接口注意设置 Cache-Control: no-cache 与 X-Accel-Buffering: no。
+- SSE 接口注意设置 Cache-Control: no-cache 与 X-Accel-Buffering: no；
+- 【连接池红线】请求级事务内不得跨长耗时 LLM 调用持有连接：
+  build_prompt（读取上下文）之后必须 `await release_connection(db)`
+  （infrastructure/database.session），BaseAgent.run/stream 已内置该步骤；
+  本服务实现对话入口时复用 BaseAgent，不要在 get_db 事务里直接 await LLM。
 方法清单（按顺序实现）：
     - [ ] 对话入口：加载会话记忆 -> 选择 Agent -> 执行 -> 保存消息与 token 统计
     - [ ] 任务执行：按 agent_type 分派到对应 Agent（resume/talent/matching/assessment/training）

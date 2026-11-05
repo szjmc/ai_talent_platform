@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import CurrentUser, get_db, require_permission
 from app.core.pagination import PageParams, build_page_result
 from app.core.permissions import PermissionEnum
-from app.core.response import PageResult, success
-from app.schemas.common import COMMON_ERROR_RESPONSES, SuccessResponse
+from app.core.response import ApiResponse, PageResult, success
+from app.schemas.common import COMMON_ERROR_RESPONSES
 from app.schemas.talent import (
     TalentCreate,
     TalentDetailResponse,
@@ -34,10 +34,11 @@ def get_service(db: AsyncSession = Depends(get_db)) -> TalentService:
 
 
 @router.get(
-    "", summary="人才档案分页列表", response_model=SuccessResponse[PageResult[TalentResponse]],
+    "", summary="人才档案分页列表", response_model=ApiResponse[PageResult[TalentResponse]],
     dependencies=[Depends(require_permission(PermissionEnum.TALENT_READ))],
 )
 async def list_talents(
+    user: CurrentUser,
     page: PageParams = Depends(),
     keyword: str | None = Query(None, max_length=64, description="姓名/手机/公司/职位/院校"),
     education: str | None = Query(None, max_length=20),
@@ -49,12 +50,12 @@ async def list_talents(
     service: TalentService = Depends(get_service),
 ):
     query = TalentQuery(keyword=keyword, education=education, work_years_min=work_years_min, work_years_max=work_years_max, organization_id=organization_id, status=status, skill=skill)
-    result = await service.page_list(page, query)
+    result = await service.page_list(page, query, current_user=user)
     return success(data=build_page_result(result.items, result.total, page), message="查询成功")
 
 
 @router.get(
-    "/stats", summary="人才统计", response_model=SuccessResponse[TalentStatsResponse],
+    "/stats", summary="人才统计", response_model=ApiResponse[TalentStatsResponse],
     dependencies=[Depends(require_permission(PermissionEnum.TALENT_READ))],
 )
 async def talent_stats(
@@ -65,7 +66,7 @@ async def talent_stats(
 
 
 @router.post(
-    "", summary="创建人才档案", response_model=SuccessResponse[TalentResponse],
+    "", summary="创建人才档案", response_model=ApiResponse[TalentResponse],
     dependencies=[Depends(require_permission(PermissionEnum.TALENT_CREATE))],
 )
 async def create_talent(data: TalentCreate, operator: CurrentUser, service: TalentService = Depends(get_service)):
@@ -73,15 +74,16 @@ async def create_talent(data: TalentCreate, operator: CurrentUser, service: Tale
 
 
 @router.get(
-    "/{talent_id}", summary="人才档案详情", response_model=SuccessResponse[TalentDetailResponse],
+    "/{talent_id}", summary="人才档案详情", response_model=ApiResponse[TalentDetailResponse],
     dependencies=[Depends(require_permission(PermissionEnum.TALENT_READ))],
 )
-async def get_talent(talent_id: int, service: TalentService = Depends(get_service)):
-    return success(data=await service.get_detail(talent_id))
+async def get_talent(talent_id: int, user: CurrentUser, service: TalentService = Depends(get_service)):
+    """人才详情（数据范围外返回 403）。"""
+    return success(data=await service.get_detail(talent_id, current_user=user))
 
 
 @router.put(
-    "/{talent_id}", summary="更新人才档案", response_model=SuccessResponse[TalentResponse],
+    "/{talent_id}", summary="更新人才档案", response_model=ApiResponse[TalentResponse],
     dependencies=[Depends(require_permission(PermissionEnum.TALENT_UPDATE))],
 )
 async def update_talent(talent_id: int, data: TalentUpdate, operator: CurrentUser, service: TalentService = Depends(get_service)):
@@ -89,7 +91,7 @@ async def update_talent(talent_id: int, data: TalentUpdate, operator: CurrentUse
 
 
 @router.delete(
-    "/{talent_id}", summary="逻辑删除人才档案", response_model=SuccessResponse[None],
+    "/{talent_id}", summary="逻辑删除人才档案", response_model=ApiResponse[None],
     dependencies=[Depends(require_permission(PermissionEnum.TALENT_DELETE))],
 )
 async def delete_talent(talent_id: int, operator: CurrentUser, service: TalentService = Depends(get_service)):
@@ -98,7 +100,7 @@ async def delete_talent(talent_id: int, operator: CurrentUser, service: TalentSe
 
 
 @router.get(
-    "/{talent_id}/portrait", summary="人才最新画像", response_model=SuccessResponse[TalentPortraitResponse],
+    "/{talent_id}/portrait", summary="人才最新画像", response_model=ApiResponse[TalentPortraitResponse],
     dependencies=[Depends(require_permission(PermissionEnum.TALENT_READ))],
 )
 async def get_talent_portrait(talent_id: int, service: TalentService = Depends(get_service)):

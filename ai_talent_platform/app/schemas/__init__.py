@@ -9,7 +9,9 @@
 基类：
     BaseSchema  写模型（extra=forbid，严格入参）
     ORMModel    读模型（from_attributes=True）
-    PageData[T] 分页 data 包装
+分页与响应（唯一来源，不在此重复定义）：
+    PageParams / PageResult  -> core/pagination + core/response
+    ApiResponse[T]           -> core/response（Swagger response_model）
 已实现：common / auth / user / organization
 待实现：position / talent / resume / assessment / training / matching /
         knowledge / analytics

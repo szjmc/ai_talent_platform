@@ -94,6 +94,35 @@ def _classify_driver_error(exc: BaseException) -> tuple[ReasonLiteral, str]:
     return "unknown", "数据库连接失败，请查看服务端日志获取详细堆栈"
 
 
+async def _probe_database(
+    url: str,
+    *,
+    name: str,
+    target: str,
+    started: float,
+    connect_args: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """统一的 SELECT 1 探针（MySQL / PgSQL 唯一实现，供 check_mysql / check_pgsql 共用）。"""
+    try:
+        from sqlalchemy import text
+        from sqlalchemy.ext.asyncio import create_async_engine
+
+        engine = create_async_engine(
+            url, pool_pre_ping=True, **({"connect_args": connect_args} if connect_args else {})
+        )
+        try:
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+        finally:
+            await engine.dispose()
+        return _result(target, "up", "ok", f"{name} 连接正常",
+                       (time.perf_counter() - started) * 1000)
+    except Exception as exc:  # noqa: BLE001
+        reason, message = _classify_driver_error(exc)
+        logger.warning("%s 健康检查失败：%s", name, message)
+        return _result(target, "down", reason, message, (time.perf_counter() - started) * 1000)
+
+
 async def check_mysql() -> dict[str, Any]:
     """MySQL（业务主库）健康检查。"""
     target = f"{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"
@@ -120,25 +149,13 @@ async def check_mysql() -> dict[str, Any]:
             (time.perf_counter() - started) * 1000,
         )
 
-    try:
-        from sqlalchemy import text
-        from sqlalchemy.ext.asyncio import create_async_engine
-
-        engine = create_async_engine(
-            settings.DATABASE_URL, pool_pre_ping=True, connect_args={"connect_timeout": 3}
-        )
-        try:
-            async with engine.connect() as conn:
-                await conn.execute(text("SELECT 1"))
-        finally:
-            await engine.dispose()
-        return _result(
-            target, "up", "ok", "MySQL 连接正常", (time.perf_counter() - started) * 1000
-        )
-    except Exception as exc:  # noqa: BLE001
-        reason, message = _classify_driver_error(exc)
-        logger.warning("MySQL 健康检查失败：%s", message)
-        return _result(target, "down", reason, message, (time.perf_counter() - started) * 1000)
+    return await _probe_database(
+        settings.DATABASE_URL,
+        name="MySQL",
+        target=target,
+        started=started,
+        connect_args={"connect_timeout": 3},
+    )
 
 
 async def check_pgsql() -> dict[str, Any]:
@@ -175,23 +192,12 @@ async def check_pgsql() -> dict[str, Any]:
             (time.perf_counter() - started) * 1000,
         )
 
-    try:
-        from sqlalchemy import text
-        from sqlalchemy.ext.asyncio import create_async_engine
-
-        engine = create_async_engine(settings.PGSQL_URL, pool_pre_ping=True)
-        try:
-            async with engine.connect() as conn:
-                await conn.execute(text("SELECT 1"))
-        finally:
-            await engine.dispose()
-        return _result(
-            target, "up", "ok", "PgSQL 连接正常", (time.perf_counter() - started) * 1000
-        )
-    except Exception as exc:  # noqa: BLE001
-        reason, message = _classify_driver_error(exc)
-        logger.warning("PgSQL 健康检查失败：%s", message)
-        return _result(target, "down", reason, message, (time.perf_counter() - started) * 1000)
+    return await _probe_database(
+        settings.PGSQL_URL,
+        name="PgSQL",
+        target=target,
+        started=started,
+    )
 
 
 async def check_databases() -> dict[str, Any]:

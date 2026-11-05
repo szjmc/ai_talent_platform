@@ -76,14 +76,22 @@ async def create_mysql_database() -> None:
 
 
 async def create_mysql_tables(drop: bool = False) -> None:
-    """MySQL：建表（可选先删表）。"""
+    """MySQL：建表（可选先删表）。
+
+    与 app.infrastructure.database.session.init_db 共用 MySQL 命名锁
+    （GET_LOCK），多 worker / 本脚本与应用同时启动时 DDL 串行化，避免竞争。
+    """
     engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
     try:
         async with engine.begin() as conn:
-            if drop:
-                print("      [警告] 正在删除 MySQL 所有表……")
-                await conn.run_sync(Base.metadata.drop_all)
-            await conn.run_sync(Base.metadata.create_all)
+            await conn.execute(text("SELECT GET_LOCK('ai_talent_platform:create_all', 30)"))
+            try:
+                if drop:
+                    print("      [警告] 正在删除 MySQL 所有表……")
+                    await conn.run_sync(Base.metadata.drop_all)
+                await conn.run_sync(Base.metadata.create_all)
+            finally:
+                await conn.execute(text("SELECT RELEASE_LOCK('ai_talent_platform:create_all')"))
         tables = sorted(Base.metadata.tables)
         print(f"[2/4] MySQL 表结构创建完成，共 {len(tables)} 张表：{', '.join(tables)}")
     finally:

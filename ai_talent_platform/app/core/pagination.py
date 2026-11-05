@@ -5,11 +5,15 @@
 标签：[架构组] [P1]（分页契约）
 
 实现思路：
-1. PageParams：作为 FastAPI 依赖使用（Depends(PageParams)），自动解析 page / page_size，
-   并从 settings 读取默认值与上限，越界自动收敛而不是报错；
+1. PageParams：两种 FastAPI 依赖用法等价，任选其一（不要自己调 PageParams() 再解析 Query）：
+       page: PageParams = Depends()                    # 类依赖（推荐）
+       page: PageParams = Depends(get_page_params)     # 函数依赖（core/dependencies）
+   直接构造 PageParams(page=2)（脚本 / 测试）同样可用：未传参数时取 settings 默认值；
 2. 提供 skip / limit 属性供 Repository 直接使用；
 3. build_page_result()：把「查询结果 + 总数」组装成 PageResult，供 Service 返回；
-4. 支持排序参数（order_by + order），Service 传给 Repository 时做白名单校验。
+4. 支持排序参数（order_by + order），Service 传给 Repository 时做白名单校验；
+5. 对外的分页结构唯一为本模块的 PageParams + core.response.PageResult（历史上的
+   PageQuery / schemas.common.PageData 已删除，避免多套契约）。
 
 使用示例（Router）：
     @router.get("")
@@ -21,7 +25,7 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Generic, Sequence, TypeVar
+from typing import Any, Sequence, TypeVar
 
 from fastapi import Query
 from pydantic import BaseModel, Field
@@ -35,8 +39,15 @@ ORDER_ASC = "asc"
 ORDER_DESC = "desc"
 
 
+def _as_positive_int(value: Any, fallback: int) -> int:
+    """把依赖注入值 / 直接构造值归一化为正整数（Query FieldInfo 走 fallback）。"""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        return fallback
+    return value
+
+
 class PageParams:
-    """分页 + 排序查询参数（FastAPI 依赖）。"""
+    """分页 + 排序查询参数（FastAPI 依赖，也可直接构造）。"""
 
     def __init__(
         self,
@@ -49,10 +60,14 @@ class PageParams:
         order_by: str | None = Query(None, description="排序字段（由各模块白名单校验）"),
         order: str = Query(ORDER_DESC, pattern="^(asc|desc)$", description="排序方向 asc/desc"),
     ) -> None:
-        self.page = page
-        self.page_size = page_size
-        self.order_by = order_by
-        self.order = order
+        # FastAPI 注入时是具体值；直接 PageParams() 调用时默认值是 Query FieldInfo，
+        # 统一归一化为 int/str，保证两种构造方式都能得到可用的 skip/limit。
+        self.page = _as_positive_int(page, settings.DEFAULT_PAGE)
+        self.page_size = min(
+            _as_positive_int(page_size, settings.DEFAULT_PAGE_SIZE), settings.MAX_PAGE_SIZE
+        )
+        self.order_by = order_by if isinstance(order_by, str) else None
+        self.order = order if order in (ORDER_ASC, ORDER_DESC) else ORDER_DESC
 
     # ---------------- 派生属性
     @property
@@ -111,13 +126,3 @@ def build_page_result(
         page_size=ps,
         pages=calc_pages(total, ps),
     )
-
-
-class PageQuery(BaseModel, Generic[T]):
-    """可选的泛型分页响应体：{items, total, page, page_size, pages}。"""
-
-    items: list[T]
-    total: int
-    page: int
-    page_size: int
-    pages: int

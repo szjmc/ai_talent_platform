@@ -14,19 +14,21 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import CurrentUser, get_client_ip, get_db
-from app.core.response import success
+from app.core.dependencies import CurrentUser, bearer_scheme, get_client_ip, get_db
+from app.core.response import ApiResponse, success
 from app.schemas.auth import (
     ChangePasswordRequest,
     LoginRequest,
     LoginUserInfo,
+    LogoutRequest,
     RefreshTokenRequest,
     RegisterRequest,
     TokenResponse,
 )
-from app.schemas.common import COMMON_ERROR_RESPONSES, SuccessResponse
+from app.schemas.common import COMMON_ERROR_RESPONSES
 from app.schemas.user import UserResponse
 from app.services.auth_service import AuthService
 
@@ -41,7 +43,7 @@ def get_auth_service(db: AsyncSession = Depends(get_db)) -> AuthService:
 @router.post(
     "/register",
     summary="用户注册",
-    response_model=SuccessResponse[UserResponse],
+    response_model=ApiResponse[UserResponse],
     openapi_extra={"security": []},
 )
 async def register(
@@ -81,7 +83,7 @@ async def login(
 @router.post(
     "/refresh",
     summary="刷新访问令牌",
-    response_model=SuccessResponse[TokenResponse],
+    response_model=ApiResponse[TokenResponse],
     openapi_extra={"security": []},
 )
 async def refresh_token(
@@ -93,7 +95,7 @@ async def refresh_token(
     return success(data=TokenResponse(**result), message="刷新成功")
 
 
-@router.get("/me", summary="获取当前登录用户", response_model=SuccessResponse[LoginUserInfo])
+@router.get("/me", summary="获取当前登录用户", response_model=ApiResponse[LoginUserInfo])
 async def get_me(user: CurrentUser, service: AuthService = Depends(get_auth_service)):
     """返回当前用户的角色与权限码，前端据此渲染菜单与按钮。"""
     info = await service.get_user_info(user)
@@ -112,10 +114,19 @@ async def change_password(
 
 
 @router.post("/logout", summary="退出登录")
-async def logout(user: CurrentUser):
-    """退出登录。
+async def logout(
+    user: CurrentUser,
+    service: AuthService = Depends(get_auth_service),
+    token: LogoutRequest | None = None,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+):
+    """退出登录：吊销当前 access_token（jti 进入黑名单，立即失效）。
 
-    JWT 是无状态令牌，服务端不做强制失效；前端丢弃 token 即可。
-    如需立即失效（强制下线），可在此基础上引入 Redis 黑名单（记录 jti + exp）。
+    请求体可选携带 refresh_token，一并吊销；再次使用旧令牌会返回 401。
     """
+    await service.logout(
+        user,
+        access_token=credentials.credentials if credentials else None,
+        refresh_token=token.refresh_token if token else None,
+    )
     return success(message="已退出登录")

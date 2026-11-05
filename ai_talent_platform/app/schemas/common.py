@@ -1,8 +1,8 @@
 """
 模块：app/schemas/common.py
-职责：通用数据结构（分页、ID、状态、排序、批量操作等）。
+职责：通用数据结构（ID、状态、排序、批量操作等）。
 
-标签：[架构组] [P1]（跨业务通用 Schema：分页 / ID / 排序 / 批量）
+标签：[架构组] [P1]（跨业务通用 Schema：ID / 排序 / 批量）
 
 实现思路：
 1. 这里只放「跨业务复用」的 Schema，具体业务 Schema 放各自文件；
@@ -11,17 +11,17 @@
 3. 常用基类：
      ORMModel     读模型基类（from_attributes）
      BaseSchema   写模型基类（禁止额外字段，保证入参严格）
-4. 提供泛型包装，便于在 Swagger 中展示 `{code,message,data}` 与分页结构。
+4. 响应与分页结构不在此重复定义（历史上的 PageData / PageQuerySchema / SuccessResponse
+   已删除）：分页统一 core/pagination.PageParams + core/response.PageResult，
+   Swagger 响应包装统一 core/response.ApiResponse，避免多套契约漂移。
 """
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
-
-T = TypeVar("T")
 
 
 class ORMModel(BaseModel):
@@ -59,35 +59,6 @@ class SortSchema(BaseSchema):
 
     order_by: str | None = Field(None, description="排序字段")
     order: str = Field("desc", pattern="^(asc|desc)$", description="排序方向")
-
-
-class PageQuerySchema(BaseSchema):
-    """通用分页查询参数（作为 Query 参数使用时可继承）。"""
-
-    page: int = Field(1, ge=1, description="页码")
-    page_size: int = Field(20, ge=1, le=200, description="每页条数")
-    keyword: str | None = Field(None, max_length=64, description="关键字模糊搜索")
-    order_by: str | None = Field(None, description="排序字段")
-    order: str = Field("desc", pattern="^(asc|desc)$", description="排序方向")
-
-
-class PageData(BaseModel, Generic[T]):
-    """分页 data 结构（与 core.pagination.build_page_result 输出一致）。"""
-
-    items: list[T] = Field(default_factory=list)
-    total: int = 0
-    page: int = 1
-    page_size: int = 20
-    pages: int = 0
-
-
-class SuccessResponse(BaseModel, Generic[T]):
-    """Swagger 响应模型：统一结构 + 泛型 data。"""
-
-    code: int = 200
-    message: str = "success"
-    data: T | None = None
-    trace_id: str = "-"
 
 
 class TimestampSchema(ORMModel):
