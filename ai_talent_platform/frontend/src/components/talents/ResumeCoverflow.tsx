@@ -81,7 +81,7 @@ export default function ResumeCoverflow({ talents, province, fullscreen, onFulls
               return <motion.div layout key={talent.id} className={`resume-cover-card paper-archive-card ${offset === 0 ? 'is-active' : ''} ${isPicked ? 'is-picked' : ''}`}
                 style={{ zIndex: isPicked ? 100 + pickedIndex : 20 - distance, pointerEvents: hidden && !isPicked ? 'none' : 'auto' }}
                 initial={false} exit={{ opacity: 0, scale: .85 }}
-                animate={isPicked ? { x: floatX, y: fullscreen ? -18 : 0, z: 320 + pickedIndex * 8, rotateY: 0, rotateZ: 0, scale: fullscreen ? 1.04 : .96, opacity: 1 } : { x: offset * (fullscreen ? 270 : 245), y: distance * 13, z: -distance * 105, rotateY: offset * -7, rotateZ: offset * .45, scale: deckScale, opacity: hidden ? 0 : Math.max(.28, 1 - distance * .18) }}
+                animate={isPicked ? { x: floatX, y: fullscreen ? -8 : 0, z: 0, rotateY: 0, rotateZ: 0, scale: 1, opacity: 1 } : { x: offset * (fullscreen ? 285 : 255), y: distance * 13, z: 0, rotateY: offset * -3.5, rotateZ: offset * .35, scale: deckScale, opacity: hidden ? 0 : picked.length ? Math.max(.16, .52 - distance * .12) : Math.max(.42, 1 - distance * .14) }}
                 whileHover={isPicked ? undefined : { y: distance * 13 - 5 }} transition={spring}>
                 <div className="paper-sheet paper-sheet-back" /><div className="paper-sheet paper-sheet-middle" />
                 <div className="archive-card-face" role="button" tabIndex={0} onClick={() => pickCard(talent, index)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') pickCard(talent, index); }} aria-label={`取出${talent.name}的人才档案`}>
