@@ -18,7 +18,10 @@
 安全约定：
 - 密码错误统一抛 CredentialsError（不区分用户不存在 / 密码错误，防止用户名枚举）；
 - 任何异常信息都不会泄露 password_hash；
-- 角色变更后旧 token 中的 roles 会过期，属于可接受行为（重新登录即刷新）。
+- 角色变更后旧 token 中的 roles 会过期，属于可接受行为（重新登录即刷新）；
+- 令牌失效闭环：logout 吊销当前 access（及携带的 refresh）jti；
+  change_password 触发用户级吊销（全端下线）；refresh / get_current_user 校验吊销状态；
+- 登录 / 登出 / 改密 / 注册均 publish_audit 审计事件（EventBus 异步落库）。
 """
 
 from __future__ import annotations
@@ -39,15 +42,20 @@ from app.core.exceptions import (
 )
 from app.core.permissions import ROLE_PERMISSIONS, RoleEnum, get_permissions_by_roles
 from app.core.security import (
+    TOKEN_TYPE_REFRESH,
     create_access_token,
     create_refresh_token,
+    decode_token,
     hash_password,
     verify_password,
 )
+from app.core.token_revocation import is_token_revoked, revoke_jti, revoke_user_tokens
 from app.models.user import User
 from app.repositories.organization_repository import OrganizationRepository
 from app.repositories.user_repository import UserRepository
+from app.repositories.base import unique_write_guard
 from app.schemas.auth import ChangePasswordRequest, LoginRequest, LoginUserInfo, RegisterRequest
+from app.services.audit_service import publish_audit
 
 logger = logging.getLogger(__name__)
 
@@ -77,10 +85,22 @@ class AuthService:
             is_active=True,
             is_superuser=False,
         )
-        self.db.add(user)
-        await self.db.flush()  # 拿到 id 后绑定角色
+        # SAVEPOINT 保护：并发注册撞唯一键时抛 DuplicateError 而不是 500，
+        # 且不回滚掉请求级事务里的其它工作
+        async with unique_write_guard(self.db, "User 数据已存在或违反唯一约束"):
+            self.db.add(user)
+            await self.db.flush()  # 拿到 id 后绑定角色
 
         await self.user_repo.set_roles(self.db, user, [RoleEnum.EMPLOYEE.value])
+        publish_audit(
+            action="create",
+            module="auth",
+            target_type="user",
+            target_id=user.id,
+            user_id=user.id,
+            username=user.username,
+            status="success",
+        )
         logger.info("用户注册成功 id=%s username=%s", user.id, user.username)
         return user
 
@@ -91,6 +111,10 @@ class AuthService:
 
         # 统一错误提示，避免暴露「用户是否存在」
         if user is None:
+            publish_audit(
+                action="login", module="auth", username=data.username,
+                request_ip=client_ip, status="fail", error_message="用户不存在或密码错误",
+            )
             raise CredentialsError()
         if not user.is_active:
             raise AccountDisabledError()
@@ -106,18 +130,26 @@ class AuthService:
                 max_fail=settings.LOGIN_MAX_FAIL_TIMES,
                 lock_minutes=settings.LOGIN_LOCK_MINUTES,
             )
+            publish_audit(
+                action="login", module="auth", user_id=user.id, username=user.username,
+                request_ip=client_ip, status="fail", error_message="密码错误",
+            )
             logger.warning("登录失败 username=%s ip=%s", data.username, client_ip)
             raise CredentialsError()
 
         await self.user_repo.update_login_success(self.db, user, client_ip)
 
-        # remember_me：签发有效期更长的 access_token
+        # remember_me：签发有效期更长的 access_token（同一签发路径，必带 jti）
         expires_minutes = (
             settings.JWT_REFRESH_EXPIRE_MINUTES if data.remember_me else settings.JWT_EXPIRE_MINUTES
         )
         access_token = self._issue_access_token(user, expires_minutes=expires_minutes)
         refresh_token = create_refresh_token(user.id)
 
+        publish_audit(
+            action="login", module="auth", user_id=user.id, username=user.username,
+            request_ip=client_ip, status="success",
+        )
         logger.info("登录成功 id=%s username=%s ip=%s", user.id, user.username, client_ip)
         return {
             "access_token": access_token,
@@ -128,33 +160,23 @@ class AuthService:
         }
 
     def _issue_access_token(self, user: User, *, expires_minutes: int | None = None) -> str:
-        """签发 access_token（默认使用 settings 中的有效期）。"""
-        if expires_minutes is None or expires_minutes == settings.JWT_EXPIRE_MINUTES:
-            return create_access_token(
-                user.id, username=user.username, roles=user.role_codes
-            )
-        # 自定义有效期（remember_me 场景）
-        from datetime import datetime, timedelta, timezone
-
-        import jwt
-
-        now = datetime.now(timezone.utc)
-        payload = {
-            "sub": str(user.id),
-            "type": "access",
-            "iat": int(now.timestamp()),
-            "exp": int((now + timedelta(minutes=expires_minutes)).timestamp()),
-            "username": user.username,
-            "roles": user.role_codes,
-        }
-        return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+        """签发 access_token（统一走 create_access_token：默认 / remember_me 都带 jti）。"""
+        return create_access_token(
+            user.id,
+            username=user.username,
+            roles=user.role_codes,
+            expires_minutes=expires_minutes,
+        )
 
     # ------------------------------------------------------------ 令牌刷新
     async def refresh(self, refresh_token: str) -> dict:
-        """用 refresh_token 换新的 access_token（refresh_token 本身不轮转）。"""
-        from app.core.security import decode_token, TOKEN_TYPE_REFRESH
+        """用 refresh_token 换新的 access_token（refresh_token 本身不轮转）。
 
+        吊销校验：登出时吊销的 refresh jti、改密触发的用户级下线都会在此拒绝。
+        """
         payload = decode_token(refresh_token, expected_type=TOKEN_TYPE_REFRESH)
+        if await is_token_revoked(payload):
+            raise AuthError("登录状态已失效，请重新登录")
         user = await self.user_repo.get_by_id(self.db, int(payload["sub"]))
         if user is None or user.is_deleted:
             raise AuthError("用户不存在或已被删除")
@@ -168,9 +190,37 @@ class AuthService:
             "expires_in": settings.JWT_EXPIRE_MINUTES * 60,
         }
 
+    # ------------------------------------------------------------ 登出
+    async def logout(
+        self,
+        user: User,
+        *,
+        access_token: str | None = None,
+        refresh_token: str | None = None,
+    ) -> None:
+        """登出：吊销当前 access_token（携带 refresh_token 时一并吊销），旧令牌立即失效。"""
+        revoked = 0
+        for token, expected in (
+            (access_token, "access"),
+            (refresh_token, TOKEN_TYPE_REFRESH),
+        ):
+            if not token:
+                continue
+            try:
+                payload = decode_token(token, expected_type=expected)
+            except AuthError:
+                continue  # 令牌本身已无效，无需吊销
+            await revoke_jti(payload.get("jti"), payload.get("exp"))
+            revoked += 1
+        publish_audit(
+            action="logout", module="auth", user_id=user.id, username=user.username,
+            status="success",
+        )
+        logger.info("登出 user_id=%s 吊销令牌数=%s", user.id, revoked)
+
     # ------------------------------------------------------------ 修改密码
     async def change_password(self, user: User, data: ChangePasswordRequest) -> None:
-        """修改当前用户密码。"""
+        """修改当前用户密码（成功后全端下线：用户级吊销存量令牌）。"""
         if data.new_password != data.confirm_password:
             raise ParamError("两次输入的新密码不一致")
         if not verify_password(data.old_password, user.password_hash):
@@ -180,7 +230,13 @@ class AuthService:
 
         user.password_hash = hash_password(data.new_password)
         await self.db.flush()
-        logger.info("修改密码成功 user_id=%s", user.id)
+        # 改密 = 强制所有旧令牌失效（iat 早于此刻的 access/refresh 全部拒绝）
+        await revoke_user_tokens(user.id)
+        publish_audit(
+            action="update", module="auth", target_type="password", target_id=user.id,
+            user_id=user.id, username=user.username, status="success",
+        )
+        logger.info("修改密码成功 user_id=%s（已吊销全部旧令牌）", user.id)
 
     # ------------------------------------------------------------ 当前用户信息
     def build_login_user_info(self, user: User) -> LoginUserInfo:

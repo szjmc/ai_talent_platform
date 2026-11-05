@@ -12,7 +12,9 @@
      has_permission(user_roles, required)     单个权限判断
      has_any_permission / has_all_permissions  多权限判断
      check_permission(...)                     失败抛 PermissionDeniedError
-     data_scope_sql_filter(...)                数据范围（全部/本部门/本部门及下级/仅本人）
+     get_data_scope(roles)                     数据范围（全部/本部门/本部门及下级/仅本人）
+     check_data_scope(...)                     单条数据范围校验（越权抛 PermissionDeniedError）
+     visible_organization_ids(...)             列表过滤：范围 -> 可见部门 ID 集合
 5. 真正的「登录 + 权限」依赖注入在 core/dependencies.py：
      Depends(require_permission(PermissionEnum.TALENT_CREATE))
 
@@ -227,3 +229,44 @@ def check_data_scope(
         return
     if not dept_in_scope:
         raise PermissionDeniedError("无权访问其他部门数据")
+
+
+def visible_organization_ids(
+    roles: list[str] | set[str] | None,
+    organization_id: int | None,
+    subtree_org_ids: set[int] | list[int] | None = None,
+) -> set[int] | None:
+    """行级数据范围 -> 可见部门 ID 集合（列表 / 详情查询的过滤条件来源）。
+
+    :param roles: 当前用户角色（多角色取最宽范围）
+    :param organization_id: 当前用户所属部门 ID
+    :param subtree_org_ids: 本部门及下级的部门 ID 集合（Service 用
+        organization_repository.list_subtree 预先取出；dept 范围不使用）
+    :return:
+        None        -> 不限制（ALL，含 super_admin 的角色配置）
+        set[int]    -> 仅这些部门可见（dept = {本部门}；dept_sub = 本部门 + 下级）
+        set()       -> 无可见部门（SELF 范围，或 dept/dept_sub 但本人无部门），
+                       调用方应退化为「仅本人数据」
+
+    典型用法（Service）：
+        org_ids = visible_organization_ids(user.role_codes, user.organization_id, subtree)
+        if org_ids is None:
+            ...不过滤
+        elif org_ids:
+            extra_where.append(Model.organization_id.in_(org_ids))
+        else:
+            extra_where.append(<仅本人条件>)
+    """
+    scope = get_data_scope(roles)
+    if scope == DataScopeEnum.ALL:
+        return None
+    if scope == DataScopeEnum.SELF:
+        return set()
+    if not organization_id:
+        return set()
+    if scope == DataScopeEnum.DEPT:
+        return {int(organization_id)}
+    # DEPT_SUB：本部门 + 下级（subtree 未提供时至少保证本部门可见）
+    ids = {int(organization_id)}
+    ids.update(int(i) for i in (subtree_org_ids or ()))
+    return ids

@@ -27,7 +27,7 @@ pytestmark = pytest.mark.asyncio
 async def test_settings_use_mysql_and_pgsql_only():
     """配置层面不允许出现 SQLite。"""
     assert settings.DATABASE_URL.startswith("mysql+aiomysql://")
-    assert settings.DATABASE_URL_SYNC.startswith("mysql+pymysql://")
+    assert settings.MYSQL_SERVER_URL.startswith("mysql+aiomysql://")
     assert settings.PGSQL_URL.startswith("postgresql+asyncpg://")
     summary = settings.database_summary()
     assert "sqlite" not in str(summary).lower()

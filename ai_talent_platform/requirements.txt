@@ -28,8 +28,11 @@ alembic>=1.13                    # 数据库迁移
 PyJWT>=2.8
 bcrypt>=4.1
 
-# ---------------- 缓存（P1，可选）
-# redis>=5.0
+# ---------------- 缓存 / 限流（P1；REDIS_ENABLED=false 时自动降级为进程内实现）
+redis>=5.0
+
+# ---------------- 日志（P1；多 worker 安全滚动，缺失时自动回退标准 RotatingFileHandler）
+concurrent-log-handler>=0.2.31
 
 # ---------------- 文档解析（P1，简历 / 知识库）
 # pdfplumber>=0.11

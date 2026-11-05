@@ -827,7 +827,7 @@ JSON 检索：`skill_tags` 用 `JSON_CONTAINS(skill_tags, '"Python"')`；高频�
 
 1. 宽表 `dim_talent_wide` 供 Vanna NL2SQL 直接查询，避免复杂 JOIN；
 2. 时序表统一 `fact_` 前缀 + 时间分区，索引 `(talent_id, event_at)`；
-3. 同步方式：MySQL → PgSQL 由定时任务/ETL（`scripts/sync_analytics.py` 待实现）增量同步；
+3. 同步方式：MySQL → PgSQL 由定时任务/ETL（`scripts/sync_analytics.py` ✅ 已实现，`sync_all(*, full_refresh=False)` 幂等增量同步）；
 4. 只读账号：NL2SQL 使用专用只读账号，且仅授权 `public` 下的 `fact_*`/`dim_*`。
 
 ---
@@ -1538,7 +1538,7 @@ python scripts/seed_data.py # 可选：演示部门树 + 测试账号（Test@123
 ### 13.2 表结构变更流程（生产）
 
 1. 修改 `app/models/*.py`；
-2. `alembic revision --autogenerate -m "add xxx"`（`alembic/env.py` 使用 `settings.DATABASE_URL_SYNC`）；
+2. `alembic revision --autogenerate -m "add xxx"`（`alembic/env.py` 由 `settings.DB_*` 字段拼装同步驱动 DSN，勿在 settings 中新增 `*_URL_SYNC` 死配置）；
 3. 人工审查生成的迁移脚本（特别是索引与默认值）；
 4. `alembic upgrade head`；
 5. 在 `docs/database_design.md` 与 `docs/api_document.md` 对应章节同步更新。

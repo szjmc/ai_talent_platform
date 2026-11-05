@@ -64,6 +64,12 @@ class RefreshTokenRequest(BaseSchema):
     refresh_token: str = Field(..., description="登录时返回的 refresh_token")
 
 
+class LogoutRequest(BaseSchema):
+    """登出请求（可选体）：可携带 refresh_token 一并吊销。"""
+
+    refresh_token: str | None = Field(None, description="可选：需要一并吊销的 refresh_token")
+
+
 class ChangePasswordRequest(BaseSchema):
     """修改密码请求。"""
 

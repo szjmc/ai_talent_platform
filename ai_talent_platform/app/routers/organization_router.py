@@ -18,8 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.dependencies import get_db, require_permission
 from app.core.pagination import PageParams, build_page_result
 from app.core.permissions import PermissionEnum
-from app.core.response import PageResult, success
-from app.schemas.common import COMMON_ERROR_RESPONSES, SuccessResponse
+from app.core.response import ApiResponse, PageResult, success
+from app.schemas.common import COMMON_ERROR_RESPONSES
 from app.schemas.organization import (
     OrgCreate,
     OrgMoveRequest,
@@ -41,7 +41,7 @@ def get_org_service(db: AsyncSession = Depends(get_db)) -> OrganizationService:
 @router.get(
     "/tree",
     summary="组织架构树",
-    response_model=SuccessResponse[list[OrgTreeNode]],
+    response_model=ApiResponse[list[OrgTreeNode]],
     dependencies=[Depends(require_permission(PermissionEnum.ORG_READ))],
 )
 async def get_org_tree(service: OrganizationService = Depends(get_org_service)):
@@ -52,7 +52,7 @@ async def get_org_tree(service: OrganizationService = Depends(get_org_service)):
 @router.get(
     "",
     summary="部门列表（分页）",
-    response_model=SuccessResponse[PageResult[OrgResponse]],
+    response_model=ApiResponse[PageResult[OrgResponse]],
     dependencies=[Depends(require_permission(PermissionEnum.ORG_READ))],
 )
 async def list_orgs(
@@ -67,7 +67,7 @@ async def list_orgs(
 @router.get(
     "/{org_id}",
     summary="部门详情",
-    response_model=SuccessResponse[OrgResponse],
+    response_model=ApiResponse[OrgResponse],
     dependencies=[Depends(require_permission(PermissionEnum.ORG_READ))],
 )
 async def get_org(org_id: int, service: OrganizationService = Depends(get_org_service)):
@@ -77,7 +77,7 @@ async def get_org(org_id: int, service: OrganizationService = Depends(get_org_se
 @router.post(
     "",
     summary="创建部门",
-    response_model=SuccessResponse[OrgResponse],
+    response_model=ApiResponse[OrgResponse],
     dependencies=[Depends(require_permission(PermissionEnum.ORG_MANAGE))],
 )
 async def create_org(data: OrgCreate, service: OrganizationService = Depends(get_org_service)):
@@ -87,7 +87,7 @@ async def create_org(data: OrgCreate, service: OrganizationService = Depends(get
 @router.put(
     "/{org_id}",
     summary="更新部门",
-    response_model=SuccessResponse[OrgResponse],
+    response_model=ApiResponse[OrgResponse],
     dependencies=[Depends(require_permission(PermissionEnum.ORG_MANAGE))],
 )
 async def update_org(
@@ -99,7 +99,7 @@ async def update_org(
 @router.patch(
     "/{org_id}/move",
     summary="移动部门",
-    response_model=SuccessResponse[OrgResponse],
+    response_model=ApiResponse[OrgResponse],
     dependencies=[Depends(require_permission(PermissionEnum.ORG_MANAGE))],
 )
 async def move_org(

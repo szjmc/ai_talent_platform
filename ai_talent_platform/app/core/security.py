@@ -70,12 +70,14 @@ def _create_token(
     expires_minutes: int,
     extra: dict[str, Any] | None = None,
 ) -> str:
-    """统一令牌签发逻辑。"""
+    """统一令牌签发逻辑（每个令牌都带唯一 jti，供吊销存储使用）。"""
     now = datetime.now(timezone.utc)
     payload: dict[str, Any] = {
         "sub": str(subject),
         "type": token_type,
-        "iat": int(now.timestamp()),
+        # 秒级浮点：用户级吊销（revoke_user_tokens）按 iat < cutoff 比较，
+        # 浮点精度保证「吊销后立刻重新登录」的新令牌不会被误伤。
+        "iat": now.timestamp(),
         "exp": int((now + timedelta(minutes=expires_minutes)).timestamp()),
         "jti": uuid.uuid4().hex,
     }
@@ -90,14 +92,20 @@ def create_access_token(
     username: str | None = None,
     roles: list[str] | None = None,
     extra: dict[str, Any] | None = None,
+    expires_minutes: int | None = None,
 ) -> str:
-    """签发访问令牌。"""
+    """签发访问令牌（expires_minutes 用于 remember_me 自定义有效期）。"""
     payload_extra: dict[str, Any] = {"roles": roles or []}
     if username:
         payload_extra["username"] = username
     if extra:
         payload_extra.update(extra)
-    return _create_token(user_id, TOKEN_TYPE_ACCESS, settings.JWT_EXPIRE_MINUTES, payload_extra)
+    return _create_token(
+        user_id,
+        TOKEN_TYPE_ACCESS,
+        expires_minutes if expires_minutes is not None else settings.JWT_EXPIRE_MINUTES,
+        payload_extra,
+    )
 
 
 def create_refresh_token(user_id: int | str, *, extra: dict[str, Any] | None = None) -> str:

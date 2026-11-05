@@ -24,6 +24,7 @@ from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
@@ -131,14 +132,14 @@ def mysql_ready() -> Generator[None, None, None]:
     asyncio.run(engine.dispose())
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def db_session(mysql_ready) -> AsyncGenerator[AsyncSession, None]:
     """直接操作数据库的会话（用于准备 / 校验数据）。"""
     async with TestingSessionLocal() as session:
         yield session
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client() -> AsyncGenerator[object, None]:
     """异步 HTTP 客户端（ASGI 直连，无需起服务；不要求数据库可用）。"""
     from httpx import ASGITransport, AsyncClient

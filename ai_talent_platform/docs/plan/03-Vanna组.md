@@ -59,15 +59,15 @@
 
 | 文件 | 依赖包 | 关键实现 |
 | --- | --- | --- |
-| `app/adapters/nl2sql/sql_validator.py` | `sqlglot` | `validate_select_sql(sql, allowed_tables)->str`、`inject_limit(sql, max_rows=1000)`、`inject_data_scope(sql, scope_sql)`；禁止多语句/DDL/DML/系统表 |
-| `app/adapters/nl2sql/vanna_adapter.py` | `vanna` | `ask(question, user_scope)->NL2SQLResponse{sql, columns, rows, chart, insight, elapsed_ms}`；内部固定顺序：generate → validate → execute(只读 PgSQL) → chart → insight |
+| `app/adapters/nl2sql/sql_validator.py` | ✅ 已实现（零依赖词法校验，`sqlglot` 可选未启用） | `validate_select_sql(sql, allowed_tables, max_rows, apply_limit)->str`、`inject_limit(sql, max_rows=200)`、`inject_data_scope(sql, scope_sql)`；禁止多语句/DDL/DML/系统表 |
+| `app/adapters/nl2sql/vanna_adapter.py` | ✅ 已实现（vanna 未安装时「依赖未就绪」降级） | `ask(question, user_scope, max_rows)->NL2SQLResponse{sql, columns, rows, chart, insight, elapsed_ms}`；内部固定顺序：generate → validate → 行级数据范围 → execute(只读 PgSQL) → chart → insight |
 | `scripts/train_vanna.py` | `vanna` | 导入 DDL（分析库 6 表）/ 指标口径文档 / 示例 SQL / 业务术语；`--reset` 重建 |
-| `app/services/analytics_service.py` | — | `overview()`、`nl2sql_ask()`、`chart_config()`、`export()`、`dashboard()`；调 Service 层而非直连 SQL |
-| `app/routers/analytics_router.py` | — | 6 个接口：`GET /analytics/overview`、`GET /analytics/distribution`、`GET /analytics/trend`、`POST /analytics/nl2sql`、`POST /analytics/report`、`GET /analytics/reports`，挂 `analytics:read` / `analytics:export` |
+| `app/services/analytics_service.py` | ✅ 已实现 | `overview()`、`distribution()`、`trend()`、`nl2sql()`、`generate_report()`(+`reports()`)；调 Service 层而非直连 SQL |
+| `app/routers/analytics_router.py` | ✅ 已实现 | 6 个接口：`GET /analytics/overview`、`GET /analytics/distribution`、`GET /analytics/trend`、`POST /analytics/nl2sql`、`POST /analytics/report`、`GET /analytics/reports`，挂 `analytics:read` / `analytics:export` |
 | `app/models/analytics.py` + `scripts/init_pgsql.py` | ✅ 已实现 | 6 张分析宽表 ORM 与分区建表已落地（只读复用，严禁重建）；本组新增 `scripts/sync_analytics.py` 实现 MySQL → PgSQL 幂等增量同步 ETL |
 | `app/ai/skills/sql_skill.py` | ✅ 架构组已实现 | `SqlQuerySkill` 已完成，只读无需修改；内部自动动态导入本组 `VannaAdapter.ask(question=..., user_scope=..., max_rows=...)` |
 | `app/repositories/assessment_repository.py`、`app/schemas/assessment.py`、`app/services/assessment_service.py`、`app/routers/assessment_router.py` | — | **在线智能测评闭环（P1）**：`QuestionForCandidateSchema` 物理剔除 `answer` 防泄密、超时标记 `overtime`、单选/多选规则计分、调 `dispatch("assessment")` 生成主观题评分与报告、联动 `[RAG组] TalentService` 更新评级，实现 `/assessments` 下 6 个接口 |
-| `tests/test_nl2sql.py`、`tests/test_assessment.py` | — | 校验器 30 条 + 适配器 mock 10 条 + 测评防泄密与判分单测（新增测试文件必须加 `标签：[Vanna组] [P1]`） |
+| `tests/test_analytics_channel.py`（✅，含校验器/适配器/服务/ETL/工作流全链路） | — | 校验器安全用例 + 适配器 mock 链路 + 概览/分布/趋势/报告任务单测（新增测试文件必须加 `标签：[Vanna组] [P1]`） |
 
 ---
 

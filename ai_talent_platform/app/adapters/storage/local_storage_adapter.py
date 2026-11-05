@@ -70,7 +70,7 @@ class LocalStorageAdapter(BaseStorage):
         return file_storage.get_size(path)
 
     def url(self, path: str) -> str:
-        """对外访问地址（文件下载路由由业务模块提供，见 routers/file_router.py）。"""
+        """对外访问地址（下载路由待实现：当前由 /files 占位提供，后续落 routers/file_router.py）。"""
         return f"{settings.API_PREFIX}/files/raw/{str(path).lstrip('/')}"
 
     def absolute_path(self, path: str) -> Path:

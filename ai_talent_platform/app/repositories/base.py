@@ -28,6 +28,8 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any, ClassVar, Generic, Sequence, TypeVar
 
 from sqlalchemy import Select, and_, delete, func, inspect, or_, select, update
@@ -40,6 +42,35 @@ from app.core.response import PageResult
 from app.models.base import Base
 
 ModelT = TypeVar("ModelT", bound=Base)
+
+
+@asynccontextmanager
+async def unique_write_guard(db: AsyncSession, action: str) -> AsyncIterator[None]:
+    """唯一键写操作守卫：SAVEPOINT 内执行写入，冲突转为 DuplicateError。
+
+    为什么是 SAVEPOINT 而不是 db.rollback()：请求级事务（get_db）里可能已完成
+    多次读写，直接 rollback 会把整个请求的成果一并丢弃（历史 bug）。begin_nested()
+    只回滚到 SAVEPOINT，外层事务、已读数据与此前写入全部保留，会话继续可用。
+
+    契约：进入守卫时会话必须没有「未 flush 的写操作」—— begin_nested 建立 SAVEPOINT
+    前会先 flush 快照，脏状态会在 SAVEPOINT 之外失败而失去保护。本仓库的写方法
+    都遵循「进入即干净」（每次操作立即 flush）；若契约被破坏（is_active=False），
+    守卫退化为整体回滚以恢复会话可用，并仍然抛出 DuplicateError。
+
+    用法：
+        async with unique_write_guard(db, "Talent 数据已存在或违反唯一约束"):
+            db.add(obj)
+            await db.flush()
+    """
+    try:
+        async with db.begin_nested():
+            yield
+    except IntegrityError as exc:
+        txn = db.get_transaction()
+        if txn is not None and not txn.is_active:
+            await db.rollback()
+        detail = (getattr(exc.orig, "args", None) or [exc])[0]
+        raise DuplicateError(f"{action}：{detail}") from exc
 
 
 class BaseRepository(Generic[ModelT]):
@@ -303,8 +334,11 @@ class BaseRepository(Generic[ModelT]):
         else:
             obj = obj_in
 
-        db.add(obj)
-        await self._flush_with_unique_guard(db, obj)
+        async with unique_write_guard(
+            db, f"{self._model().__name__} 数据已存在或违反唯一约束"
+        ):
+            db.add(obj)
+            await db.flush()
         return obj
 
     async def create_many(
@@ -312,18 +346,15 @@ class BaseRepository(Generic[ModelT]):
         db: AsyncSession,
         objs: Sequence[ModelT] | Sequence[dict[str, Any]],
     ) -> list[ModelT]:
-        """批量新增（一次 flush，失败抛 DuplicateError）。"""
+        """批量新增（一次 flush，唯一键冲突只回滚到 SAVEPOINT，失败抛 DuplicateError）。"""
         instances: list[ModelT] = []
         for item in objs:
             instances.append(self._model()(**item) if isinstance(item, dict) else item)
         if not instances:
             return []
-        db.add_all(instances)
-        try:
+        async with unique_write_guard(db, "批量写入失败，存在唯一键冲突"):
+            db.add_all(instances)
             await db.flush()
-        except IntegrityError as exc:
-            await db.rollback()
-            raise DuplicateError(f"批量写入失败，存在唯一键冲突：{exc.orig}") from exc
         return instances
 
     async def update(
@@ -333,16 +364,20 @@ class BaseRepository(Generic[ModelT]):
         obj_in: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> ModelT:
-        """更新记录（字段级增量更新，自动 +1 乐观锁版本号）。"""
+        """更新记录（字段级增量更新，自动 +1 乐观锁版本号，SAVEPOINT 保护唯一键）。"""
         data = {**(obj_in or {}), **kwargs}
-        for field, value in data.items():
-            if field in {"id", "created_at", "created_by"}:
-                continue
-            if hasattr(db_obj, field):
-                setattr(db_obj, field, value)
-        if hasattr(db_obj, "version"):
-            db_obj.version = (db_obj.version or 1) + 1
-        await self._flush_with_unique_guard(db, db_obj)
+        # 修改与 flush 都放进 SAVEPOINT：冲突时内存状态随快照一起还原，外层事务保留
+        async with unique_write_guard(
+            db, f"{self._model().__name__} 数据已存在或违反唯一约束"
+        ):
+            for field, value in data.items():
+                if field in {"id", "created_at", "created_by"}:
+                    continue
+                if hasattr(db_obj, field):
+                    setattr(db_obj, field, value)
+            if hasattr(db_obj, "version"):
+                db_obj.version = (db_obj.version or 1) + 1
+            await db.flush()
         return db_obj
 
     async def update_by_id(
@@ -396,16 +431,6 @@ class BaseRepository(Generic[ModelT]):
         return True
 
     # ------------------------------------------------------------ 内部
-    async def _flush_with_unique_guard(self, db: AsyncSession, obj: ModelT) -> None:
-        """flush 并把唯一键冲突转换为业务异常，避免抛 500。"""
-        try:
-            await db.flush()
-        except IntegrityError as exc:
-            await db.rollback()
-            raise DuplicateError(
-                f"{self._model().__name__} 数据已存在或违反唯一约束：{getattr(exc.orig, 'args', [exc])[0]}"
-            ) from exc
-
     def check_version(self, db_obj: ModelT, expected_version: int | None) -> None:
         """乐观锁校验（可在 Service 更新前调用）。"""
         if expected_version is not None and getattr(db_obj, "version", None) != expected_version:
