@@ -1,0 +1,215 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 700" width="1120" height="700" font-family="-apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif">
+  <defs>
+    <style>
+      .tbl { fill: #ffffff; stroke: #94a3b8; stroke-width: 1.2; rx: 6; ry: 6; }
+      .tbl-head { fill: #1e293b; }
+      .tbl-title { font-size: 12px; font-weight: 700; fill: #ffffff; }
+      .col { font-size: 10.5px; fill: #334155; }
+      .pk { font-size: 10.5px; font-weight: 700; fill: #b91c1c; }
+      .fk { font-size: 10.5px; fill: #1d4ed8; }
+      .rel { stroke: #475569; stroke-width: 1.2; fill: none; }
+      .rel-weak { stroke: #94a3b8; stroke-width: 1.1; stroke-dasharray: 4 3; fill: none; }
+      .legend { font-size: 11px; fill: #475569; }
+      .group { font-size: 12px; font-weight: 700; fill: #0f172a; }
+    </style>
+    <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6">
+      <circle cx="5" cy="5" r="4" fill="#475569"/>
+    </marker>
+    <marker id="crow" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="12" markerHeight="9" orient="auto-start-reverse">
+      <path d="M 0 6 L 8 1 M 0 6 L 8 11 M 0 6 L 12 6" stroke="#475569" stroke-width="1.2" fill="none"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1120" height="700" fill="#f8fafc"/>
+  <text x="24" y="28" font-size="16" font-weight="700" fill="#0f172a">ER 关系图（核心表）</text>
+  <text x="24" y="46" class="legend">PK 主键 ｜ FK 外键 ｜ 虚线 = 逻辑外键（应用层校验）｜ 所有表均含 id/created_at/updated_at/is_deleted/deleted_at/created_by/updated_by/version 系统字段（下图省略）</text>
+
+  <!-- organizations -->
+  <g>
+    <rect x="24" y="70" width="190" height="126" class="tbl"/>
+    <rect x="24" y="70" width="190" height="22" class="tbl-head" rx="6" ry="6"/>
+    <text x="34" y="85" class="tbl-title">organizations 组织</text>
+    <text x="34" y="106" class="pk">PK id</text>
+    <text x="34" y="121" class="fk">FK parent_id → organizations.id</text>
+    <text x="34" y="136" class="col">code  UNIQUE</text>
+    <text x="34" y="151" class="col">name / level / path</text>
+    <text x="34" y="166" class="col">leader_id（逻辑 FK→users）</text>
+    <text x="34" y="181" class="col">sort / is_active / remark</text>
+  </g>
+
+  <!-- users -->
+  <g>
+    <rect x="24" y="230" width="190" height="146" class="tbl"/>
+    <rect x="24" y="230" width="190" height="22" class="tbl-head" rx="6" ry="6"/>
+    <text x="34" y="245" class="tbl-title">users 用户</text>
+    <text x="34" y="266" class="pk">PK id</text>
+    <text x="34" y="281" class="fk">FK organization_id → organizations</text>
+    <text x="34" y="296" class="col">username UNIQUE / password_hash</text>
+    <text x="34" y="311" class="col">mobile / email / real_name</text>
+    <text x="34" y="326" class="col">is_active / is_superuser</text>
+    <text x="34" y="341" class="col">fail_count / locked_until</text>
+    <text x="34" y="356" class="col">last_login_at / last_login_ip</text>
+  </g>
+
+  <!-- roles / user_roles -->
+  <g>
+    <rect x="24" y="410" width="190" height="92" class="tbl"/>
+    <rect x="24" y="410" width="190" height="22" class="tbl-head" rx="6" ry="6"/>
+    <text x="34" y="425" class="tbl-title">roles 角色</text>
+    <text x="34" y="446" class="pk">PK id</text>
+    <text x="34" y="461" class="col">code UNIQUE（super_admin…）</text>
+    <text x="34" y="476" class="col">name / description / is_active</text>
+  </g>
+  <g>
+    <rect x="24" y="524" width="190" height="72" class="tbl"/>
+    <rect x="24" y="524" width="190" height="22" class="tbl-head" rx="6" ry="6"/>
+    <text x="34" y="539" class="tbl-title">user_roles 关联</text>
+    <text x="34" y="560" class="fk">PK/FK user_id → users.id</text>
+    <text x="34" y="575" class="fk">PK/FK role_id → roles.id</text>
+    <text x="34" y="590" class="col">created_at</text>
+  </g>
+
+  <!-- positions -->
+  <g>
+    <rect x="286" y="70" width="200" height="146" class="tbl"/>
+    <rect x="286" y="70" width="200" height="22" class="tbl-head" rx="6" ry="6"/>
+    <text x="296" y="85" class="tbl-title">positions 岗位</text>
+    <text x="296" y="106" class="pk">PK id</text>
+    <text x="296" y="121" class="fk">FK organization_id → organizations</text>
+    <text x="296" y="136" class="col">code UNIQUE / title</text>
+    <text x="296" y="151" class="col">level / headcount / status</text>
+    <text x="296" y="166" class="col">description TEXT</text>
+    <text x="296" y="181" class="col">requirements JSON</text>
+    <text x="296" y="196" class="col">skill_tags JSON / salary_*</text>
+  </g>
+
+  <!-- talents -->
+  <g>
+    <rect x="286" y="246" width="200" height="176" class="tbl"/>
+    <rect x="286" y="246" width="200" height="22" class="tbl-head" rx="6" ry="6"/>
+    <text x="296" y="261" class="tbl-title">talents 人才档案</text>
+    <text x="296" y="282" class="pk">PK id</text>
+    <text x="296" y="297" class="fk">FK organization_id → organizations</text>
+    <text x="296" y="312" class="fk">FK resume_id → resumes.id</text>
+    <text x="296" y="327" class="col">name / gender / mobile</text>
+    <text x="296" y="342" class="col">education / school / major</text>
+    <text x="296" y="357" class="col">work_years / current_company</text>
+    <text x="296" y="372" class="col">skill_tags JSON / certificates</text>
+    <text x="296" y="387" class="col">status / potential_level / source</text>
+    <text x="296" y="402" class="col">portrait_summary</text>
+  </g>
+
+  <!-- resumes / files -->
+  <g>
+    <rect x="548" y="70" width="200" height="132" class="tbl"/>
+    <rect x="548" y="70" width="200" height="22" class="tbl-head" rx="6" ry="6"/>
+    <text x="558" y="85" class="tbl-title">resumes 简历</text>
+    <text x="558" y="106" class="pk">PK id</text>
+    <text x="558" y="121" class="fk">FK talent_id → talents.id</text>
+    <text x="558" y="136" class="fk">FK file_id → files.id</text>
+    <text x="558" y="151" class="col">file_hash UNIQUE（秒传）</text>
+    <text x="558" y="166" class="col">status / accuracy / parsed_data JSON</text>
+    <text x="558" y="181" class="col">parse_error / parsed_at</text>
+    <text x="558" y="196" class="col">file_name / file_type / file_size</text>
+  </g>
+  <g>
+    <rect x="548" y="230" width="200" height="102" class="tbl"/>
+    <rect x="548" y="230" width="200" height="22" class="tbl-head" rx="6" ry="6"/>
+    <text x="558" y="245" class="tbl-title">files 文件元数据</text>
+    <text x="558" y="266" class="pk">PK id</text>
+    <text x="558" y="281" class="col">file_hash（去重）/ stored_name</text>
+    <text x="558" y="296" class="col">biz_type + biz_id / uploader_id</text>
+    <text x="558" y="311" class="col">storage_type / file_path / size</text>
+    <text x="558" y="326" class="col">content_type / download_count</text>
+  </g>
+
+  <!-- assessments -->
+  <g>
+    <rect x="548" y="360" width="200" height="150" class="tbl"/>
+    <rect x="548" y="360" width="200" height="22" class="tbl-head" rx="6" ry="6"/>
+    <text x="558" y="375" class="tbl-title">assessments 测评</text>
+    <text x="558" y="396" class="pk">PK id</text>
+    <text x="558" y="411" class="fk">FK talent_id / position_id</text>
+    <text x="558" y="426" class="col">title / status / deadline</text>
+    <text x="558" y="441" class="col">question_count / started_at</text>
+    <text x="558" y="456" class="col">submitted_at / created_by_ai</text>
+    <text x="558" y="476" class="legend">├─ assessment_questions 题目</text>
+    <text x="558" y="491" class="legend">├─ assessment_answers 答题</text>
+    <text x="558" y="506" class="legend">└─ assessment_results 结果</text>
+  </g>
+
+  <!-- trainings -->
+  <g>
+    <rect x="548" y="536" width="200" height="132" class="tbl"/>
+    <rect x="548" y="536" width="200" height="22" class="tbl-head" rx="6" ry="6"/>
+    <text x="558" y="551" class="tbl-title">training_plans 培训</text>
+    <text x="558" y="572" class="pk">PK id</text>
+    <text x="558" y="587" class="fk">FK talent_id → talents.id</text>
+    <text x="558" y="602" class="col">name / goal / start_date / end_date</text>
+    <text x="558" y="617" class="col">status / created_by_ai</text>
+    <text x="558" y="632" class="legend">├─ plan_courses → courses</text>
+    <text x="558" y="647" class="legend">└─ learning_records 学习记录</text>
+  </g>
+
+  <!-- matching / knowledge / conversation / audit -->
+  <g>
+    <rect x="810" y="70" width="286" height="132" class="tbl"/>
+    <rect x="810" y="70" width="286" height="22" class="tbl-head" rx="6" ry="6"/>
+    <text x="820" y="85" class="tbl-title">matching_records 匹配记录</text>
+    <text x="820" y="106" class="pk">PK id</text>
+    <text x="820" y="121" class="fk">UQ(batch_id, position_id, talent_id)</text>
+    <text x="820" y="136" class="col">score / dimension_scores JSON</text>
+    <text x="820" y="151" class="col">highlights / gaps JSON</text>
+    <text x="820" y="166" class="col">strategy / model_name / matched_by</text>
+    <text x="820" y="181" class="col">matched_at（按月分区）</text>
+    <text x="820" y="196" class="legend">↳ position_id, talent_id 逻辑外键</text>
+  </g>
+  <g>
+    <rect x="810" y="230" width="286" height="132" class="tbl"/>
+    <rect x="810" y="230" width="286" height="22" class="tbl-head" rx="6" ry="6"/>
+    <text x="820" y="245" class="tbl-title">knowledge_docs / knowledge_chunks</text>
+    <text x="820" y="266" class="pk">PK id（docs / chunks）</text>
+    <text x="820" y="281" class="fk">chunks.doc_id → knowledge_docs.id</text>
+    <text x="820" y="296" class="col">title / category / status</text>
+    <text x="820" y="311" class="col">permission_scope / allowed_roles JSON</text>
+    <text x="820" y="326" class="col">chunk_count / embedding_model</text>
+    <text x="820" y="341" class="col">chunks.milvus_pk（向量主键）</text>
+    <text x="820" y="356" class="legend">↳ 向量存 Milvus，原文在本表</text>
+  </g>
+  <g>
+    <rect x="810" y="390" width="286" height="112" class="tbl"/>
+    <rect x="810" y="390" width="286" height="22" class="tbl-head" rx="6" ry="6"/>
+    <text x="820" y="405" class="tbl-title">conversations / chat_messages</text>
+    <text x="820" y="426" class="pk">PK id</text>
+    <text x="820" y="441" class="fk">FK user_id → users.id</text>
+    <text x="820" y="456" class="col">agent_type / title / message_count</text>
+    <text x="820" y="471" class="col">messages: role / content / citations</text>
+    <text x="820" y="486" class="col">prompt_tokens / completion_tokens</text>
+  </g>
+  <g>
+    <rect x="810" y="528" width="286" height="140" class="tbl"/>
+    <rect x="810" y="528" width="286" height="22" class="tbl-head" rx="6" ry="6"/>
+    <text x="820" y="543" class="tbl-title">audit_logs 审计</text>
+    <text x="820" y="564" class="pk">PK id</text>
+    <text x="820" y="579" class="col">user_id / username（逻辑 FK）</text>
+    <text x="820" y="594" class="col">action / module / target_type / target_id</text>
+    <text x="820" y="609" class="col">request_method / path / ip / trace_id</text>
+    <text x="820" y="624" class="col">before_data / after_data JSON</text>
+    <text x="820" y="639" class="col">status / error_message / created_at</text>
+    <text x="820" y="656" class="legend">只增不改，无 update/delete</text>
+  </g>
+
+  <!-- 关系线 -->
+  <path class="rel" d="M 214 96 L 286 96" marker-end="url(#crow)"/>
+  <path class="rel" d="M 214 286 L 286 300" marker-end="url(#crow)"/>
+  <path class="rel" d="M 119 300 L 119 410" marker-end="url(#crow)"/>
+  <path class="rel" d="M 119 524 L 119 502" marker-end="url(#crow)"/>
+  <path class="rel" d="M 409 246 L 409 216" marker-end="url(#crow)"/>
+  <path class="rel" d="M 486 340 L 548 150" marker-end="url(#crow)"/>
+  <path class="rel" d="M 486 360 L 548 280" marker-end="url(#crow)"/>
+  <path class="rel" d="M 486 400 L 548 430" marker-end="url(#crow)"/>
+  <path class="rel" d="M 486 420 L 548 600" marker-end="url(#crow)"/>
+  <path class="rel-weak" d="M 186 168 L 340 246" marker-end="url(#dot)"/>
+  <path class="rel-weak" d="M 214 450 L 810 560" marker-end="url(#dot)"/>
+  <path class="rel-weak" d="M 214 300 L 810 430" marker-end="url(#dot)"/>
+</svg>

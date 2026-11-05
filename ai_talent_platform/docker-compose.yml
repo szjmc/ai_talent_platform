@@ -1,0 +1,97 @@
+# ============================================================
+# 标签：[架构组] [P1]（本地 MySQL / PgSQL 基础设施编排，仅开发联调用）
+# 本地数据库依赖（仅供开发/联调使用，生产请使用独立集群）
+#   docker compose up -d        启动 MySQL 8 + PgSQL 16
+#   docker compose ps           查看状态
+#   docker compose down         停止（数据保留在 volume 中）
+#   docker compose down -v      停止并删除数据
+# 账号密码与 .env.example 中的默认值保持一致
+# ============================================================
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: talent-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ai_talent_platform
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+      - --default-authentication-plugin=mysql_native_password
+      - --max_connections=500
+      - --default-time-zone=+08:00
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+
+  pgsql:
+    image: postgres:16
+    container_name: talent-pgsql
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ai_talent_analytics
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgsql_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ai_talent_analytics"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  # 可选：MinIO（对象存储，STORAGE_BACKEND=minio 时启用）
+  #   docker compose --profile storage up -d
+  #   控制台 http://127.0.0.1:9001（minioadmin / minioadmin），桶名与 .env 的 MINIO_BUCKET 一致
+  minio:
+    image: minio/minio:latest
+    container_name: talent-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: ["server", "/data", "--console-address", ":9001"]
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    profiles: ["storage"]
+
+  # 可选：Redis（缓存 / 会话 / 限流）。启用时把 .env 中 REDIS_ENABLED 改为 true
+  redis:
+    image: redis:7-alpine
+    container_name: talent-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    profiles: ["cache"]
+
+volumes:
+  mysql_data:
+  pgsql_data:
+  redis_data:
+  minio_data:

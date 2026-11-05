@@ -1,0 +1,11 @@
+# 分析库同步 · 系统级定时（方案①：不依赖应用进程，最省事）
+#
+# 安装：crontab -e 后粘贴下面一行（按实际路径改 APP_DIR / 解释器）
+# 说明：与进程内 APScheduler 可并存——两侧都抢同一把 Redis 锁（lock:sync:analytics），
+#       不会重复执行；若未启用 Redis，请只保留其中一种方式。
+#
+# 每天 02:00 跑增量（默认近 12 个月窗口 + 水位收敛）
+0 2 * * * cd /opt/ai_talent_platform && .venv/bin/python scripts/sync_analytics.py >> logs/sync_analytics.log 2>&1
+
+# 每月 1 日 03:00 跑一次全量校准（清空事实表重灌，修复历史漂移）
+0 3 1 * * cd /opt/ai_talent_platform && .venv/bin/python scripts/sync_analytics.py --full >> logs/sync_analytics_full.log 2>&1

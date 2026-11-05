@@ -1,0 +1,13 @@
+[Unit]
+Description=AI 人才平台 · MySQL -> PgSQL 分析库同步
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=appuser
+WorkingDirectory=/opt/ai_talent_platform
+Environment=APP_ENV=prod
+ExecStart=/opt/ai_talent_platform/.venv/bin/python /opt/ai_talent_platform/scripts/sync_analytics.py
+StandardOutput=append:/opt/ai_talent_platform/logs/sync_analytics.log
+StandardError=append:/opt/ai_talent_platform/logs/sync_analytics.log

@@ -1,0 +1,10 @@
+[Unit]
+Description=每天 02:00 触发分析库增量同步
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target
