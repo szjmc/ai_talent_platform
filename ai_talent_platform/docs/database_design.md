@@ -827,7 +827,7 @@ JSON 检索：`skill_tags` 用 `JSON_CONTAINS(skill_tags, '"Python"')`；高频�
 
 1. 宽表 `dim_talent_wide` 供 Vanna NL2SQL 直接查询，避免复杂 JOIN；
 2. 时序表统一 `fact_` 前缀 + 时间分区，索引 `(talent_id, event_at)`；
-3. 同步方式：MySQL → PgSQL 由定时任务/ETL（`scripts/sync_analytics.py` 待实现）增量同步；
+3. 同步方式：MySQL → PgSQL 由定时任务/ETL（`scripts/sync_analytics.py` ✅ 已实现，`sync_all(*, full_refresh=False)` 幂等增量同步）；
 4. 只读账号：NL2SQL 使用专用只读账号，且仅授权 `public` 下的 `fact_*`/`dim_*`。
 
 ---

@@ -31,6 +31,7 @@ from app.routers.auth_router import router as auth_router
 from app.routers.organization_router import router as organization_router
 from app.routers.user_router import router as user_router
 from app.routers.talent_router import router as talent_router
+from app.routers.analytics_router import router as analytics_router
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,15 @@ api_router.include_router(auth_router)
 api_router.include_router(user_router)
 api_router.include_router(organization_router)
 api_router.include_router(talent_router)
+api_router.include_router(analytics_router)
+
+IMPLEMENTED_MODULES: list[str] = [
+    "auth",
+    "users",
+    "organizations",
+    "talents",
+    "analytics",
+]
 
 # ------------------------------------------------------------------ 待实现模块
 # 说明：这些路由目前只提供占位接口（返回 501 提示），待对应负责人实现后，
@@ -56,7 +66,6 @@ _STUB_MODULES: list[tuple[str, str, str]] = [
     ("trainings", "培训管理", "[Dify组] 课程、培训计划、学习进度（见 routers/training_router.py）"),
     ("matchings", "人岗匹配", "[Agent组] 执行匹配、匹配结果、匹配解释（见 routers/matching_router.py）"),
     ("knowledge", "知识库", "[RAG组] 知识文档上传、RAG 检索、智能问答（见 routers/knowledge_router.py）"),
-    ("analytics", "数据分析", "[Vanna组] 统计概览、NL2SQL 问数、报告导出（见 routers/analytics_router.py）"),
     ("agents", "AI 智能体", "[Agent组] Agent 对话、任务执行、SSE 流式输出（见 routers/agent_router.py）"),
     ("files", "文件管理", "[架构组] 文件上传、下载、预览（待新建 routers/file_router.py）"),
     ("audit", "审计日志", "[架构组] 操作与 AI 调用审计查询、统计（入库链路已通，查询接口待新建 routers/audit_router.py）"),
@@ -65,7 +74,11 @@ _STUB_MODULES: list[tuple[str, str, str]] = [
 for _prefix, _tag, _desc in _STUB_MODULES:
     api_router.include_router(placeholder_router(prefix=_prefix, tag=_tag, description=_desc))
 
-logger.info("总路由注册完成：已实现 4 个模块 + %s 个占位模块", len(_STUB_MODULES))
+logger.info(
+    "总路由注册完成：已实现 %s 个模块 + %s 个占位模块",
+    len(IMPLEMENTED_MODULES),
+    len(_STUB_MODULES),
+)
 
 
 system_router = APIRouter(prefix="/system", tags=["系统"])
@@ -96,7 +109,7 @@ async def system_info():
             "storage": settings.storage_summary,
             # AI 运行时状态：LLM 适配器 / 已注册技能 / 已注册 Agent（架构组）
             "ai_ready": ai_runtime_status(),
-            "implemented_modules": ["auth", "users", "organizations", "talents"],
+            "implemented_modules": list(IMPLEMENTED_MODULES),
         },
         message="OK",
     )

@@ -241,7 +241,7 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 | 培训 | `/trainings` | 🚧 | 9 | `[Dify组]` |
 | 匹配 | `/matchings` | 🚧 | 5 | `[Agent组]` |
 | 知识库 | `/knowledge` | 🚧 | 7 | `[RAG组]` |
-| 分析 | `/analytics` | 🚧 | 6 | `[Vanna组]` |
+| 分析 | `/analytics` | ✅ | 6 | `[Vanna组]` |
 | 智能体 | `/agents` | 🚧 | 6 | `[Agent组]`（含 `[Dify组]` 双模分支） |
 | 文件 | `/files` | 🚧 | 5 | `[架构组]` |
 | 审计 | `/audit` | 🚧 | 3 | `[架构组]` |
@@ -1108,7 +1108,7 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 <a id="api-analytics"></a>
 
-## 十六、分析模块 Analytics — 🚧 待实现
+## 十六、分析模块 Analytics — ✅ 已实现
 
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |

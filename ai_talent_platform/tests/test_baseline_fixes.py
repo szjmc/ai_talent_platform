@@ -510,7 +510,6 @@ _SKELETON_ROUTERS = (
     ("trainings", "app.routers.training_router"),
     ("matchings", "app.routers.matching_router"),
     ("knowledge", "app.routers.knowledge_router"),
-    ("analytics", "app.routers.analytics_router"),
     ("agents", "app.routers.agent_router"),
 )
 
