@@ -31,6 +31,7 @@ from app.core.response import success
 from app.routers.auth_router import router as auth_router
 from app.routers.organization_router import router as organization_router
 from app.routers.user_router import router as user_router
+from app.routers.talent_router import router as talent_router
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ api_router = APIRouter()
 api_router.include_router(auth_router)
 api_router.include_router(user_router)
 api_router.include_router(organization_router)
+api_router.include_router(talent_router)
 
 # ------------------------------------------------------------------ 待实现模块
 # 说明：这些路由目前只提供占位接口（返回 501 提示），待对应负责人实现后，
@@ -50,7 +52,6 @@ api_router.include_router(organization_router)
 # 全平台只划分 5 个研发组（架构组 / RAG组 / Agent组 / Vanna组 / Dify组），业务模块垂直归口。
 _STUB_MODULES: list[tuple[str, str, str]] = [
     ("positions", "岗位管理", "[Agent组] 岗位 CRUD、岗位说明书 AI 解析、岗位向量化（见 routers/position_router.py）"),
-    ("talents", "人才档案", "[RAG组] 人才档案 CRUD、画像查询、语义检索、档案合并（见 routers/talent_router.py）"),
     ("resumes", "简历管理", "[RAG组] 简历上传、AI 解析、解析结果查询（见 routers/resume_router.py）"),
     ("assessments", "人才测评", "[Vanna组] 测评创建、答题、提交、结果分析（见 routers/assessment_router.py）"),
     ("trainings", "培训管理", "[Dify组] 课程、培训计划、学习进度（见 routers/training_router.py）"),
@@ -65,7 +66,7 @@ _STUB_MODULES: list[tuple[str, str, str]] = [
 for _prefix, _tag, _desc in _STUB_MODULES:
     api_router.include_router(placeholder_router(prefix=_prefix, tag=_tag, description=_desc))
 
-logger.info("总路由注册完成：已实现 3 个模块 + %s 个占位模块", len(_STUB_MODULES))
+logger.info("总路由注册完成：已实现 4 个模块 + %s 个占位模块", len(_STUB_MODULES))
 
 
 system_router = APIRouter(prefix="/system", tags=["系统"])
@@ -96,7 +97,7 @@ async def system_info():
             "storage": settings.storage_summary,
             # AI 运行时状态：LLM 适配器 / 已注册技能 / 已注册 Agent（架构组）
             "ai_ready": ai_runtime_status(),
-            "implemented_modules": ["auth", "users", "organizations"],
+            "implemented_modules": ["auth", "users", "organizations", "talents"],
         },
         message="OK",
     )

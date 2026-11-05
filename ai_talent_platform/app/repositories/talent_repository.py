@@ -1,53 +1,85 @@
-"""
-模块：app/repositories/talent_repository.py
-职责：人才档案数据访问层。
+"""人才档案数据访问层。
 
-标签：[RAG组] [P0]（get_by_mobile / search_by_skills / count_by_organization / stats_*）
+标签：[RAG组] [P0]
 
-============================ 实现思路与代码要点 ============================
-本仓库继承 BaseRepository，只需声明：
-    model = <Model>
-    filterable_fields = {...}      # 允许精确筛选的字段（白名单，防注入）
-    searchable_fields = {...}      # 关键字模糊搜索字段
-    sortable_fields = {...}        # 可排序字段白名单
-    default_order = "-id"
-
-- 向量检索流程：Milvus 召回 talent_id 列表 -> 本仓库 get_by_ids 回表 -> 保持得分排序；
-- 统计类方法返回 dict 列表（键名与 schemas/analytics.py 对应）；
-- 敏感字段（手机号/身份证）在 Schema 层脱敏，不在仓库层处理。
-方法清单（按顺序实现，勾选表示已完成）：
-    - [ ] get_by_mobile(db, mobile)                      手机号查重
-    - [ ] get_by_ids(db, ids)                            批量查询（向量检索回表）
-    - [ ] search_by_skills(db, skills)                   技能包含筛选（JSON）
-    - [ ] count_by_organization(db, org_ids)             部门人才分布统计
-    - [ ] stats_by_education(db)                         学历分布（分组统计）
-    - [ ] stats_by_month(db, year)                       月度新增趋势
-
-实现约束：
-- 不写业务判断（是否允许操作由 Service 决定）；
-- 不 commit / rollback（事务由 core 的依赖与 transaction 管理）；
-- 聚合统计用 SQLAlchemy func，不要在 Python 中循环统计；
-- 返回 ORM 对象，序列化交给 Schema。
-=========================================================================
+所有语句使用 SQLAlchemy 参数绑定；JSON 技能条件由 MySQL JSON_CONTAINS 执行。
+本层不提交事务，也不做手机号查重等业务判断。
 """
 
 from __future__ import annotations
 
-from app.models.base import Base
+import json
+from typing import Any, Sequence
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.talent import Talent, TalentPortrait
 from app.repositories.base import BaseRepository
 
-# 模型实现后取消注释：
-# from app.models.talent import Talent
 
-# TODO(负责人)：按上述方法清单实现。
-
-
-class TalentRepository(BaseRepository):
-    """人才档案仓库（骨架）。"""
-
-    # 注意：未指定 model 前调用任何方法都会抛 NotImplementedError
-    # model = <Model>
-    filterable_fields: set[str] = set()
-    searchable_fields: set[str] = set()
-    sortable_fields: set[str] = {"id", "created_at", "updated_at"}
+class TalentRepository(BaseRepository[Talent]):
+    model = Talent
+    filterable_fields = {"id", "mobile", "education", "status", "organization_id", "potential_level"}
+    searchable_fields = {"name", "mobile", "email", "current_company", "current_position", "school", "major"}
+    sortable_fields = {"id", "created_at", "updated_at", "name", "work_years"}
     default_order = "-id"
+
+    async def get_by_mobile(
+        self, db: AsyncSession, mobile: str, *, exclude_id: int | None = None
+    ) -> Talent | None:
+        stmt = select(Talent).where(Talent.mobile == mobile, Talent.is_deleted.is_(False))
+        if exclude_id is not None:
+            stmt = stmt.where(Talent.id != exclude_id)
+        return (await db.execute(stmt.limit(1))).scalar_one_or_none()
+
+    async def get_by_ids(self, db: AsyncSession, ids: Sequence[int]) -> list[Talent]:
+        """向量召回后的批量回表；调用方负责按召回得分重排。"""
+        if not ids:
+            return []
+        stmt = select(Talent).where(Talent.id.in_(list(ids)), Talent.is_deleted.is_(False))
+        return list((await db.execute(stmt)).scalars().all())
+
+    @staticmethod
+    def skill_conditions(skills: Sequence[str] | None) -> list[Any]:
+        """每个技能都必须包含于 JSON 数组（AND），JSON 文本通过参数绑定传输。"""
+        return [func.json_contains(Talent.skill_tags, json.dumps(skill, ensure_ascii=False)) for skill in skills or [] if skill]
+
+    async def search_by_skills(self, db: AsyncSession, skills: Sequence[str]) -> list[Talent]:
+        return list(await self.list(db, extra_where=self.skill_conditions(skills)))
+
+    async def get_latest_portrait(self, db: AsyncSession, talent_id: int) -> TalentPortrait | None:
+        stmt = (
+            select(TalentPortrait)
+            .where(TalentPortrait.talent_id == talent_id, TalentPortrait.is_deleted.is_(False))
+            .order_by(TalentPortrait.version.desc(), TalentPortrait.id.desc())
+            .limit(1)
+        )
+        return (await db.execute(stmt)).scalar_one_or_none()
+
+    async def count_by_organization(
+        self, db: AsyncSession, org_ids: Sequence[int] | None = None
+    ) -> list[dict[str, int | None]]:
+        stmt = select(Talent.organization_id, func.count(Talent.id).label("value")).where(Talent.is_deleted.is_(False))
+        if org_ids:
+            stmt = stmt.where(Talent.organization_id.in_(list(org_ids)))
+        rows = (await db.execute(stmt.group_by(Talent.organization_id).order_by(func.count(Talent.id).desc()))).all()
+        return [{"organization_id": org_id, "value": int(value)} for org_id, value in rows]
+
+    async def stats_by_education(self, db: AsyncSession) -> list[dict[str, str | int | None]]:
+        stmt = (
+            select(Talent.education, func.count(Talent.id).label("value"))
+            .where(Talent.is_deleted.is_(False))
+            .group_by(Talent.education)
+            .order_by(func.count(Talent.id).desc())
+        )
+        return [{"education": education, "value": int(value)} for education, value in (await db.execute(stmt)).all()]
+
+    async def stats_by_month(self, db: AsyncSession, year: int) -> list[dict[str, int]]:
+        stmt = (
+            select(func.month(Talent.created_at).label("month"), func.count(Talent.id).label("value"))
+            .where(Talent.is_deleted.is_(False), func.year(Talent.created_at) == year)
+            .group_by(func.month(Talent.created_at))
+            .order_by(func.month(Talent.created_at))
+        )
+        return [{"month": int(month), "value": int(value)} for month, value in (await db.execute(stmt)).all()]
