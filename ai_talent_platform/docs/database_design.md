@@ -437,7 +437,8 @@
 
 > 表结构已定稿，ORM 模型已全部落地（字段名/类型/索引/约束如需变更需评审，并同步 Alembic 迁移）。
 > 21 张业务表 + 4 张公共表共 25 张表由 `app/models/*` 定义，经 `app/models/__init__.py` 注册进 `Base.metadata`；
-> 执行 `python scripts/init_db.py` 建表，`python scripts/dump_orm_mapping.py --output docs/orm_mapping.md` 导出全局 ORM 映射。
+> 2026-11-06 [Agent组] 按 `models/__init__.py` 扩展流程追加 `talent_invitations` / `exam_sessions` 2 张表，现共 **27 张**；
+> 执行 `python scripts/init_db.py` 建表，`python scripts/dump_orm_mapping.py --format md --output docs/orm_mapping.md` 导出全局 ORM 映射。
 > 注意：Repository / Service / API 仍是骨架，表结构可用但业务读写逻辑未实现。
 
 ### 6.1 `positions` 岗位

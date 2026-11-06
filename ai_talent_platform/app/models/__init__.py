@@ -35,6 +35,7 @@ from app.models.assessment import (  # noqa: E402
 from app.models.audit import AuditLog  # noqa: E402
 from app.models.conversation import ChatMessage, Conversation  # noqa: E402
 from app.models.file import File  # noqa: E402
+from app.models.invitation import ExamSession, TalentInvitation  # noqa: E402
 from app.models.knowledge import KnowledgeChunk, KnowledgeDoc  # noqa: E402
 from app.models.matching import MatchingRecord  # noqa: E402
 from app.models.organization import Organization  # noqa: E402
@@ -89,6 +90,9 @@ __all__ = [
     "LearningRecord",
     # 匹配
     "MatchingRecord",
+    # 人才邀约（笔试/测评/面试）—— [Agent组] 新增模型，按本文件扩展流程追加
+    "TalentInvitation",
+    "ExamSession",
     # 知识库
     "KnowledgeDoc",
     "KnowledgeChunk",

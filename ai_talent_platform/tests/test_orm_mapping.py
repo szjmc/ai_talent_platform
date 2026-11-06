@@ -39,18 +39,21 @@ EXPECTED_MYSQL_TABLES = {
     "resume_experiences",
     "resumes",
     "roles",
+    "talent_invitations",
     "talent_portraits",
     "talents",
     "training_plans",
     "user_roles",
     "users",
+    "exam_sessions",
 }
 
 
-def test_all_25_business_tables_are_mapped():
+def test_all_business_tables_are_mapped():
+    """27 张 MySQL 业务表（原 25 张冻结表 + [Agent组] 邀约/笔试 2 张追加表）。"""
     assert set(Base.metadata.tables) == EXPECTED_MYSQL_TABLES
     mapping = build_orm_mapping()
-    assert mapping["mysql"]["table_count"] == 25
+    assert mapping["mysql"]["table_count"] == 27
     assert mapping["mysql"]["table_count"] == len(table_model_map("mysql"))
 
 

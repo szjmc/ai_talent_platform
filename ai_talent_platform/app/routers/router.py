@@ -29,6 +29,7 @@ from app.routers._stub import placeholder_router
 from app.core.response import ApiResponse, success
 from app.routers.agent_router import router as agent_router
 from app.routers.auth_router import router as auth_router
+from app.routers.invite_router import router as invite_router
 from app.routers.organization_router import router as organization_router
 from app.routers.user_router import router as user_router
 from app.routers.talent_router import router as talent_router
@@ -45,6 +46,7 @@ api_router.include_router(organization_router)
 api_router.include_router(agent_router)
 api_router.include_router(talent_router)
 api_router.include_router(analytics_router)
+api_router.include_router(invite_router)
 
 IMPLEMENTED_MODULES: list[str] = [
     "auth",
@@ -53,6 +55,7 @@ IMPLEMENTED_MODULES: list[str] = [
     "agents",
     "talents",
     "analytics",
+    "invites",
 ]
 
 # ------------------------------------------------------------------ 待实现模块

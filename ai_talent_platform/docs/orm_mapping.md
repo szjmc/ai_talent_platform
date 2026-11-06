@@ -2,7 +2,7 @@
 
 > 本文由 `scripts/dump_orm_mapping.py` 从 SQLAlchemy 元数据自动生成，勿手工编辑。
 
-- MySQL 业务主库 `ai_talent_platform`：25 张表 / 413 个字段 / 46 条 ORM 关系
+- MySQL 业务主库 `ai_talent_platform`：27 张表 / 455 个字段 / 46 条 ORM 关系
 - PgSQL 分析库 `ai_talent_analytics`（schema `public`）：6 张表 / 50 个字段，分区父表 4 张
 
 | 库 | 表名 | ORM 类 | 定义文件 | 字段数 |
@@ -15,6 +15,7 @@
 | ai_talent_platform | `chat_messages` | `ChatMessage` | `app.models.conversation` | 17 |
 | ai_talent_platform | `conversations` | `Conversation` | `app.models.conversation` | 14 |
 | ai_talent_platform | `courses` | `Course` | `app.models.training` | 17 |
+| ai_talent_platform | `exam_sessions` | `ExamSession` | `app.models.invitation` | 22 |
 | ai_talent_platform | `files` | `File` | `app.models.file` | 21 |
 | ai_talent_platform | `knowledge_chunks` | `KnowledgeChunk` | `app.models.knowledge` | 14 |
 | ai_talent_platform | `knowledge_docs` | `KnowledgeDoc` | `app.models.knowledge` | 20 |
@@ -27,6 +28,7 @@
 | ai_talent_platform | `resume_experiences` | `ResumeExperience` | `app.models.resume` | 15 |
 | ai_talent_platform | `resumes` | `Resume` | `app.models.resume` | 19 |
 | ai_talent_platform | `roles` | `Role` | `app.models.role` | 7 |
+| ai_talent_platform | `talent_invitations` | `TalentInvitation` | `app.models.invitation` | 20 |
 | ai_talent_platform | `talent_portraits` | `TalentPortrait` | `app.models.talent` | 18 |
 | ai_talent_platform | `talents` | `Talent` | `app.models.talent` | 29 |
 | ai_talent_platform | `training_plans` | `TrainingPlan` | `app.models.training` | 16 |
@@ -374,6 +376,53 @@ ORM 关系：
 | --- | --- | --- | --- | --- | --- |
 | `learning_records` | 一对多 | `LearningRecord`（`learning_records`） | select | course | delete,delete-orphan,expunge,merge,refresh-expire,save-update |
 | `plan_courses` | 一对多 | `PlanCourse`（`plan_courses`） | select | course | delete,delete-orphan,expunge,merge,refresh-expire,save-update |
+
+### `exam_sessions` → `ExamSession`
+
+笔试作答会话表（定义：`app.models.invitation`）
+
+- 主键：`id`
+
+| 字段 | 类型 | 空 | 默认 | 主键 | 外键 | 说明 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `invitation_id` | `BIGINT` | 否 | — |  | talent_invitations.id ON DELETE CASCADE | 邀约 ID（FK -> talent_invitations.id，一会约一卷） |
+| `token` | `VARCHAR(64)` | 否 | — |  | — | 邀约 token 冗余（公开接口直接查询） |
+| `question_ids` | `JSON` | 否 | 服务器端 '[]' |  | — | 抽题快照（有序 question_id 列表） |
+| `answers` | `JSON` | 是 | — |  | — | 作答内容：{question_id: answer}；answer 结构见阅卷逻辑 |
+| `violations` | `JSON` | 是 | 服务器端 '[]' |  | — | 作弊检测违规记录：[{ts, type, detail}]（YOLO/人脸回退检测） |
+| `proctor_state` | `JSON` | 是 | — |  | — | 监考连续状态机：{no_face_streak, frames, multi_person, ...} |
+| `candidate_ip` | `VARCHAR(45)` | 是 | — |  | — | 交卷/首帧来源 IP（审计） |
+| `status` | `VARCHAR(20)` | 否 | 服务器端 'in_progress' |  | — | 状态：in_progress 作答中 / submitted 已交卷 / expired 超时 / cancelled 关联邀约被取消 |
+| `started_at` | `DATETIME` | 是 | — |  | — | 首次打开时间 |
+| `deadline` | `DATETIME` | 是 | — |  | — | 作答截止（min(首次打开+时长, 邀约过期)） |
+| `submitted_at` | `DATETIME` | 是 | — |  | — | 交卷时间 |
+| `score` | `NUMERIC(6, 2)` | 是 | — |  | — | 客观题自动得分（文本题需人工，未计入） |
+| `total_score` | `NUMERIC(6, 2)` | 是 | — |  | — | 卷面总分（快照题目分值合计） |
+| `score_detail` | `JSON` | 是 | — |  | — | 逐题阅卷：{question_id: {correct, got, score, manual}} |
+| `id` | `BIGINT` | 否 | — | ✅ | — | 主键 ID（BIGINT，主键索引由 PK 提供） |
+| `version` | `INTEGER` | 否 | 服务器端 1 |  | — | 乐观锁版本号，每次更新 +1 |
+| `created_at` | `DATETIME` | 否 | 服务器端 CURRENT_TIMESTAMP |  | — | 创建时间 |
+| `updated_at` | `DATETIME` | 否 | 服务器端 CURRENT_TIMESTAMP |  | — | 更新时间 |
+| `is_deleted` | `BOOLEAN` | 否 | 服务器端 0 |  | — | 是否已删除（逻辑删除） |
+| `deleted_at` | `DATETIME` | 是 | — |  | — | 删除时间 |
+| `created_by` | `BIGINT` | 是 | — |  | — | 创建人用户 ID |
+| `updated_by` | `BIGINT` | 是 | — |  | — | 最后修改人用户 ID |
+
+唯一约束：
+
+| 约束名 | 字段 |
+| --- | --- |
+| `uq_exam_sessions_invitation_id` | `invitation_id` |
+
+索引：
+
+| 索引名 | 字段 | 唯一 |
+| --- | --- | --- |
+| `ix_exam_sessions_created_by` | `created_by` | 否 |
+| `ix_exam_sessions_deadline` | `deadline` | 否 |
+| `ix_exam_sessions_is_deleted` | `is_deleted` | 否 |
+| `ix_exam_sessions_status_deadline` | `status, deadline` | 否 |
+| `ix_exam_sessions_token` | `token` | 否 |
 
 ### `files` → `File`
 
@@ -895,6 +944,46 @@ ORM 关系：
 | 属性 | 关系 | 目标 | 加载方式 | 反向属性 | 级联 |
 | --- | --- | --- | --- | --- | --- |
 | `users` | 多对多 | `User（经 user_roles）`（`users`） | select | roles | merge,save-update |
+
+### `talent_invitations` → `TalentInvitation`
+
+人才邀约表（笔试/测评/面试）（定义：`app.models.invitation`）
+
+- 主键：`id`
+
+| 字段 | 类型 | 空 | 默认 | 主键 | 外键 | 说明 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `talent_id` | `BIGINT` | 是 | — |  | talents.id ON DELETE SET NULL | 人才 ID（FK -> talents.id，可空：演示数据无档案时为 NULL） |
+| `talent_snapshot` | `JSON` | 是 | — |  | — | 创建时的人才快照：name/mobile/email |
+| `type` | `VARCHAR(16)` | 否 | 服务器端 'written_test' |  | — | 类型：written_test 笔试 / assessment 测评 / interview 面试 |
+| `token` | `VARCHAR(64)` | 否 | — |  | — | 公开访问链接 token（secret） |
+| `title` | `VARCHAR(128)` | 否 | 服务器端 '' |  | — | 邀约标题（展示用） |
+| `channels` | `JSON` | 是 | — |  | — | 发送渠道列表：sms / email |
+| `send_results` | `JSON` | 是 | — |  | — | 各渠道发送结果：{channel, ok, mode, error} |
+| `question_count` | `INTEGER` | 是 | — |  | — | 笔试题量（创建时按简历解析结果计算/覆盖） |
+| `duration_minutes` | `INTEGER` | 否 | 服务器端 60 |  | — | 笔试时长（分钟，自首次打开起算，不超过 expires_at） |
+| `interview_time` | `DATETIME` | 是 | — |  | — | 面试约定时间（type=interview） |
+| `expires_at` | `DATETIME` | 是 | — |  | — | 链接过期时间 |
+| `status` | `VARCHAR(20)` | 否 | 服务器端 'created' |  | — | 状态：created 已创建 / sent 已发送 / opened 候选人已打开 / submitted 已交卷 / finished 面试完成 / expired 已过期 / cancelled 已取消 |
+| `created_by` | `BIGINT` | 是 | — |  | users.id ON DELETE SET NULL | 创建人（FK -> users.id） |
+| `id` | `BIGINT` | 否 | — | ✅ | — | 主键 ID（BIGINT，主键索引由 PK 提供） |
+| `version` | `INTEGER` | 否 | 服务器端 1 |  | — | 乐观锁版本号，每次更新 +1 |
+| `created_at` | `DATETIME` | 否 | 服务器端 CURRENT_TIMESTAMP |  | — | 创建时间 |
+| `updated_at` | `DATETIME` | 否 | 服务器端 CURRENT_TIMESTAMP |  | — | 更新时间 |
+| `is_deleted` | `BOOLEAN` | 否 | 服务器端 0 |  | — | 是否已删除（逻辑删除） |
+| `deleted_at` | `DATETIME` | 是 | — |  | — | 删除时间 |
+| `updated_by` | `BIGINT` | 是 | — |  | — | 最后修改人用户 ID |
+
+索引：
+
+| 索引名 | 字段 | 唯一 |
+| --- | --- | --- |
+| `ix_talent_invitations_created_by` | `created_by` | 否 |
+| `ix_talent_invitations_expires_at` | `expires_at` | 否 |
+| `ix_talent_invitations_is_deleted` | `is_deleted` | 否 |
+| `ix_talent_invitations_talent_id` | `talent_id` | 否 |
+| `ix_talent_invitations_talent_status` | `talent_id, status` | 否 |
+| `ix_talent_invitations_token` | `token` | 是 |
 
 ### `talent_portraits` → `TalentPortrait`
 

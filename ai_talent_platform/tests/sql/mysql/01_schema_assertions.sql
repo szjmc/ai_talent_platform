@@ -1,5 +1,5 @@
 -- ============================================================================
--- 01_schema_assertions.sql — MySQL 业务库结构断言（25 张表）
+-- 01_schema_assertions.sql — MySQL 业务库结构断言（27 张表：原 25 张 + [Agent组] 邀约/笔试 2 张）
 -- 标签：[架构组] [P1]（结构验收：表/字段/唯一键/外键删除规则/默认值）
 --
 -- 本文件由 ORM 元数据（app/models/*）推导生成，模型变更后需同步更新。
@@ -66,16 +66,16 @@ DELETE FROM sqltest_results WHERE test_id LIKE 'SCH-%';
 
 -- ---------------------------------------------------------------- 表齐全性
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
-SELECT 'SCH-001', '25 张业务表全部存在', COUNT(*) = 25, CONCAT('实际表数=', COUNT(*))
+SELECT 'SCH-001', '27 张业务表全部存在', COUNT(*) = 27, CONCAT('实际表数=', COUNT(*))
 FROM information_schema.tables
 WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'
-  AND table_name IN ('assessment_answers', 'assessment_questions', 'assessment_results', 'assessments', 'audit_logs', 'chat_messages', 'conversations', 'courses', 'files', 'knowledge_chunks', 'knowledge_docs', 'learning_records', 'matching_records', 'organizations', 'plan_courses', 'position_requirements', 'positions', 'resume_experiences', 'resumes', 'roles', 'talent_portraits', 'talents', 'training_plans', 'user_roles', 'users');
+  AND table_name IN ('assessment_answers', 'assessment_questions', 'assessment_results', 'assessments', 'audit_logs', 'chat_messages', 'conversations', 'courses', 'exam_sessions', 'files', 'knowledge_chunks', 'knowledge_docs', 'learning_records', 'matching_records', 'organizations', 'plan_courses', 'position_requirements', 'positions', 'resume_experiences', 'resumes', 'roles', 'talent_invitations', 'talent_portraits', 'talents', 'training_plans', 'user_roles', 'users');
 
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
-SELECT 'SCH-002', '全部业务表使用 InnoDB 引擎', COUNT(*) = 25, CONCAT('InnoDB 表数=', COUNT(*))
+SELECT 'SCH-002', '全部业务表使用 InnoDB 引擎', COUNT(*) = 27, CONCAT('InnoDB 表数=', COUNT(*))
 FROM information_schema.tables
 WHERE table_schema = DATABASE() AND engine = 'InnoDB'
-  AND table_name IN ('assessment_answers', 'assessment_questions', 'assessment_results', 'assessments', 'audit_logs', 'chat_messages', 'conversations', 'courses', 'files', 'knowledge_chunks', 'knowledge_docs', 'learning_records', 'matching_records', 'organizations', 'plan_courses', 'position_requirements', 'positions', 'resume_experiences', 'resumes', 'roles', 'talent_portraits', 'talents', 'training_plans', 'user_roles', 'users');
+  AND table_name IN ('assessment_answers', 'assessment_questions', 'assessment_results', 'assessments', 'audit_logs', 'chat_messages', 'conversations', 'courses', 'exam_sessions', 'files', 'knowledge_chunks', 'knowledge_docs', 'learning_records', 'matching_records', 'organizations', 'plan_courses', 'position_requirements', 'positions', 'resume_experiences', 'resumes', 'roles', 'talent_invitations', 'talent_portraits', 'talents', 'training_plans', 'user_roles', 'users');
 
 INSERT INTO sqltest_results (test_id, test_name, passed, detail)
 SELECT 'SCH-003', 'users 表字符集为 utf8mb4', COUNT(*) = 1, CONCAT('collation=', MAX(table_collation))

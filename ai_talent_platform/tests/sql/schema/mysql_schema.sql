@@ -637,3 +637,71 @@ CREATE INDEX ix_resume_experiences_company ON resume_experiences (company);
 CREATE INDEX ix_resume_experiences_created_by ON resume_experiences (created_by);
 CREATE INDEX ix_resume_experiences_is_deleted ON resume_experiences (is_deleted);
 CREATE INDEX ix_resume_experiences_resume_id ON resume_experiences (resume_id);
+
+-- ---------------------------------------------------------------------------
+-- [Agent组] 追加：人才邀约 / 笔试会话（27 张业务表；ORM 同步 app/models/invitation.py）
+
+CREATE TABLE talent_invitations (
+	talent_id BIGINT COMMENT '人才 ID（FK -> talents.id，可空：演示数据无档案时为 NULL）', 
+	talent_snapshot JSON COMMENT '创建时的人才快照：name/mobile/email', 
+	type VARCHAR(16) NOT NULL COMMENT '类型：written_test 笔试 / assessment 测评 / interview 面试' DEFAULT 'written_test', 
+	token VARCHAR(64) NOT NULL COMMENT '公开访问链接 token（secret）', 
+	title VARCHAR(128) NOT NULL COMMENT '邀约标题（展示用）' DEFAULT '', 
+	channels JSON COMMENT '发送渠道列表：sms / email', 
+	send_results JSON COMMENT '各渠道发送结果：{channel, ok, mode, error}', 
+	question_count INTEGER COMMENT '笔试题量（创建时按简历解析结果计算/覆盖）', 
+	duration_minutes INTEGER NOT NULL COMMENT '笔试时长（分钟，自首次打开起算，不超过 expires_at）' DEFAULT 60, 
+	interview_time DATETIME COMMENT '面试约定时间（type=interview）', 
+	expires_at DATETIME COMMENT '链接过期时间', 
+	status VARCHAR(20) NOT NULL COMMENT '状态：created 已创建 / sent 已发送 / opened 候选人已打开 / submitted 已交卷 / finished 面试完成 / expired 已过期 / cancelled 已取消' DEFAULT 'created', 
+	created_by BIGINT COMMENT '创建人（FK -> users.id）', 
+	id BIGINT NOT NULL COMMENT '主键 ID（BIGINT，主键索引由 PK 提供）' AUTO_INCREMENT, 
+	version INTEGER NOT NULL COMMENT '乐观锁版本号，每次更新 +1' DEFAULT 1, 
+	created_at DATETIME NOT NULL COMMENT '创建时间' DEFAULT CURRENT_TIMESTAMP, 
+	updated_at DATETIME NOT NULL COMMENT '更新时间' DEFAULT CURRENT_TIMESTAMP, 
+	is_deleted BOOL NOT NULL COMMENT '是否已删除（逻辑删除）' DEFAULT 0, 
+	deleted_at DATETIME COMMENT '删除时间', 
+	updated_by BIGINT COMMENT '最后修改人用户 ID', 
+	CONSTRAINT pk_talent_invitations PRIMARY KEY (id), 
+	CONSTRAINT fk_talent_invitations_talent_id_talents FOREIGN KEY(talent_id) REFERENCES talents (id) ON DELETE SET NULL, 
+	CONSTRAINT fk_talent_invitations_created_by_users FOREIGN KEY(created_by) REFERENCES users (id) ON DELETE SET NULL
+)COMMENT='人才邀约表（笔试/测评/面试）';
+CREATE INDEX ix_talent_invitations_created_by ON talent_invitations (created_by);
+CREATE INDEX ix_talent_invitations_expires_at ON talent_invitations (expires_at);
+CREATE INDEX ix_talent_invitations_is_deleted ON talent_invitations (is_deleted);
+CREATE INDEX ix_talent_invitations_talent_id ON talent_invitations (talent_id);
+CREATE INDEX ix_talent_invitations_talent_status ON talent_invitations (talent_id, status);
+CREATE UNIQUE INDEX ix_talent_invitations_token ON talent_invitations (token);
+
+CREATE TABLE exam_sessions (
+	invitation_id BIGINT NOT NULL COMMENT '邀约 ID（FK -> talent_invitations.id，一会约一卷）', 
+	token VARCHAR(64) NOT NULL COMMENT '邀约 token 冗余（公开接口直接查询）', 
+	question_ids JSON NOT NULL COMMENT '抽题快照（有序 question_id 列表）' DEFAULT '[]', 
+	answers JSON COMMENT '作答内容：{question_id: answer}；answer 结构见阅卷逻辑', 
+	violations JSON COMMENT '作弊检测违规记录：[{ts, type, detail}]（YOLO/人脸回退检测）' DEFAULT '[]', 
+	proctor_state JSON COMMENT '监考连续状态机：{no_face_streak, frames, multi_person, ...}', 
+	candidate_ip VARCHAR(45) COMMENT '交卷/首帧来源 IP（审计）', 
+	status VARCHAR(20) NOT NULL COMMENT '状态：in_progress 作答中 / submitted 已交卷 / expired 超时 / cancelled 关联邀约被取消' DEFAULT 'in_progress', 
+	started_at DATETIME COMMENT '首次打开时间', 
+	deadline DATETIME COMMENT '作答截止（min(首次打开+时长, 邀约过期)）', 
+	submitted_at DATETIME COMMENT '交卷时间', 
+	score NUMERIC(6, 2) COMMENT '客观题自动得分（文本题需人工，未计入）', 
+	total_score NUMERIC(6, 2) COMMENT '卷面总分（快照题目分值合计）', 
+	score_detail JSON COMMENT '逐题阅卷：{question_id: {correct, got, score, manual}}', 
+	id BIGINT NOT NULL COMMENT '主键 ID（BIGINT，主键索引由 PK 提供）' AUTO_INCREMENT, 
+	version INTEGER NOT NULL COMMENT '乐观锁版本号，每次更新 +1' DEFAULT 1, 
+	created_at DATETIME NOT NULL COMMENT '创建时间' DEFAULT CURRENT_TIMESTAMP, 
+	updated_at DATETIME NOT NULL COMMENT '更新时间' DEFAULT CURRENT_TIMESTAMP, 
+	is_deleted BOOL NOT NULL COMMENT '是否已删除（逻辑删除）' DEFAULT 0, 
+	deleted_at DATETIME COMMENT '删除时间', 
+	created_by BIGINT COMMENT '创建人用户 ID', 
+	updated_by BIGINT COMMENT '最后修改人用户 ID', 
+	CONSTRAINT pk_exam_sessions PRIMARY KEY (id), 
+	CONSTRAINT uq_exam_sessions_invitation_id UNIQUE (invitation_id), 
+	CONSTRAINT fk_exam_sessions_invitation_id_talent_invitations FOREIGN KEY(invitation_id) REFERENCES talent_invitations (id) ON DELETE CASCADE
+)COMMENT='笔试作答会话表';
+CREATE INDEX ix_exam_sessions_created_by ON exam_sessions (created_by);
+CREATE INDEX ix_exam_sessions_deadline ON exam_sessions (deadline);
+CREATE INDEX ix_exam_sessions_is_deleted ON exam_sessions (is_deleted);
+CREATE INDEX ix_exam_sessions_status_deadline ON exam_sessions (status, deadline);
+CREATE INDEX ix_exam_sessions_token ON exam_sessions (token);

@@ -220,6 +220,26 @@ class Settings(BaseSettings):
     AGENT_ROUTE_LLM: bool = False      # 总路由是否启用 LLM 意图分类（默认关闭=纯规则路由）
     CONVERSATION_WINDOW: int = 10      # 对话记忆窗口（条）
 
+    # ------------------------------------------- 人才邀约 / 笔试 / 面试间
+    # [Agent组] 新增配置项（仅追加；短信/邮件默认 mock+日志，配置后走真实 SMTP）
+    INVITE_BASE_URL: str = "http://localhost:5173"   # 候选人公开页前缀（拼 /invite/<token>）
+    INVITE_TOKEN_TTL_HOURS: int = 72                # 邀约链接有效期（小时）
+    INVITE_EXAM_DURATION_MINUTES: int = 60          # 笔试默认时长（分钟）
+    INVITE_INTERVIEW_GRACE_MINUTES: int = 15        # 面试可提前进场时间
+    INVITE_INTERVIEW_END_GRACE_MINUTES: int = 180   # 面试可延后离场时间
+    SMTP_HOST: str = ""                             # 空 = 邮件按 mock 记录日志（不真发）
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = ""
+    SMTP_TLS: bool = True
+    SMS_PROVIDER: str = "mock"                      # mock = 记录日志不真发（预留真实网关）
+    SMS_ACCESS_KEY: str = ""
+    SMS_ACCESS_SECRET: str = ""
+    PROCTOR_YOLO_MODEL: str = ""                    # yolov8n.onnx 路径；空 = 自动探测 models/ 目录
+    PROCTOR_INTERVAL_SECONDS: int = 5               # 前端监考帧上报间隔（秒）
+    WEBRTC_ICE_SERVERS: str = '[{"urls":"stun:stun.l.google.com:19302"}]'
+
     # ------------------------------------------------------------------ 校验器
     @field_validator("API_PREFIX")
     @classmethod

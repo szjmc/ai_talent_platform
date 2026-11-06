@@ -1212,6 +1212,58 @@ event: error   data: {"code":5002,"message":"模型调用失败"}
 
 ---
 
+<a id="api-invites"></a>
+
+## 十七 B、人才邀约模块 Invites（笔试 / 测评 / 面试）— ✅ 已实现
+
+> 前缀 `/invites`。host 侧 3 接口需登录 + 权限；候选人侧 6 个公开接口凭 `token` 访问（无需登录）；
+> 面试间信令走 WebSocket。题量按**简历解析结果**（工作年限 + 技能标签）自动计算，题目从测评题库
+> （`assessment_questions`）创建时随机抽题快照；邮件/短信默认 mock 降级（`send_results.mode=mock`），
+> 配置 `SMTP_*` 后真发邮件。
+
+### 接口
+
+| 方法 | 路径 | 权限 | 说明 |
+| --- | --- | --- | --- |
+| POST | `/invites` | `talent:update` | 创建并发送邀约（type=written_test/assessment/interview） |
+| GET | `/invites` | `talent:read` | 邀约分页（`talent_id` 可选过滤） |
+| GET | `/invites/{invite_id}` | `talent:read` | 邀约详情（含 token/url/发送结果） |
+| GET | `/invites/visit/{token}` | 公开 | 落地页信息（类型/时间/有效期/监考引擎/ICE 配置） |
+| GET | `/invites/exam/{token}` | 公开 | 开始或恢复笔试（题面快照，**不含 answer**；首次打开锁定截止时间） |
+| POST | `/invites/exam/{token}/submit` | 公开 | 交卷阅卷（单选/多选自动出分，文本题待人工） |
+| POST | `/invites/exam/{token}/frame` | 公开 | 监考帧上报（base64 图片 → YOLO/Haar 检测，返回新增/累计违规） |
+| GET | `/invites/exam/{token}/result` | 公开 | 成绩与违规统计 |
+| WS | `/invites/ws/{token}?role=candidate\|interviewer` | token | 面试间 WebRTC 信令（joined/peer-joined/offer/answer/ice/peer-left） |
+
+**创建邀约请求示例**
+
+```json
+{
+  "type": "interview",
+  "talent_name": "张三", "mobile": "13800000000", "email": "zhangsan@example.com",
+  "channels": ["sms", "email"],
+  "interview_time": "2026-11-08T10:00:00+08:00",
+  "question_count": null, "duration_minutes": 60, "expires_hours": 72
+}
+```
+
+- `question_count=null` → 按简历解析自动：`6 + min(工作年限,4) + min(技能数,8)//2`，夹在 [5,20] 并不超过题库量；
+- 候选人链接 `{INVITE_BASE_URL}/invite/{token}`；面试官入口为同链接加 `?role=interviewer`；
+- 关闭码：`4401` 邀约无效 / `4403` 不在时间窗 / `4404` 非面试 / `4409` 角色占用；
+- 错误码复用全局约定：`3001` 邀约或会话不存在、`1002` 过期/超时/题库为空。
+
+**数据对象（节选）**
+
+```
+InviteCreateRequest { type, talent_id?, talent_name?, mobile?, email?, channels[], question_count?, duration_minutes?, interview_time?, expires_hours?, title? }
+InviteResponse      { id, talent_name, token, url, status, channels, send_results[{channel,ok,mode,error}], question_count?, interview_time?, expires_at }
+ExamStartResponse   { status, started_at, deadline, questions[{id,seq,type,content,options[{key,text}]}], total_score, proctor_enabled, proctor_engine, frame_interval_seconds }
+ExamResultResponse  { status, score, total_score, submitted_at, violations_count, pending_manual }
+FrameCheckResponse  { enabled, engine, violations[{ts,type,detail}], total_violations, person_like }
+```
+
+---
+
 <a id="api-files"></a>
 
 ## 十八、文件模块 Files — 🚧 待实现
@@ -1383,3 +1435,4 @@ curl -s -X POST http://127.0.0.1:8000/api/v1/resumes/upload \
 | 版本 | 日期 | 说明 |
 | --- | --- | --- |
 | v1.0.0 | 2026-11-03 | 首版：全局规范、错误码、权限矩阵、认证/用户/组织完整契约；其余 11 个模块的接口契约与数据结构先定稿（标记 🚧） |
+| v1.1.0 | 2026-11-06 | 智能体模块（十七，7 接口 + SSE）；人才邀约模块（十七 B，host 3 + 公开 6 + 面试间 WS，含笔试抽题阅卷与 YOLO/Haar 监考降级） |

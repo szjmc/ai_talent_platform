@@ -112,6 +112,7 @@ config    → 配置：settings / logging / prompt
 | 用户 | `GET/POST /api/v1/users` `GET/PUT/DELETE /api/v1/users/{id}` `PATCH /{id}/status` `PUT /{id}/roles` `POST /{id}/reset-password` |
 | 组织 | `GET /api/v1/organizations/tree` `GET/POST /api/v1/organizations` `GET/PUT/DELETE /{id}` `PATCH /{id}/move` |
 | 智能体 | `GET /api/v1/agents` `POST /api/v1/agents/chat` `POST /api/v1/agents/chat/stream` `GET /api/v1/agents/conversations` `GET /api/v1/agents/conversations/{id}/messages` `POST /api/v1/agents/tasks` `GET /api/v1/agents/tasks/{task_id}` |
+| 邀约 | `POST/GET /api/v1/invites` `GET /api/v1/invites/{id}` `GET /invites/visit/{token}` `GET /invites/exam/{token}` `POST /invites/exam/{token}/submit` `POST /invites/exam/{token}/frame` `GET /invites/exam/{token}/result` `WS /invites/ws/{token}` |
 | 系统 | `GET /api/v1/system/info` |
 
 其余 8 个模块当前为占位路由（返回 501 + 主责研发组提示，见 `data.owner`），实现后替换 `app/routers/router.py` 中的 include 即可。
