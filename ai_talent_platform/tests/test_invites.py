@@ -24,6 +24,7 @@ from app.core.exceptions import BusinessRuleError, NotFoundError
 from app.core.security import generate_random_token
 from app.infrastructure.database.session import get_db
 from app.models.assessment import AssessmentQuestion
+from app.repositories.invitation_repository import TalentInvitationRepository
 from app.schemas.invitation import InviteCreateRequest
 from app.services.invitation_service import (
     InvitationService,
@@ -563,3 +564,51 @@ def test_random_token_url_safe() -> None:
     token = generate_random_token(24)
     assert len(token) >= 24
     assert all(c.isalnum() or c in "-_" for c in token)
+
+
+# ------------------------------------------------------------------ token 查重（回归）
+class _FakeScalarResult:
+    def __init__(self, value) -> None:
+        self._value = value
+
+    def scalar_one_or_none(self):
+        return self._value
+
+
+class _FakeMintDb:
+    """按调用序返回查重结果（None=该 token 空闲）。"""
+
+    def __init__(self, results: list) -> None:
+        self._results = list(results)
+        self.calls = 0
+
+    async def execute(self, _stmt):
+        value = self._results[min(self.calls, len(self._results) - 1)]
+        self.calls += 1
+        return _FakeScalarResult(value)
+
+
+class TestMintToken:
+    """回归：exists(filters={"token"}) 因 filterable 白名单缺失被静默丢弃，
+    导致表非空后必然『token 生成冲突』。查重必须直查 token 列。"""
+
+    async def test_fresh_token_first_try(self) -> None:
+        db = _FakeMintDb([None])
+        token = await TalentInvitationRepository().mint_token(db)
+        assert token
+        assert db.calls == 1
+
+    async def test_retries_after_collision(self) -> None:
+        db = _FakeMintDb([1, None])
+        token = await TalentInvitationRepository().mint_token(db)
+        assert token
+        assert db.calls == 2
+
+    async def test_raises_after_exhaustion(self) -> None:
+        db = _FakeMintDb([1])
+        with pytest.raises(RuntimeError, match="token 生成冲突"):
+            await TalentInvitationRepository().mint_token(db)
+        assert db.calls == 6
+
+    def test_token_field_is_filterable(self) -> None:
+        assert "token" in TalentInvitationRepository.filterable_fields

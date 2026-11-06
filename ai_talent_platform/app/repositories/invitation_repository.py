@@ -17,7 +17,7 @@ from app.repositories.base import BaseRepository
 
 class TalentInvitationRepository(BaseRepository[TalentInvitation]):
     model = TalentInvitation
-    filterable_fields = {"id", "talent_id", "type", "status", "created_by"}
+    filterable_fields = {"id", "talent_id", "type", "status", "created_by", "token"}
     searchable_fields = {"token", "title"}
     sortable_fields = {"id", "created_at", "interview_time", "status"}
     default_order = "-created_at"
@@ -30,13 +30,18 @@ class TalentInvitationRepository(BaseRepository[TalentInvitation]):
         return (await db.execute(stmt)).scalar_one_or_none()
 
     async def mint_token(self, db: AsyncSession, *, length: int = 24) -> str:
-        """生成唯一 token（冲突重试；概率极低）。"""
+        """生成唯一 token。
+
+        查重必须直查 token 列：BaseRepository.exists(filters=...) 走白名单过滤，
+        字段不在 filterable_fields 时会被**静默丢弃**，退化成「表非空即存在」——
+        已有任意一条邀约后会必然重试耗尽（历史 bug，勿改回 exists+filters）。
+        """
         for _ in range(6):
             token = generate_random_token(length)
-            exists = await self.exists(db, filters={"token": token})
-            if not exists:
+            stmt = select(TalentInvitation.id).where(TalentInvitation.token == token).limit(1)
+            if (await db.execute(stmt)).scalar_one_or_none() is None:
                 return token
-        raise RuntimeError("邀约 token 生成冲突（重试耗尽）")  # pragma: no cover
+        raise RuntimeError("邀约 token 生成冲突（重试耗尽）")
 
 
 class ExamSessionRepository(BaseRepository[ExamSession]):
