@@ -1,16 +1,15 @@
 """
 模块：app/ai/workflows/analysis_workflow.py
-职责：数据分析工作流——按用户进行流失风险预警 + 人才研判。
+职责：数据分析工作流——受权问数取数 + 基于真实聚合指标的人才研判。
 
 标签：[Agent组] [P2]  依赖：AnalyticsService（问数 / 看板聚合）
 
 两类工作：
-1. 流失风险预警：按用户（user_id）拉取其数据范围内的指标，
-   评估离职趋势 / 培训完成率 / 匹配率，输出结构化 risks 列表；
-2. 人才研判（四节点流水线）：
+1. run_analysis：自然语言问数取数并组装提示词，交给基座调用 LLM；
+2. run_analysis_workflow：四节点人才研判
        collect_metrics -> talent_review -> team_structure -> recommendation
-   （纯 async 函数编排——LangGraph 为可选依赖且当前未启用，
-   见 requirements.txt 注释；接入图引擎时仅需替换编排层，节点函数不变）
+   指标只来自 AnalyticsService 当前受权聚合；离职趋势、培训完成率、匹配率
+   缺少可靠数据源/口径时保留 None 并标记 partial，不伪造零值或风险结论。
 
 ============================ 实现思路与代码要点 ============================
 节点编排：
@@ -36,6 +35,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import logging
 from typing import Any
 
 # 取数入口：架构组写的「Vanna 对 Agent 的唯一出口」，内部已做权限过滤 + 注入护栏 + limit 截断
@@ -216,135 +216,50 @@ async def run_analysis(question: str, max_rows: int = DEFAULT_QUERY_MAX_ROWS) ->
         "prompt": prompt,
         "data": data,
     }
-import logging
-from datetime import datetime, timezone
-from typing import Any
 
-from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-# 服务类注入点：默认延迟解析为 AnalyticsService；测试可 monkeypatch 替换
-# （None = 默认），或注入旧签名假服务验证兼容路径。
+# 服务类注入点：默认 AnalyticsService；测试可替换为同签名服务。
 _analytics_service_cls: Any | None = None
 
 
-def _current_context() -> tuple[list[str], int | None]:
-    """从 AIContext 取当前角色与组织（无上下文 -> ([], None)，由服务层 fail-closed）。"""
-    try:
-        from app.ai.context import get_context
-
-        context = get_context()
-        return list(context.roles or []), context.organization_id
-    except Exception:  # noqa: BLE001 - 无上下文 / 循环导入时保持空
-        return [], None
-
-
 def _point_field(point: Any, field: str) -> Any:
-    """兼容取值（dict 或 pydantic 模型），供风险评估/洞察模板复用。"""
+    """兼容 dict / Pydantic 模型取值。"""
     if isinstance(point, dict):
         return point.get(field)
     return getattr(point, field, None)
 
 
-# 跨组缺口注记：Vanna 组重构后的 AnalyticsService 采用 (filters, user) 风格，
-# 且暂未提供驾驶舱概览（overview）与离职趋势（turnover）指标；本工作流按
-# fail-soft 原则对缺失/失败的指标降级为 0 值 + degraded 注记，不中断流水线。
-_DEGRADED_OVERVIEW: dict[str, Any] = {
-    "total_talents": 0,
-    "active_positions": 0,
-    "match_rate": 0.0,
-    "training_completion": 0.0,
-    "assessment_avg_score": None,
-    "degraded": True,
-}
-
-
-async def _compat_call(service: Any, method: str, *args: Any, note: str) -> Any:
-    """按旧签名调用服务方法；缺失/签名不匹配/失败时返回 None（调用方降级）。
-
-    Vanna 组 AnalyticsService 重构后旧签名（overview(scope) 等）不再可用，
-    此处统一探测兜底，避免 AttributeError 打断整条研判流水线。
-    """
-    fn = getattr(service, method, None)
-    if fn is None:
-        logger.warning("AnalyticsService.%s 不存在（跨组 API 未对齐），已降级", method)
-        return None
-    try:
-        return await fn(*args)
-    except Exception as exc:  # noqa: BLE001 - 指标级降级，不中断流水线
-        logger.warning("AnalyticsService.%s 调用失败（跨组 API 未对齐？）：%s", method, exc)
-        return None
+def _shift_month(value: datetime.date, offset: int) -> datetime.date:
+    index = value.year * 12 + (value.month - 1) + offset
+    return datetime.date(index // 12, index % 12 + 1, 1)
 
 
 def _assess_risks(metrics: dict[str, Any]) -> list[dict[str, Any]]:
-    """按指标评估流失风险（纯函数，便于单测）。
-
-    规则：
-    - 离职趋势末值 > 首值且 > 0 -> high（离职上升）
-    - 培训完成率 < 0.6          -> medium（培训不足）
-    - 匹配率 < 0.5              -> medium（岗位匹配偏低）
-    - 人才总数为 0              -> info（无数据，提示先同步）
-    """
-    risks: list[dict[str, Any]] = []
+    """只对有真实分母的指标提示风险；缺数据不是 0，也不据此判定流失/培训/匹配风险。"""
     overview = metrics.get("overview") or {}
-    turnover_metric = metrics.get("trend_turnover") or {}
-    turnover_points = _point_field(turnover_metric, "points") or []
-    if len(turnover_points) >= 2:
-        first = float(_point_field(turnover_points[0], "value") or 0)
-        last = float(_point_field(turnover_points[-1], "value") or 0)
-        if last > first and last > 0:
-            risks.append(
-                {
-                    "level": "high",
-                    "type": "turnover_rising",
-                    "message": f"离职趋势上升（{_point_field(turnover_points[0], 'month')} {first} -> "
-                    f"{_point_field(turnover_points[-1], 'month')} {last}）",
-                }
-            )
-    training = float(_point_field(overview, "training_completion") or 0)
-    if overview and training < 0.6:
-        risks.append(
-            {
-                "level": "medium",
-                "type": "training_low",
-                "message": f"培训完成率偏低（{training:.0%}，阈值 60%）",
-            }
-        )
-    match_rate = float(_point_field(overview, "match_rate") or 0)
-    if overview and match_rate < 0.5:
-        risks.append(
-            {
-                "level": "medium",
-                "type": "match_low",
-                "message": f"岗位匹配率偏低（{match_rate:.0%}，阈值 50%）",
-            }
-        )
-    if overview and float(_point_field(overview, "total_talents") or 0) == 0:
-        risks.append(
-            {
-                "level": "info",
-                "type": "no_data",
-                "message": "人才总数为 0：请先执行 scripts/sync_analytics.py 同步分析库",
-            }
-        )
-    return risks
+    total = _point_field(overview, "total_talents")
+    if total == 0:
+        return [{"level": "info", "type": "no_data",
+                 "message": "最新快照人才总数为 0：请确认人才档案与分析库同步"}]
+    return []
 
 
 def _render_insight(topic: str, metrics: dict[str, Any]) -> str:
-    """指标驱动的结构化研判结论（模板；LLM 增强为后续接入点）。"""
     overview = metrics.get("overview") or {}
     parts = [f"研判主题：{topic or '默认人才盘点'}。"]
-    if overview:
-        parts.append(
-            f"人才规模 {int(_point_field(overview, 'total_talents') or 0)} 人，"
-            f"在招岗位 {int(_point_field(overview, 'active_positions') or 0)} 个，"
-            f"匹配率 {float(_point_field(overview, 'match_rate') or 0):.0%}，"
-            f"培训完成率 {float(_point_field(overview, 'training_completion') or 0):.0%}，"
-            f"平均测评分 {_point_field(overview, 'assessment_avg_score') or '-'}。"
-        )
+    total = _point_field(overview, "total_talents")
+    avg = _point_field(overview, "assessment_avg_score")
+    if total is not None:
+        parts.append(f"最新月度快照人才总数 {total} 人。")
     else:
-        parts.append("指标聚合未返回数据（分析库未启用或数据未同步）。")
+        parts.append("最新月度快照不可用，人才总数未按零处理。")
+    if avg is not None:
+        parts.append(f"测评记录平均分 {avg}。")
+    else:
+        parts.append("暂无可用测评平均分。")
+    parts.append("离职趋势、培训完成率、岗位匹配率缺少可靠口径或数据源，未生成结论。")
     return "".join(parts)
 
 
@@ -353,132 +268,126 @@ async def run_analysis_workflow(
     *,
     organization_id: int | None = None,
     db: Any = None,
+    user: Any = None,
 ) -> dict[str, Any]:
-    """执行人才研判流水线（按用户数据范围）。
+    """按可信登录身份执行四节点人才研判。
 
-    :param topic: 研判主题（如 "Q4 研发团队盘点"）
-    :param organization_id: 指定组织（缺省取 AIContext.organization_id）
-    :param db: 可选 MySQL 会话（缺省无 -> 业务小聚合指标降级为 0 并注记）
-    :returns: {topic, organization_id, nodes{collect_metrics, talent_review,
-               team_structure, recommendation}, risks, insight, status, generated_at}
+    指标全部来自 AnalyticsService 的受权只读聚合；不支持/失败的指标保留 None，
+    不伪造 overview、离职趋势、培训完成率或匹配率。db 仅为兼容旧调用保留，
+    分析查询由 AnalyticsService 自行建立 PgSQL 只读会话。
     """
-    # import 置于函数内：避免模块级依赖、并保证 collect_metrics 只经服务层取数
+    from app.schemas.analytics_statistics import AnalyticsFilters, TrendQuery
     from app.services.analytics_service import AnalyticsService
 
+    generated_at = datetime.datetime.now().astimezone()
     service_cls = _analytics_service_cls or AnalyticsService
-
-    context_roles, context_org = _current_context()
-    scope_org = organization_id if organization_id is not None else context_org
-    scope = {"roles": context_roles, "organization_id": scope_org}
-    generated_at = datetime.now(timezone.utc)
     nodes: dict[str, Any] = {}
-    risks: list[dict[str, Any]] = []
-    status = "succeeded"
-    error: str | None = None
+    if user is None:
+        return {
+            "topic": topic, "organization_id": organization_id,
+            "nodes": {"collect_metrics": {"error": "缺少可信登录身份"}},
+            "risks": [], "insight": "", "status": "failed",
+            "error": "人才研判需要登录用户身份", "generated_at": generated_at.isoformat(),
+        }
+
+    filters = AnalyticsFilters(organization_ids=[organization_id] if organization_id else [])
+    today = generated_at.date()
+    trend_query = TrendQuery(
+        organization_ids=filters.organization_ids,
+        start_month=_shift_month(today.replace(day=1), -11),
+        end_month=today.replace(day=1),
+        comparison="none",
+    )
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    async def _call(name: str, coro):
+        try:
+            return await coro
+        except Exception as exc:  # noqa: BLE001 - 指标级降级，最终状态如实标记
+            logger.warning("AnalyticsService.%s 失败：%s", name, exc)
+            errors.append(f"{name}: {exc}")
+            return None
 
     try:
         service = service_cls(db)
-        # ---- 节点 1：collect_metrics（唯一取数入口：AnalyticsService，禁止裸 SQL）
-        # 每个指标独立降级：新版服务未提供 overview/turnover 时置 None，不互相拖垮。
-        overview = await _compat_call(service, "overview", scope,
-                                      note="驾驶舱概览指标")
-        education = await _compat_call(service, "distribution", "education", scope,
-                                       note="学历分布")
-        org_dist = await _compat_call(service, "distribution", "org", scope,
-                                      note="组织分布")
-        trend = await _compat_call(service, "trend", "turnover", scope,
-                                   note="离职趋势")
-        degraded = overview is None or trend is None or education is None or org_dist is None
-        if overview is None:
-            overview = dict(_DEGRADED_OVERVIEW)
-        metrics: dict[str, Any] = {
-            "overview": overview,
-            "distribution_education": education,
-            "distribution_org": org_dist,
-            "trend_turnover": trend,
-        }
-        nodes["collect_metrics"] = {
-            "metrics": metrics,
-            "collected_at": generated_at.isoformat(),
-            "degraded": degraded,
-        }
-    except Exception as exc:  # noqa: BLE001 - 工作流返回结构化失败，不打断调用方
+        education = await _call("distribution.education", service.distribution("education", filters, user))
+        org_dist = await _call("distribution.org", service.distribution("org", filters, user))
+        assessment = await _call("assessment_summary", service.assessment_summary(filters, user))
+        trend = await _call("trend.talent_total", service.trend(trend_query, user))
+    except Exception as exc:  # noqa: BLE001 - 服务构造失败
         logger.exception("collect_metrics 失败 topic=%s", topic)
         return {
-            "topic": topic,
-            "organization_id": scope_org,
+            "topic": topic, "organization_id": organization_id,
             "nodes": {"collect_metrics": {"error": str(exc)}},
-            "risks": [],
-            "insight": "",
-            "status": "failed",
-            "error": str(exc),
-            "generated_at": generated_at.isoformat(),
+            "risks": [], "insight": "", "status": "failed",
+            "error": str(exc), "generated_at": generated_at.isoformat(),
         }
 
-    try:
-        # ---- 节点 2：人才研判（风险评估 + 结论）
-        trend_points = _point_field(trend, "points") or [] if trend is not None else []
-        risks = _assess_risks({"overview": overview, "trend_turnover": {"points": trend_points}})
-        nodes["talent_review"] = {
-            "summary": _render_insight(topic, {"overview": overview}),
-            "risks": risks,
-        }
-
-        # ---- 节点 3：组织结构（分布缺失时输出空集 + 提示，不抛错）
-        org_items = _point_field(org_dist, "items") or [] if org_dist is not None else []
-        edu_items = _point_field(education, "items") or [] if education is not None else []
-        nodes["team_structure"] = {
-            "org_distribution": [
-                {"label": _point_field(i, "label"), "value": _point_field(i, "value")}
-                for i in org_items
-            ],
-            "education_distribution": [
-                {"label": _point_field(i, "label"), "value": _point_field(i, "value")}
-                for i in edu_items
-            ],
-            "note": (
-                "" if org_items and edu_items
-                else "分布指标暂不可用（AnalyticsService 接口未对齐或数据未同步）"
-            ),
-        }
-
-        # ---- 节点 4：建议
-        actions: list[str] = []
-        for risk in risks:
-            if risk["type"] == "turnover_rising":
-                actions.append("对高离职部门启动保留面谈与薪酬竞争力复盘")
-            elif risk["type"] == "training_low":
-                actions.append("补齐必修课程学习计划，按月跟踪完成率至 60% 以上")
-            elif risk["type"] == "match_low":
-                actions.append("复盘岗位画像与推荐阈值，优先处理零匹配在招岗位")
-        if not actions:
-            actions.append("指标整体平稳：维持例行月度盘点与关键岗位继任观察")
-        insight = _render_insight(topic, {"overview": overview})
-        nodes["recommendation"] = {"actions": actions, "insight": insight}
-    except Exception as exc:  # noqa: BLE001 - 指标已到手，节点失败降级 partial
-        logger.exception("研判节点失败 topic=%s", topic)
-        status = "partial"
-        error = str(exc)
-        insight = _render_insight(topic, {"overview": overview})
-
-    # 指标有降级 -> partial（模块 docstring 约定：缺失不抛断流，但状态要如实）
-    if degraded and status == "succeeded":
-        status = "partial"
-        error = error or "部分指标降级：AnalyticsService 未提供 overview/turnover 接口（跨组 API 待对齐）"
-
-    result: dict[str, Any] = {
-        "topic": topic,
-        "organization_id": scope_org,
-        "nodes": nodes,
-        "risks": risks,
-        "insight": insight,
-        "status": status,
-        "generated_at": generated_at.isoformat(),
+    trend_items = list(_point_field(trend, "items") or []) if trend is not None else []
+    latest = trend_items[-1] if trend_items else None
+    total = None
+    if latest is not None and not _point_field(latest, "missing"):
+        total = _point_field(latest, "value")
+    overview = {
+        "total_talents": total,
+        "active_positions": None,
+        "match_rate": None,
+        "training_completion": None,
+        "assessment_avg_score": _point_field(assessment, "average_score") if assessment is not None else None,
+        "degraded": any(value is None for value in (education, org_dist, assessment, trend)),
     }
-    if error:
-        result["error"] = error
-    # settings 仅作接入点标记：LLM 解读就绪后在此挂接（当前为模板研判）
-    result["llm_enabled"] = bool(settings.LLM_API_KEY)
+    for result in (education, org_dist, assessment, trend):
+        warnings.extend(_point_field(result, "warnings") or [])
+    metrics = {
+        "overview": overview,
+        "distribution_education": education,
+        "distribution_org": org_dist,
+        "assessment_summary": assessment,
+        "trend_talent_total": trend,
+        # 旧字段保留为 None，明确没有离职趋势数据源。
+        "trend_turnover": None,
+    }
+    nodes["collect_metrics"] = {
+        "metrics": metrics, "collected_at": generated_at.isoformat(),
+        "degraded": overview["degraded"], "warnings": warnings, "errors": errors,
+    }
+
+    risks = _assess_risks(metrics)
+    insight = _render_insight(topic, metrics)
+    nodes["talent_review"] = {"summary": insight, "risks": risks}
+
+    def _distribution_items(result: Any) -> list[dict[str, Any]]:
+        return [{"label": _point_field(item, "label"), "value": _point_field(item, "count")}
+                for item in (_point_field(result, "items") or [])]
+
+    org_items = _distribution_items(org_dist)
+    edu_items = _distribution_items(education)
+    nodes["team_structure"] = {
+        "org_distribution": org_items,
+        "education_distribution": edu_items,
+        "note": "" if org_items and edu_items else "分布指标不可用或为空，请检查分析库同步与授权范围",
+    }
+
+    actions: list[str] = []
+    if total is None or not org_items or not edu_items:
+        actions.append("先补齐人才档案并执行分析库同步，再复核月度快照与组织/学历分布")
+    if assessment is None or _point_field(assessment, "record_count") in (None, 0):
+        actions.append("暂无可用测评记录，完成笔试评分后再纳入能力研判")
+    if not actions:
+        actions.append("基于当前受权快照维持例行月度盘点；离职、培训完成率与匹配率待可靠数据源接入后再评估")
+    nodes["recommendation"] = {"actions": actions, "insight": insight}
+
+    status = "partial" if errors or overview["degraded"] or warnings else "succeeded"
+    result: dict[str, Any] = {
+        "topic": topic, "organization_id": organization_id, "nodes": nodes,
+        "risks": risks, "insight": insight, "status": status,
+        "generated_at": generated_at.isoformat(), "llm_enabled": False,
+    }
+    if errors:
+        result["error"] = "；".join(errors)
+    elif warnings:
+        result["error"] = "；".join(dict.fromkeys(warnings))
     return result
 
 

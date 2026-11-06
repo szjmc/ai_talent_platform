@@ -19,7 +19,6 @@ Service 的定位：把「校验 + 仓库调用 + 外部能力 + 事务」组织
             # 4) 副作用（审计、缓存、向量化、AI 任务）
             # 5) 返回 ORM 对象（由 Router 用 Response Schema 序列化）
 
-标签：[RAG组] [P0]
 """
 
 from __future__ import annotations
@@ -134,7 +133,7 @@ class TalentService:
         if scope == DataScopeEnum.DEPT_SUB and current_user.organization_id:
             org = await self.org_repo.get_by_id(self.db, current_user.organization_id)
             if org is not None and org.path:
-                nodes = await self.org_repo.list_subtree(self.db, org.path)
+                nodes = await self.org_repo.list_subtree(self.db, org.path + str(org.id) + "/")
                 subtree = {n.id for n in nodes}
         return visible_organization_ids(
             current_user.role_codes, current_user.organization_id, subtree

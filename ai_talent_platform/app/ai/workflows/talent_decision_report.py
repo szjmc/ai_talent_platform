@@ -1,4 +1,5 @@
 """
+标签：[Vanna组]+[Agent组] [P1]
 模块：app/ai/workflows/talent_decision_report.py
 职责：人才决策报告工作流（Agent 组完整版——多分组取数 / 风险预警 / 周期报告 / 继任）。
 
@@ -198,35 +199,18 @@ QUERY_GROUP_MAP: dict[str, dict[str, Any]] = {
 # 权限档位：self 最低，all 最高（越大越宽）
 _SCOPE_LEVEL: dict[str, int] = {"self": 1, "dept": 2, "dept_sub": 3, "all": 4}
 
-# ---------------------------------------------------------------- 文案映射（去演示化）
-# 把 Vanna 返回的「演示人才XX / /910001/ / completed / in_progress」等测试味词汇，
-# 换成面向业务的中文表达，让报告更专业。只影响展示文案，不改数据。
+# ---------------------------------------------------------------- 展示文案
+# 只翻译已知状态枚举；姓名、部门路径等业务值原样保留，绝不映射成演示部门。
 _LABEL_MAP: dict[str, str] = {
-    "completed": "已完成",
-    "in_progress": "进行中",
-    "learning": "学习中",
-    "not_started": "未开始",
-    "待提升": "待提升",
-    "良好": "良好",
-    "优秀": "优秀",
-    "待评分": "待评分",
-}
-# 部门路径 -> 部门名称（演示数据的 org_path 只有数字，映射成可读名称）
-_ORG_PATH_MAP: dict[str, str] = {
-    "/910001/": "研发部",
-    "/910002/": "人力部",
-    "/910003/": "市场部",
+    "completed": "已完成", "in_progress": "进行中",
+    "learning": "学习中", "not_started": "未开始",
 }
 
 
 def _beautify_label(value: str) -> str:
-    """把单个体标签「去演示化」：状态词、部门路径映射成业务中文名。"""
+    """翻译状态枚举，不改写数据库中的姓名、部门或其他业务标签。"""
     text = str(value)
-    if text in _LABEL_MAP:
-        return _LABEL_MAP[text]
-    if text in _ORG_PATH_MAP:
-        return _ORG_PATH_MAP[text]
-    return text
+    return _LABEL_MAP.get(text, text)
 
 
 # ---------------------------------------------------------------- 权限过滤
@@ -387,7 +371,7 @@ def build_charts(data: dict[str, Any]) -> list[dict[str, Any]]:
         # ChartConfig 是 Pydantic 模型，转成 dict 供前端渲染
         chart_dict = chart.model_dump(mode="json") if hasattr(chart, "model_dump") else dict(chart)
 
-        # 去演示化：把标签、标题里的测试词汇映射成业务名
+        # 仅翻译状态枚举，保留真实业务标签
         chart_dict = _beautify_chart(chart_dict)
         # 打上分组标签，供报告按「分析类型」归类排版
         chart_dict["group"] = _group_of_label(label)
@@ -428,7 +412,7 @@ def group_charts(charts: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _beautify_chart(chart: dict[str, Any]) -> dict[str, Any]:
-    """把图表里的测试味标签（演示人才/部门路径/英文状态）换成业务中文名。"""
+    """仅翻译图表中的英文状态枚举，保留真实姓名和部门标签。"""
     if "x_labels" in chart and chart["x_labels"]:
         chart["x_labels"] = [_beautify_label(str(x)) for x in chart["x_labels"]]
     if "series" in chart:
@@ -441,8 +425,7 @@ def _beautify_chart(chart: dict[str, Any]) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------- 风险阈值常量（统一管控，接入真实数据后可在此校准）
-# 说明：这些阈值当前是「合理默认值」，基于测试数据拍定，不是最终业务标准。
-# 正式接入真实数据后，应由 HR 业务方确认各阈值，再回填此处。改这里一处即全局生效。
+# 说明：以下为可配置业务规则的默认阈值，不是模拟数据；上线前应由 HR 业务方确认。
 class _RiskThresholds:
     """风险阈值常量池。所有阈值集中在这里，便于业务校准与审计。"""
 

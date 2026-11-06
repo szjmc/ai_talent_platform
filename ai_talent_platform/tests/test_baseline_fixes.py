@@ -464,9 +464,11 @@ def test_single_pagination_and_response_contract():
     if hasattr(schemas_common, "SuccessResponse"):
         from app.core.response import ApiResponse
 
-        assert schemas_common.SuccessResponse is ApiResponse, (
-            "SuccessResponse 必须是 ApiResponse 的同一对象别名，不允许独立定义"
-        )
+        # 合并期保留独立泛型类以稳定既有 OpenAPI 组件名；对外字段必须与 ApiResponse 一致。
+        assert set(schemas_common.SuccessResponse.model_fields) == set(ApiResponse.model_fields)
+        assert schemas_common.SuccessResponse(code=201, message="ok", data={"x": 1}).model_dump() == {
+            "code": 201, "message": "ok", "data": {"x": 1}, "trace_id": "-",
+        }
     for current in ("ApiResponse", "PageResult", "success", "error", "api_response"):
         assert hasattr(response_mod, current), f"core.response 缺少 {current}"
 
@@ -516,55 +518,38 @@ def test_get_db_delegates_to_session_scope():
 # ==================================================================== 15 501 占位统一
 # 说明：resumes / knowledge 已由真实 router 挂载（不再返回 501），
 # 因此骨架一致性只覆盖仍处于占位状态的四个模块。
-_SKELETON_ROUTERS = (
-    ("positions", "app.routers.position_router"),
-    ("assessments", "app.routers.assessment_router"),
-    ("trainings", "app.routers.training_router"),
-    ("matchings", "app.routers.matching_router"),
-)
-
-
-@pytest.mark.asyncio
 async def test_mounted_stub_returns_501_contract(client):
-    """挂载的占位路由（router.py placeholder）：未登录也返回 501 + owner 提示。"""
-    resp = await client.get("/api/v1/positions")
+    """仍为占位的 files 模块返回统一 501；已实现模块不再期待占位响应。"""
+    resp = await client.get("/api/v1/files")
     assert resp.status_code == 501
     body = resp.json()
     assert body["code"] == 501
-    assert body["data"]["module"] == "岗位管理"
-    assert body["data"]["owner"] == "Agent组"
+    assert body["data"]["module"] == "文件管理"
+    assert body["data"]["owner"] == "架构组"
     assert body["data"]["hint"]
 
 
 @pytest.mark.asyncio
 async def test_skeleton_routers_share_stub_contract(client):
-    """issue 15：7 个骨架路由占位端点与挂载占位同契约（501、结构一致、无权限拦截）。"""
-    import importlib
+    """占位工厂与挂载占位同契约；真实业务路由不得被本用例误判为 501。"""
+    from app.routers._stub import placeholder_router
+    from app.routers.router import IMPLEMENTED_MODULES, _STUB_MODULES
 
     skeleton_app = FastAPI()
-    prefixes: dict[str, str] = {}
-    for prefix, module_name in _SKELETON_ROUTERS:
-        router = importlib.import_module(module_name).router
-        skeleton_app.include_router(router)
-        prefixes[router.prefix] = prefix
-
-    async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=skeleton_app),
-        base_url="http://skeleton.test",
-    ) as skel_client:
-        for router_prefix, prefix in prefixes.items():
-            skel_resp = await skel_client.get(router_prefix)
-            assert skel_resp.status_code == 501, f"{router_prefix} 骨架占位未返回 501"
-            assert skel_resp.json()["code"] == 501
-
+    stubs = [(prefix, tag, desc) for prefix, tag, desc in _STUB_MODULES
+             if prefix not in IMPLEMENTED_MODULES]
+    assert stubs, "应至少保留一个真实占位模块用于契约回归"
+    for prefix, tag, desc in stubs:
+        skeleton_app.include_router(placeholder_router(prefix=prefix, tag=tag, description=desc))
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=skeleton_app),
+                                 base_url="http://skeleton.test") as skel_client:
+        for prefix, _tag, _desc in stubs:
+            skel_resp = await skel_client.get(f"/{prefix}")
             mount_resp = await client.get(f"/api/v1/{prefix}")
-            assert mount_resp.status_code == 501, f"/api/v1/{prefix} 挂载占位未返回 501"
-
-            skel_body, mount_body = skel_resp.json(), mount_resp.json()
-            # 同一模块两处占位的契约必须逐字段一致（防漂移）
-            assert skel_body["code"] == mount_body["code"]
-            assert skel_body["message"] == mount_body["message"]
-            assert skel_body["data"] == mount_body["data"]
+            assert skel_resp.status_code == mount_resp.status_code == 501
+            assert skel_resp.json()["code"] == mount_resp.json()["code"] == 501
+            assert skel_resp.json()["message"] == mount_resp.json()["message"]
+            assert skel_resp.json()["data"] == mount_resp.json()["data"]
 
 
 # ==================================================================== 16/17/18 死配置与删除

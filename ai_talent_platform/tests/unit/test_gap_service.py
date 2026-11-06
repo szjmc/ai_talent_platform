@@ -8,7 +8,7 @@
 
 运行：pytest tests/unit --confcutdir=tests/unit -q
 
-标签：*kwq* 新增文件（GAP-001 验收）。
+标签：[Dify组] [P1]（*kwq* 新增文件，GAP-001 验收）
 """
 
 from __future__ import annotations

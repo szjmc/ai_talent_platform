@@ -1,4 +1,5 @@
 """
+标签：[Agent组] [P1]
 模块：app/ai/agents/interview_record_parser.py
 职责：面试记录表「拍照上传 -> 结构化解析」。
 
@@ -34,7 +35,7 @@ _SYSTEM_PROMPT = """你是面试记录表识别专家。从面试记录表照片
   "highlights": ["亮点1", "亮点2"],
   "weaknesses": ["不足1", "不足2"]
 }
-无法识别的字符串字段填空字符串，数字填 0，列表填 []。"""
+无法识别的字符串字段填空字符串，数字填 null，列表填 []；得分必须在0到100之间。"""
 
 
 async def parse_record_image(image_bytes: bytes, mime: str = "image/jpeg",
@@ -110,6 +111,8 @@ def _normalize(data: dict[str, Any]) -> dict[str, Any]:
         score = round(float(score), 2) if score not in (None, "", 0, "0") else None
     except (TypeError, ValueError):
         score = None
+    if score is not None and not 0 <= score <= 100:
+        raise ValueError("面试得分必须在0到100之间")
     return {
         "position": str(data.get("position") or "").strip()[:64] or None,
         "interview_score": score,
@@ -133,7 +136,8 @@ def _parse_fallback_text(text: str) -> dict[str, Any]:
     split_items = lambda s: [x.strip(" •·、;；") for x in re.split(r"[、;；\n]|(?<=[^\d])。", s or "") if x.strip()]
     return {
         "position": pm.group(1).strip()[:64] if pm else None,
-        "interview_score": round(float(sm.group(1)), 2) if sm else None,
+        "interview_score": (round(float(sm.group(1)), 2)
+                            if sm and 0 <= float(sm.group(1)) <= 100 else None),
         "comprehensive_evaluation": em.group(1).strip() if em else None,
         "highlights": split_items(hm.group(1)) if hm else [],
         "weaknesses": split_items(wm.group(1)) if wm else [],

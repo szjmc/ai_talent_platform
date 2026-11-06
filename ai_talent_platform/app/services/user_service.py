@@ -124,7 +124,7 @@ class UserService:
         if scope == DataScopeEnum.DEPT_SUB and current_user.organization_id:
             org = await self.org_repo.get_by_id(self.db, current_user.organization_id)
             if org is not None and org.path:
-                nodes = await self.org_repo.list_subtree(self.db, org.path)
+                nodes = await self.org_repo.list_subtree(self.db, org.path + str(org.id) + "/")
                 subtree = {n.id for n in nodes}
         return visible_organization_ids(
             current_user.role_codes, current_user.organization_id, subtree

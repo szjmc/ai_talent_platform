@@ -133,7 +133,7 @@ async def _llm_route(message: str) -> str | None:
     try:
         from app.adapters.llm.provider_config import provider_configured
 
-        if not provider_configured():
+        if not provider_configured(settings.LLM_PROVIDER):
             return None
         names = ", ".join(sorted(AGENT_TYPES))
         result = await llm_manager.chat(

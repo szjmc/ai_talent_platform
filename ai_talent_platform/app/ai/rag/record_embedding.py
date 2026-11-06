@@ -1,4 +1,5 @@
 """
+标签：[RAG组] [P1]
 模块：app/ai/rag/record_embedding.py
 职责：面试记录表向量化（测评组自有，独立于 RAG 组的 embedding_service）。
 

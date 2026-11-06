@@ -23,36 +23,23 @@ async def test_real_milvus_collection_filter_and_delete(monkeypatch):
         await adapter.create_collection(name, 2)
         created = True
         await adapter.create_collection(name, 2)          # 幂等
-        await adapter.upsert(name, ["a", "b"], [[1.0, 0.0], [0.0, 1.0]],
+        await adapter.upsert(name, [1, 2], [[1.0, 0.0], [0.0, 1.0]],
                              [{"talent_id": 1, "version": 1}, {"talent_id": 2, "version": 1}])
-        rows = await adapter.search(name, [1.0, 0.0], 5, expr='metadata["talent_id"] == 1')
-        assert len(rows) == 1 and rows[0]["id"] == "a"
-        await adapter.upsert(name, ["a"], [[1.0, 0.0]], [{"talent_id": 1, "version": 2}])
-        rows = await adapter.search(name, [1.0, 0.0], 5, expr='metadata["version"] == 2')
+        rows = await adapter.search(name, [1.0, 0.0], top_k=5, expr='talent_id == 1')
+        assert len(rows) == 1 and rows[0]["id"] == 1
+        await adapter.upsert(name, [1], [[1.0, 0.0]], [{"talent_id": 1, "version": 2}])
+        rows = await adapter.search(name, [1.0, 0.0], top_k=5, expr='version == 2')
         assert len(rows) == 1
-        await adapter.delete(name, ids=["a"])
-        assert not await adapter.search(name, [1.0, 0.0], 5, expr='metadata["talent_id"] == 1')
+        await adapter.delete(name, ids=[1])
+        assert not await adapter.search(name, [1.0, 0.0], top_k=5, expr='talent_id == 1')
     finally:
         if created:
             await adapter.drop(name)
 
 
 # ---------------------------------------------------------------- 离线契约
-class _Schema:
-    def __init__(self):
-        self.fields = []
-
-    def add_field(self, name, dtype, **kwargs):
-        self.fields.append({"name": name, "type": int(dtype), **kwargs})
-
-
-class _Indexes:
-    def add_index(self, **kwargs):
-        return None
-
-
 class _FakeMilvus:
-    """最小 MilvusClient 替身：覆盖人才适配器用到的 6 个调用。"""
+    """当前 TalentVectorStore 使用的 MilvusClient 快速建集合/动态字段接口替身。"""
 
     def __init__(self):
         self.collections, self.rows = {}, {}
@@ -60,39 +47,26 @@ class _FakeMilvus:
     def has_collection(self, collection_name):
         return collection_name in self.collections
 
-    def create_schema(self, **kwargs):
-        return _Schema()
-
-    def prepare_index_params(self):
-        return _Indexes()
-
-    def create_collection(self, collection_name, schema, index_params):
-        self.collections[collection_name] = schema
+    def create_collection(self, collection_name, **kwargs):
+        self.collections[collection_name] = kwargs
         self.rows[collection_name] = {}
-
-    def describe_collection(self, collection_name):
-        schema = self.collections[collection_name]
-        return {"auto_id": False, "fields": [
-            {"name": f["name"], "is_primary": f.get("is_primary", False),
-             "type": f["type"], "params": {"dim": f.get("dim", 0)}}
-            for f in schema.fields]}
 
     def upsert(self, collection_name, data):
         for row in data:
-            self.rows[collection_name][row["chunk_id"]] = row
+            self.rows[collection_name][row["id"]] = row
 
-    def search(self, collection_name, data, anns_field, filter, limit, output_fields, search_params):
+    def search(self, collection_name, data, limit, filter, output_fields):
         import re
-        conditions = re.findall(r'metadata\["(\w+)"\]\s*==\s*([\w.-]+)', filter or "")
+        conditions = re.findall(r"(\w+)\s*==\s*([\w.-]+)", filter or "")
         hits = []
         for pk, row in self.rows[collection_name].items():
-            meta = row["metadata"]
-            if all(str(meta.get(k)) == v.strip("'\"") for k, v in conditions):
-                hits.append({"id": pk, "distance": 0.5, "entity": {"metadata": meta}})
+            if all(str(row.get(key)) == value.strip("'\"") for key, value in conditions):
+                entity = {key: row[key] for key in output_fields if key in row}
+                hits.append({"id": pk, "distance": 0.5, "entity": entity})
         return [hits[:limit]]
 
-    def delete(self, collection_name, ids=None, filter=None):
-        for pk in ids or []:
+    def delete(self, collection_name, id=None, filter=None):
+        for pk in id or []:
             self.rows[collection_name].pop(pk, None)
 
     def drop_collection(self, collection_name):
@@ -101,30 +75,29 @@ class _FakeMilvus:
 
 
 async def test_talent_vector_store_offline_contract(monkeypatch):
-    """gxd-离线验证人才集合契约：建集合幂等、JSON 过滤、覆盖写、指定删除、维度校验。"""
-    from app.core.exceptions import AIError
+    """离线验证当前整数主键、动态字段过滤、覆盖写和指定删除契约。"""
+    import app.adapters.vector_store.talent_vector_store as module
 
-    monkeypatch.setattr("app.config.talent_config.talent_settings.embedding_dim", 2)
     client = _FakeMilvus()
-    store = TalentVectorStore(client=client)
+    monkeypatch.setattr(module, "_get_client", lambda: client)
+    store = module.TalentVectorStore()
     await store.create_collection("talent_vectors", 2)
-    await store.create_collection("talent_vectors", 2)          # 幂等
+    await store.create_collection("talent_vectors", 2)
     assert "talent_vectors" in client.collections
 
-    await store.upsert("talent_vectors", ["t1", "t2"], [[1.0, 0.0], [0.0, 1.0]],
+    await store.upsert("talent_vectors", [1, 2], [[1.0, 0.0], [0.0, 1.0]],
                        [{"talent_id": 1, "version": 1}, {"talent_id": 2, "version": 1}])
-    hits = await store.search("talent_vectors", [1.0, 0.0], 5, expr='metadata["talent_id"] == 1')
-    assert [h["id"] for h in hits] == ["t1"] and hits[0]["metadata"]["version"] == 1
+    hits = await store.search("talent_vectors", [1.0, 0.0], top_k=5,
+                              expr="talent_id == 1", output_fields=["version"])
+    assert [hit["id"] for hit in hits] == [1] and hits[0]["version"] == 1
 
-    await store.upsert("talent_vectors", ["t1"], [[0.9, 0.1]], [{"talent_id": 1, "version": 2}])
-    hits = await store.search("talent_vectors", [1.0, 0.0], 5, expr='metadata["version"] == 2')
-    assert [h["id"] for h in hits] == ["t1"]
+    await store.upsert("talent_vectors", [1], [[0.9, 0.1]], [{"talent_id": 1, "version": 2}])
+    hits = await store.search("talent_vectors", [1.0, 0.0], top_k=5, expr="version == 2")
+    assert [hit["id"] for hit in hits] == [1]
 
-    await store.delete("talent_vectors", ids=["t1"])
-    assert not await store.search("talent_vectors", [1.0, 0.0], 5, expr='metadata["talent_id"] == 1')
-
-    with pytest.raises(AIError):
-        await store.upsert("talent_vectors", ["bad"], [[1.0, 0.0, 0.0]], [{"talent_id": 3}])
-
+    await store.delete("talent_vectors", ids=[1])
+    assert not await store.search("talent_vectors", [1.0, 0.0], top_k=5, expr="talent_id == 1")
+    with pytest.raises(ValueError):
+        await store.upsert("talent_vectors", [3], [[1.0, 0.0], [0.0, 1.0]])
     await store.drop("talent_vectors")
     assert "talent_vectors" not in client.collections

@@ -1,4 +1,5 @@
 """
+标签：[Agent组] [P2]
 模块：scripts/smoke_resume_agent.py
 职责：验证「简历 -> 人才档案解析 Agent（ResumeAgent）-> 组卷 -> 邮件推送」链路。
 
@@ -6,7 +7,7 @@
     1. 人才档案解析 Agent 注册检查
     2. 调用同事 ResumeAgent 解析简历（真实 LLM），映射为组卷关键字
     3. 降级链路：无权限身份调用 -> 自动降级本地正则，不抛异常
-    4. 难度推断 + 组卷（RAG 不可用降级本地内置题库）
+    4. 难度推断 + 旧同步组卷入口拒绝内置题库（真实组卷需数据库身份）
     5. 邮件模板渲染（笔试链接）
 
 运行方式：
@@ -62,7 +63,7 @@ _RESUME = ("张三，8年Java开发经验，高级工程师，硕士毕业于浙
 
 
 async def _test_agent_registered() -> None:
-    from app.ai.agent import bootstrap_ai, list_agents
+    from app.ai.agent import bootstrap_ai
 
     info = bootstrap_ai()
     agents = list(info["agents"])
@@ -99,12 +100,17 @@ async def _test_fallback() -> None:
 
 async def _test_paper_and_email(kw: dict) -> None:
     from app.ai.agents.resume_parser import retrieve_questions
+    from app.core.exceptions import BusinessRuleError
     from app.infrastructure.notify.email_client import _TEMPLATES, _build_message
 
     diff = "专家"
-    qs = retrieve_questions(diff, kw.get("skills", []), count=5)
-    print("\n【4】组卷（本地内置题库兜底）")
-    _check("组卷返回题目", len(qs) == 5, f"题数={len(qs)}")
+    print("\n【4】组卷契约（题目只允许来自数据库）")
+    try:
+        retrieve_questions(diff, kw.get("skills", []), count=5)
+    except BusinessRuleError:
+        _check("旧同步组卷入口拒绝内置题库", True)
+    else:
+        _check("旧同步组卷入口拒绝内置题库", False)
 
     exam_url = "http://localhost:3000/exam/999"
     msg = _build_message("candidate@test.com", _TEMPLATES["assessment_invite"],
@@ -126,7 +132,7 @@ async def main() -> None:
     await _test_fallback()
     await _test_paper_and_email(kw)
     print("\n" + "=" * 60)
-    print("全部通过：简历经人才档案解析 Agent 自动分析，可组卷并推送笔试")
+    print("全部通过：简历解析/降级与邮件模板可用；真实组卷需数据库题库与可信身份")
     print("=" * 60)
 
 

@@ -1,4 +1,5 @@
 """
+标签：[架构组] [P2]
 测试硅基流动 LLM 是否正常调用。
 用法：python scripts/test_llm.py
 """

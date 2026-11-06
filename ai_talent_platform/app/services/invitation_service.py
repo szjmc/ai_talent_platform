@@ -7,7 +7,7 @@
   题目在**创建邀约时**从题库（assessment_questions，Vanna组）随机抽样快照进
   ExamSession.question_ids，此后题库增删不影响已发试卷。
 - 公开接口仅凭 token 访问（候选人无账号）；token 由 secrets 生成并查重。
-- 邮件/短信发送走 invite_notify（SMTP 未配置=mock 记日志，永不阻断）；
+- 邮件/短信发送走 invite_notify；未配置/失败返回 ok=False，不模拟成功；
 - 监考帧检测走 ai/proctoring（YOLO→Haar→disabled 三级降级）。
 - answer 字段在任何公开响应中都不序列化（题面只含 id/type/content/options）。
 """
@@ -139,7 +139,10 @@ def grade_answers(
 
 
 def build_invitation_link(token: str) -> str:
-    return f"{settings.INVITE_BASE_URL.rstrip('/')}/invite/{token}"
+    base = settings.INVITE_BASE_URL or settings.FRONTEND_URL or settings.PUBLIC_BASE_URL
+    if not base:
+        raise BusinessRuleError("未配置 INVITE_BASE_URL / FRONTEND_URL / PUBLIC_BASE_URL，无法生成邀约链接")
+    return f"{base.rstrip('/')}/invite/{token}"
 
 
 # --------------------------------------------------------------------------- 服务
@@ -258,7 +261,7 @@ class InvitationService:
             )
         await self.db.commit()
 
-        # 4) 通知（commit 后发送，链接已持久；mock 降级不阻断）
+        # 4) 通知（commit 后发送，链接已持久；失败结果如实落库）
         link = build_invitation_link(token)
         interview_time_iso = (
             body.interview_time.strftime("%Y-%m-%d %H:%M") if body.interview_time else None
