@@ -167,8 +167,8 @@ export interface FrameCheck {
 
 export const invitesApi = {
   create: (data: InviteCreatePayload) => request<InviteInfo>({ url: '/invites', method: 'post', data }),
-  list: (params?: { talent_id?: number; page?: number; page_size?: number }) =>
-    request<{ items: InviteInfo[]; total: number }>({ url: '/invites', params }),
+  list: (params?: { talent_id?: number; type?: InviteType; status?: string; keyword?: string; page?: number; page_size?: number }) =>
+    request<{ items: InviteInfo[]; total: number; page: number; page_size: number; pages: number }>({ url: '/invites', params }),
   visit: (token: string) => request<InviteVisit>({ url: `/invites/visit/${encodeURIComponent(token)}` }),
   examStart: (token: string) => request<ExamStart>({ url: `/invites/exam/${encodeURIComponent(token)}` }),
   examSubmit: (token: string, answers: Record<string, unknown>) =>

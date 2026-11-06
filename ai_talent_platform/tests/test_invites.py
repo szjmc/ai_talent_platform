@@ -450,6 +450,19 @@ class TestInviteRoutes:
         resp = client.get("/api/v1/invites")
         assert resp.status_code == 401
 
+    def test_list_with_filters_requires_auth(self, client: TestClient) -> None:
+        """记录抽屉的过滤参数（type/status/keyword）路由可达且仍受权限保护。"""
+        resp = client.get(
+            "/api/v1/invites",
+            params={"type": "written_test", "status": "sent", "keyword": "张三"},
+        )
+        assert resp.status_code == 401
+
+    def test_list_rejects_bad_type(self, client: TestClient) -> None:
+        """非法 type 由路由参数校验拒绝（422）或被鉴权拦截（401），不得 500。"""
+        resp = client.get("/api/v1/invites", params={"type": "hacking"})
+        assert resp.status_code in (401, 422)
+
     def test_detail_requires_auth(self, client: TestClient) -> None:
         resp = client.get("/api/v1/invites/1")
         assert resp.status_code == 401
@@ -564,6 +577,39 @@ def test_random_token_url_safe() -> None:
     token = generate_random_token(24)
     assert len(token) >= 24
     assert all(c.isalnum() or c in "-_" for c in token)
+
+
+class TestListSerialization:
+    def test_to_response_maps_record_fields(self) -> None:
+        """记录抽屉依赖的序列化字段：url / send_results / 面试时间 / 题量。"""
+        from app.models.invitation import TalentInvitation
+
+        row = TalentInvitation(
+            id=9, token="tok-abc", type="interview", title="张三 · 面试邀约", status="sent",
+            channels=["sms", "email"],
+            send_results=[{"channel": "sms", "ok": True, "mode": "mock", "error": None}],
+            duration_minutes=60,
+            interview_time=datetime(2026, 11, 8, 10, 0),
+            created_at=datetime(2026, 11, 6, 9, 0),
+        )
+        resp = InvitationService(None)._to_response(row)
+        assert resp.url.endswith("/invite/tok-abc")
+        assert resp.send_results[0].mode == "mock"
+        assert resp.type == "interview"
+        assert resp.interview_time == datetime(2026, 11, 8, 10, 0)
+        assert resp.question_count is None
+        assert resp.talent_name is None  # 快照为空且未传 talent_name
+
+    def test_to_response_uses_snapshot_name(self) -> None:
+        from app.models.invitation import TalentInvitation
+
+        row = TalentInvitation(
+            id=10, token="tok-xyz", type="written_test", title="笔试邀约", status="created",
+            duration_minutes=45, question_count=8, talent_snapshot={"name": "李四", "mobile": "138"},
+        )
+        resp = InvitationService(None)._to_response(row)
+        assert resp.talent_name == "李四"
+        assert resp.question_count == 8
 
 
 # ------------------------------------------------------------------ token 查重（回归）

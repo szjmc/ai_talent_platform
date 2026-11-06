@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Empty } from 'antd';
-import { AuditOutlined, CloseOutlined, DragOutlined, ExpandOutlined, FileTextOutlined, LeftOutlined, RightOutlined, ScheduleOutlined, ShrinkOutlined } from '@ant-design/icons';
+import { AuditOutlined, CloseOutlined, DragOutlined, ExpandOutlined, FileTextOutlined, LeftOutlined, RightOutlined, ScheduleOutlined, ShrinkOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { Talent } from '../../types';
 import ResumeDocument from './ResumeDocument';
 import InviteDialog from './InviteDialog';
-import type { InviteType } from '../../services/api';
+import InviteRecordsDrawer from './InviteRecordsDrawer';
+import type { InviteInfo, InviteType } from '../../services/api';
 
 interface Props { talents: Talent[]; province?: string; fullscreen: boolean; onFullscreenChange: (open: boolean) => void }
 
@@ -21,6 +22,8 @@ export default function ResumeCoverflow({ talents, province, fullscreen, onFulls
   const [pickedId, setPickedId] = useState<number | null>(null);
   const [closing, setClosing] = useState(false);
   const [inviteTarget, setInviteTarget] = useState<{ talent: Talent; kind: InviteType } | null>(null);
+  const [recordsOpen, setRecordsOpen] = useState(false);
+  const [recordsKeyword, setRecordsKeyword] = useState('');
   const viewportRef = useRef<HTMLDivElement>(null);
   const wheelTime = useRef(0);
   const dragged = useRef(false);
@@ -70,6 +73,12 @@ export default function ResumeCoverflow({ talents, province, fullscreen, onFulls
     setPickedId(current => (current === talent.id ? null : talent.id));
   };
 
+  /** 打开邀约记录抽屉（keyword 预填人才姓名，便于演示档案无库行时检索）。 */
+  const openRecords = (keyword: string) => {
+    setRecordsKeyword(keyword);
+    setRecordsOpen(true);
+  };
+
   // 统一短 tween：可预期的时长（无弹簧尾迹），reduced-motion 更短
   const transition = reduceMotion ? { duration: 0.08 } : { duration: 0.26, ease: [0.22, 0.61, 0.36, 1] as const };
   const pickedTalent = talents.find(t => t.id === pickedId) ?? null;
@@ -85,6 +94,7 @@ export default function ResumeCoverflow({ talents, province, fullscreen, onFulls
           {province && <span className="province-filter-label">已筛选：{province}</span>}
           {pickedTalent && <span className="picked-counter">正在查阅：{pickedTalent.name}</span>}
           {pickedTalent && <Button size="small" onClick={putBack}>收起档案</Button>}
+          <Button size="small" icon={<UnorderedListOutlined />} onClick={() => openRecords('')}>邀约记录</Button>
           <span className="coverflow-count"><b>{talents.length ? active + 1 : 0}</b> / {talents.length}</span>
           <Button size="small" icon={<LeftOutlined />} disabled={active === 0} onClick={() => move(-1)} aria-label="上一份档案" />
           <Button size="small" icon={<RightOutlined />} disabled={active >= talents.length - 1} onClick={() => move(1)} aria-label="下一份档案" />
@@ -167,6 +177,7 @@ export default function ResumeCoverflow({ talents, province, fullscreen, onFulls
                         <Button icon={<ScheduleOutlined />} onClick={() => setInviteTarget({ talent, kind: 'interview' })}>面试邀约</Button>
                         <Button icon={<FileTextOutlined />} onClick={() => setInviteTarget({ talent, kind: 'written_test' })}>笔试邀约</Button>
                         <Button icon={<AuditOutlined />} onClick={() => setInviteTarget({ talent, kind: 'assessment' })}>测评邀约</Button>
+                        <Button icon={<UnorderedListOutlined />} onClick={() => openRecords(talent.name)}>邀约记录</Button>
                       </div>
                     </>}
                   </motion.div>
@@ -188,6 +199,12 @@ export default function ResumeCoverflow({ talents, province, fullscreen, onFulls
         talent={inviteTarget?.talent ?? null}
         initialKind={inviteTarget?.kind ?? 'written_test'}
         onClose={() => setInviteTarget(null)}
+        onCreated={(info: InviteInfo) => openRecords(info.talent_name ?? info.title ?? '')}
+      />
+      <InviteRecordsDrawer
+        open={recordsOpen}
+        initialKeyword={recordsKeyword}
+        onClose={() => setRecordsOpen(false)}
       />
     </section>
   );

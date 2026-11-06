@@ -89,9 +89,14 @@ async def list_invites(
     user: CurrentUser,
     page: PageParams = Depends(),
     talent_id: int | None = Query(None, gt=0, description="按人才过滤"),
+    type: str | None = Query(None, pattern=r"^(written_test|assessment|interview)$", description="邀约类型"),
+    status: str | None = Query(
+        None, pattern=r"^(created|sent|opened|submitted|finished|expired|cancelled)$", description="状态"
+    ),
+    keyword: str | None = Query(None, max_length=64, description="标题/姓名模糊搜索"),
     service: InvitationService = Depends(get_service),
 ):
-    result = await service.page_list(page, talent_id=talent_id)
+    result = await service.page_list(page, talent_id=talent_id, type_=type, status=status, keyword=keyword)
     return success(data=result)
 
 

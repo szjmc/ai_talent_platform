@@ -277,12 +277,25 @@ class InvitationService:
         await self.db.commit()
         return self._to_response(invite, snapshot.get("name"))
 
-    async def page_list(self, page: PageParams, *, talent_id: int | None = None) -> PageResult[Any]:
+    async def page_list(
+        self,
+        page: PageParams,
+        *,
+        talent_id: int | None = None,
+        type_: str | None = None,
+        status: str | None = None,
+        keyword: str | None = None,
+    ) -> PageResult[Any]:
         if self.db is None:
             return build_page_result([], 0, page)
-        result = await self.repo.paginate(
-            self.db, page, filters={"talent_id": talent_id} if talent_id else None
-        )
+        filters: dict[str, Any] = {}
+        if talent_id:
+            filters["talent_id"] = talent_id
+        if type_:
+            filters["type"] = type_
+        if status:
+            filters["status"] = status
+        result = await self.repo.paginate(self.db, page, filters=filters or None, keyword=keyword or None)
         rows: list[TalentInvitation] = list(result.items or [])
         names = await self._talent_names([r.talent_id for r in rows if r.talent_id])
         items = [self._to_response(r, names.get(r.talent_id)) for r in rows]

@@ -10,6 +10,8 @@ interface Props {
   initialKind?: InviteType;
   open: boolean;
   onClose: () => void;
+  /** 创建成功并关闭对话框时回调（用于打开邀约记录抽屉，防止链接只出现一次就丢失） */
+  onCreated?: (info: InviteInfo) => void;
 }
 
 const KIND_OPTIONS = [
@@ -19,7 +21,7 @@ const KIND_OPTIONS = [
 ];
 
 /** 邀约创建对话框：题量按简历解析（可覆盖）/ 面试设时间 -> 创建并按渠道发送链接。 */
-export default function InviteDialog({ talent, initialKind = 'written_test', open, onClose }: Props) {
+export default function InviteDialog({ talent, initialKind = 'written_test', open, onClose, onCreated }: Props) {
   const [kind, setKind] = useState<InviteType>(initialKind);
   const [channels, setChannels] = useState<InviteChannel[]>(['sms']);
   const [mobile, setMobile] = useState('');
@@ -81,7 +83,12 @@ export default function InviteDialog({ talent, initialKind = 'written_test', ope
     navigator.clipboard?.writeText(text).then(() => message.success('已复制到剪贴板')).catch(() => message.info('请手动复制'));
   };
 
-  const close = () => { setCreated(null); onClose(); };
+  const close = () => {
+    const finished = created;
+    setCreated(null);
+    onClose();
+    if (finished) onCreated?.(finished); // 关闭后打开记录抽屉，保留链接入口
+  };
   const interviewerUrl = created ? `${created.url}?role=interviewer` : '';
 
   return (

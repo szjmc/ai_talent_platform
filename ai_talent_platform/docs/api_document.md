@@ -1226,7 +1226,7 @@ event: error   data: {"code":5002,"message":"模型调用失败"}
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
 | POST | `/invites` | `talent:update` | 创建并发送邀约（type=written_test/assessment/interview） |
-| GET | `/invites` | `talent:read` | 邀约分页（`talent_id` 可选过滤） |
+| GET | `/invites` | `talent:read` | 邀约分页（`talent_id` / `type` / `status` / `keyword` 过滤，前端「邀约记录」抽屉数据源） |
 | GET | `/invites/{invite_id}` | `talent:read` | 邀约详情（含 token/url/发送结果） |
 | GET | `/invites/visit/{token}` | 公开 | 落地页信息（类型/时间/有效期/监考引擎/ICE 配置） |
 | GET | `/invites/exam/{token}` | 公开 | 开始或恢复笔试（题面快照，**不含 answer**；首次打开锁定截止时间） |
