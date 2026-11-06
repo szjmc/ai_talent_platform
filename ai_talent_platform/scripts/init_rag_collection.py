@@ -12,7 +12,6 @@
     python scripts/init_rag_collection.py           # 建/校验集合
     python scripts/init_rag_collection.py --drop     # 危险：先删再建
 
-标签：[RAG组] [P2]（初始化 Milvus 集合的手工脚本）
 """
 from __future__ import annotations
 

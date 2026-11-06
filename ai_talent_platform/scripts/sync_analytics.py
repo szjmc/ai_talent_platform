@@ -7,7 +7,7 @@
     python scripts/sync_analytics.py --full    # 全量（清空事实表后重灌）
 
 幂等策略：
-    - 快照 / 维度表：ON CONFLICT 幂等 upsert（快照唯一键 snapshot_month+org+edu+age）；
+    - 快照：只重建当前月（源表无历史离职/调岗时间，不伪造历史），维度表幂等 upsert；
     - 事实表（测评 / 培训）：按同步窗口 DELETE + INSERT（无自然唯一键）；
     - 维表差集清理：源端已删除 / 离职 / 部门撤销的行按 id 差集删除（临时表实现）；
     - 行为事件 fact_behavior_event：无 MySQL 来源，跳过并计数 0；
@@ -21,7 +21,7 @@
         · 系统级 cron / systemd timer：见 deploy/ 目录示例
 
 表与来源：
-    fact_talent_snapshot   talents（按月快照：存量 + 学历/年龄段/部门明细，org0=全公司）
+    fact_talent_snapshot   talents（当前月快照：存量 + 学历/年龄段/部门明细，org0=全公司）
     fact_assessment_history assessments JOIN assessment_results（近 12 个月）
     fact_training_track    learning_records（近 12 个月，course_id 非空）
     fact_behavior_event    无来源（跳过）
@@ -37,7 +37,7 @@ import asyncio
 import json
 import logging
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timezone as datetime_timezone, timedelta
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -57,55 +57,52 @@ SNAPSHOT_MONTHS = 12
 
 _UPSERT_SNAPSHOT = """
 INSERT INTO fact_talent_snapshot
-    (snapshot_month, organization_id, education, age_group, talent_count, work_years_avg)
-VALUES (:snapshot_month, :organization_id, :education, :age_group, :talent_count, :work_years_avg)
+    (snapshot_month, organization_id, education, age_group, talent_count, avg_work_years)
+VALUES (:snapshot_month, :organization_id, :education, :age_group, :talent_count, :avg_work_years)
 ON CONFLICT (snapshot_month, organization_id, education, age_group) DO UPDATE SET
     talent_count = EXCLUDED.talent_count,
-    work_years_avg = EXCLUDED.work_years_avg
+    avg_work_years = EXCLUDED.avg_work_years,
+    updated_at = now()
 """
 
 _UPSERT_DIM_WIDE = """
 INSERT INTO dim_talent_wide
-    (talent_id, talent_no, name, org_id, org_path, education, age_group, skill_tags,
-     work_years, potential_level, match_score, snapshot_month)
-VALUES (:talent_id, :talent_no, :name, :org_id, :org_path, :education, :age_group, :skill_tags,
-     :work_years, :potential_level, :match_score, :snapshot_month)
+    (talent_id, name, org_path, education, skill_tags, work_years, potential_level, match_avg_score)
+VALUES (:talent_id, :name, :org_path, :education, :skill_tags, :work_years, :potential_level, :match_avg_score)
 ON CONFLICT (talent_id) DO UPDATE SET
-    talent_no = EXCLUDED.talent_no,
     name = EXCLUDED.name,
-    org_id = EXCLUDED.org_id,
     org_path = EXCLUDED.org_path,
     education = EXCLUDED.education,
-    age_group = EXCLUDED.age_group,
     skill_tags = EXCLUDED.skill_tags,
     work_years = EXCLUDED.work_years,
     potential_level = EXCLUDED.potential_level,
-    match_score = EXCLUDED.match_score,
-    snapshot_month = EXCLUDED.snapshot_month
+    match_avg_score = EXCLUDED.match_avg_score,
+    synced_at = now()
 """
 
 _UPSERT_ORG = """
-INSERT INTO dim_organization
-    (org_id, org_code, org_name, org_level, org_path, parent_org_id)
-VALUES (:org_id, :org_code, :org_name, :org_level, :org_path, :parent_org_id)
+INSERT INTO dim_organization (org_id, code, name, level, path, parent_id)
+VALUES (:org_id, :code, :name, :level, :path, :parent_id)
 ON CONFLICT (org_id) DO UPDATE SET
-    org_code = EXCLUDED.org_code,
-    org_name = EXCLUDED.org_name,
-    org_level = EXCLUDED.org_level,
-    org_path = EXCLUDED.org_path,
-    parent_org_id = EXCLUDED.parent_org_id
+    code = EXCLUDED.code,
+    name = EXCLUDED.name,
+    level = EXCLUDED.level,
+    path = EXCLUDED.path,
+    parent_id = EXCLUDED.parent_id,
+    synced_at = now()
 """
 
 _INSERT_ASSESSMENT = """
 INSERT INTO fact_assessment_history
-    (talent_id, submitted_at, assessment_type, total_score, level, dimension_scores)
-VALUES (:talent_id, :submitted_at, :assessment_type, :total_score, :level, :dimension_scores)
+    (assessment_id, talent_id, position_id, total_score, level, dimension_scores, scored_at)
+VALUES (:assessment_id, :talent_id, :position_id, :total_score, :level,
+        CAST(:dimension_scores AS JSONB), :scored_at)
 """
 
 _INSERT_TRAINING = """
 INSERT INTO fact_training_track
-    (talent_id, course_id, learn_date, study_minutes, completion_status)
-VALUES (:talent_id, :course_id, :learn_date, :study_minutes, :completion_status)
+    (talent_id, course_id, plan_id, progress, study_minutes, status, event_at)
+VALUES (:talent_id, :course_id, :plan_id, :progress, :study_minutes, :status, :event_at)
 """
 
 
@@ -204,36 +201,32 @@ def build_snapshot_rows(
 ) -> list[dict[str, Any]]:
     """按月构建快照明细（每组织 存量+学历+年龄段 三类行，另加 organization_id=0 汇总）。
 
-    存量口径：created_at <= 月末 且（非离职 或 离职月 >= 快照月）；
-    离职月 = updated_at 所在月（talents 无 left_at，与趋势口径一致）。
+    存量口径：created_at < 下月初且当前非离职。源表没有离职/调岗时间，
+    生产同步只重建当前月；纯函数传入历史月份时仅按当前状态近似，不冒充历史事实。
     """
     rows: list[dict[str, Any]] = []
     for month in months:
         month_end = _month_end(month)
+        age_ref = min(date.today(), month_end - timedelta(days=1))
         members: list[dict[str, Any]] = []
         for talent in talents:
             created = _as_date(talent.get("created_at"))
-            if created is None or created >= month_end:
+            if created is None or created >= month_end or talent.get("status") == "left":
                 continue
-            if talent.get("status") == "left":
-                left_month = _as_date(talent.get("updated_at"))
-                left_floor = (
-                    date(left_month.year, left_month.month, 1) if left_month else None
-                )
-                if left_floor is None or left_floor < month:
-                    continue
             members.append(talent)
 
-        # 每成员贡献 4 类明细行：组织×学历、组织合计、全公司×学历、全公司合计
+        # 学历和年龄分别聚合，避免查询单维分布时漏人；另保留组织和全公司总计。
         grouped: dict[tuple[int, str, str], list[dict[str, Any]]] = {}
         for talent in members:
             org_id = int(talent.get("organization_id") or 0)
             education = str(talent.get("education") or "")
-            age_group = age_group_label(talent.get("birth_date"), ref=month_end)
+            age_group = age_group_label(talent.get("birth_date"), ref=age_ref)
             for key in (
-                (org_id, education, age_group),
+                (org_id, education, ""),
+                (org_id, "", age_group),
                 (org_id, "", ""),
-                (0, education, age_group),
+                (0, education, ""),
+                (0, "", age_group),
                 (0, "", ""),
             ):
                 grouped.setdefault(key, []).append(talent)
@@ -253,7 +246,7 @@ def build_snapshot_rows(
                     "education": education,
                     "age_group": age_group,
                     "talent_count": len(members_of),
-                    "work_years_avg": (
+                    "avg_work_years": (
                         round(sum(work_years) / len(work_years), 2)
                         if work_years
                         else None
@@ -279,12 +272,9 @@ def build_dim_talent_wide_rows(
         rows.append(
             {
                 "talent_id": int(talent["id"]),
-                "talent_no": talent.get("talent_no"),
                 "name": talent.get("name"),
-                "org_id": org_id,
-                "org_path": org_paths.get(org_id, f"/{org_id}/" if org_id else ""),
+                "org_path": org_paths.get(org_id, ""),
                 "education": str(talent.get("education") or ""),
-                "age_group": age_group_label(talent.get("birth_date")),
                 "skill_tags": _parse_skill_tags(talent.get("skill_tags")),
                 "work_years": (
                     float(talent["work_years"])
@@ -292,8 +282,7 @@ def build_dim_talent_wide_rows(
                     else None
                 ),
                 "potential_level": talent.get("potential_level"),
-                "match_score": match_scores.get(int(talent["id"])),
-                "snapshot_month": snapshot_month,
+                "match_avg_score": match_scores.get(int(talent["id"])),
             }
         )
     return rows
@@ -304,15 +293,15 @@ def build_org_rows(organizations: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for org in organizations:
         org_id = int(org["id"])
-        path = org.get("path") or (f"/{org_id}/" if org_id else "")
+        path = org.get("path") or "/"
         rows.append(
             {
                 "org_id": org_id,
-                "org_code": org.get("code"),
-                "org_name": org.get("name"),
-                "org_level": int(org.get("level") or 0),
-                "org_path": path,
-                "parent_org_id": org.get("parent_id"),
+                "code": org.get("code"),
+                "name": org.get("name"),
+                "level": int(org.get("level") or 1),
+                "path": path,
+                "parent_id": org.get("parent_id"),
             }
         )
     return rows
@@ -325,8 +314,8 @@ def _window_bounds(since: date | None = None) -> tuple[date, date]:
     又避免只同步半月造成月度快照口径不完整（upsert 幂等，重复跑无副作用）。
     """
     today = date.today()
-    start = date(today.year, today.month, 1) - timedelta(days=SNAPSHOT_MONTHS * 31)
-    start = date(start.year, start.month, 1)
+    month_index = today.year * 12 + (today.month - 1) - (SNAPSHOT_MONTHS - 1)
+    start = date(month_index // 12, month_index % 12 + 1, 1)
     if since is not None:
         since_month = date(since.year, since.month, 1)
         if since_month > start:
@@ -342,7 +331,7 @@ async def _load_mysql_payload(db: AsyncSession) -> dict[str, Any]:
         for row in (
             await db.execute(
                 text(
-                    "SELECT id, talent_no, name, organization_id, education, birth_date, "
+                    "SELECT id, name, organization_id, education, birth_date, "
                     "work_years, skill_tags, potential_level, status, created_at, updated_at "
                     "FROM talents WHERE is_deleted = 0"
                 )
@@ -365,12 +354,12 @@ async def _load_mysql_payload(db: AsyncSession) -> dict[str, Any]:
         for row in (
             await db.execute(
                 text(
-                    "SELECT a.talent_id, a.submitted_at, a.title, a.total_score, "
-                    "r.level, r.dimension_scores "
-                    "FROM assessments a LEFT JOIN assessment_results r "
-                    "ON r.assessment_id = a.id "
-                    "WHERE a.is_deleted = 0 AND a.status = 'submitted' "
-                    "AND a.submitted_at IS NOT NULL"
+                    "SELECT a.id AS assessment_id, a.talent_id, a.position_id, "
+                    "COALESCE(r.created_at, a.updated_at) AS scored_at, "
+                    "r.total_score, r.level, r.dimension_scores "
+                    "FROM assessments a JOIN assessment_results r "
+                    "ON r.assessment_id = a.id AND r.is_deleted = 0 "
+                    "WHERE a.is_deleted = 0 AND a.status = 'scored'"
                 )
             )
         ).all()
@@ -380,7 +369,8 @@ async def _load_mysql_payload(db: AsyncSession) -> dict[str, Any]:
         for row in (
             await db.execute(
                 text(
-                    "SELECT talent_id, course_id, last_study_at, created_at, "
+                    "SELECT talent_id, course_id, plan_id, progress, "
+                    "COALESCE(last_study_at, updated_at, created_at) AS event_at, "
                     "study_minutes, status FROM learning_records "
                     "WHERE is_deleted = 0 AND course_id IS NOT NULL"
                 )
@@ -393,7 +383,7 @@ async def _load_mysql_payload(db: AsyncSession) -> dict[str, Any]:
             await db.execute(
                 text(
                     "SELECT talent_id, AVG(score) AS avg_score "
-                    "FROM matching_records GROUP BY talent_id"
+                    "FROM matching_records WHERE is_deleted = 0 GROUP BY talent_id"
                 )
             )
         ).all()
@@ -411,50 +401,48 @@ async def _load_mysql_payload(db: AsyncSession) -> dict[str, Any]:
     }
 
 
-def _assessment_rows(
-    assessments: list[dict[str, Any]], start: date, end: date
-) -> list[dict[str, Any]]:
+def _aware_timestamp(value: Any) -> datetime | None:
+    """MySQL DATETIME 按平台约定的服务器本地时间解释，再转为 PgSQL 时区时间。"""
+    if not isinstance(value, datetime):
+        return None
+    return value.astimezone() if value.tzinfo is None else value.astimezone(datetime_timezone.utc)
+
+
+def _assessment_rows(assessments: list[dict[str, Any]], start: date, end: date) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for item in assessments:
-        submitted = _as_date(item.get("submitted_at"))
-        if submitted is None or not (start <= submitted < end):
+        scored_at = _aware_timestamp(item.get("scored_at"))
+        if scored_at is None or not (start <= scored_at.date() < end):
             continue
-        rows.append(
-            {
-                "talent_id": int(item["talent_id"]),
-                "submitted_at": item["submitted_at"],
-                "assessment_type": item.get("title") or "综合测评",
-                "total_score": float(item["total_score"] or 0),
-                "level": item.get("level"),
-                "dimension_scores": (
-                    item.get("dimension_scores")
-                    if isinstance(item.get("dimension_scores"), str)
-                    else json.dumps(item.get("dimension_scores") or {}, ensure_ascii=False)
-                ),
-            }
-        )
+        dimensions = item.get("dimension_scores")
+        rows.append({
+            "assessment_id": int(item["assessment_id"]),
+            "talent_id": int(item["talent_id"]),
+            "position_id": item.get("position_id"),
+            "scored_at": scored_at,
+            "total_score": float(item["total_score"]) if item.get("total_score") is not None else None,
+            "level": item.get("level"),
+            "dimension_scores": dimensions if isinstance(dimensions, str)
+                                else json.dumps(dimensions or {}, ensure_ascii=False),
+        })
     return rows
 
 
-def _training_rows(
-    records: list[dict[str, Any]], start: date, end: date
-) -> list[dict[str, Any]]:
+def _training_rows(records: list[dict[str, Any]], start: date, end: date) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for item in records:
-        learn_day = _as_date(item.get("last_study_at")) or _as_date(item.get("created_at"))
-        if learn_day is None:
+        event_at = _aware_timestamp(item.get("event_at"))
+        if event_at is None or not (start <= event_at.date() < end):
             continue
-        if not (start <= learn_day < end):
-            continue
-        rows.append(
-            {
-                "talent_id": int(item["talent_id"]),
-                "course_id": int(item["course_id"]),
-                "learn_date": learn_day,
-                "study_minutes": int(item.get("study_minutes") or 0),
-                "completion_status": str(item.get("status") or "in_progress"),
-            }
-        )
+        rows.append({
+            "talent_id": int(item["talent_id"]),
+            "course_id": int(item["course_id"]),
+            "plan_id": item.get("plan_id"),
+            "progress": float(item.get("progress") or 0),
+            "event_at": event_at,
+            "study_minutes": int(item.get("study_minutes") or 0),
+            "status": str(item["status"]),
+        })
     return rows
 
 
@@ -492,8 +480,8 @@ async def _replace_window(
                 f"DELETE FROM {table} WHERE {time_column} >= :start "  # noqa: S608
                 f"AND {time_column} < :end"
             ),
-            {"start": datetime.combine(start, datetime.min.time()),
-             "end": datetime.combine(end, datetime.min.time())},
+            {"start": datetime.combine(start, datetime.min.time()).astimezone(),
+             "end": datetime.combine(end, datetime.min.time()).astimezone()},
         )
     return await _exec_many(pg, insert_sql, rows)
 
@@ -534,11 +522,7 @@ async def _write_state(
                 text(_UPSERT_STATE),
                 {
                     "job": _JOB_NAME,
-                    "last_synced_at": (
-                        datetime.combine(window[1], datetime.min.time()) if window else None
-                    )
-                    if status == "success"
-                    else None,
+                    "last_synced_at": datetime.now().astimezone() if status == "success" else None,
                     "status": status,
                     "rows_total": sum((counts or {}).values()),
                     "detail": json.dumps(counts or {}, ensure_ascii=False),
@@ -560,10 +544,8 @@ async def _delete_missing(pg: Any, table: str, key_column: str, ids: list[int]) 
         text("CREATE TEMP TABLE IF NOT EXISTS tmp_sync_ids (id BIGINT PRIMARY KEY) ON COMMIT DROP")
     )
     await pg.execute(text("TRUNCATE tmp_sync_ids"))
-    if not ids:
-        # 源端确实为空时才该清空维表；这里保守跳过，避免上游读取异常导致全表被清空。
-        logger.warning("差集清理跳过：%s 本轮源端 id 集合为空", table)
-        return 0
+    # 查询成功但源端为空是合法状态：临时表为空时差集删除会清空目标维表。
+    # 上游读取异常会在 _load_mysql_payload 阶段抛出，不会走到这里。
     await _exec_many(pg, "INSERT INTO tmp_sync_ids (id) VALUES (:id)", [{"id": int(i)} for i in ids])
     result = await pg.execute(
         text(f"DELETE FROM {table} WHERE {key_column} NOT IN (SELECT id FROM tmp_sync_ids)")  # noqa: S608
@@ -579,7 +561,7 @@ async def sync_all(*, full_refresh: bool = False) -> dict[str, int]:
     PGSQL_ENABLED=false 时抛 RuntimeError（不静默）。
 
     增量语义：读取 analytics_sync_state 的水位，把时间窗口收敛到「水位的月初」；
-    快照 / 维表始终全量 upsert（数据量小且需保证月度口径完整），
+    当前月快照在事务内 DELETE+INSERT，历史月份保留既有同步结果；维表全量 upsert，
     事实表按窗口 DELETE+INSERT，维表再按 id 差集删除源端已消失的行。
     """
     if not settings.PGSQL_ENABLED:
@@ -587,7 +569,7 @@ async def sync_all(*, full_refresh: bool = False) -> dict[str, int]:
 
     watermark = None if full_refresh else await _read_watermark()
     start, end = _window_bounds(watermark)
-    months = [m for m in month_iter(start, end)]
+    snapshot_month = date.today().replace(day=1)
 
     engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
     session_factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
@@ -599,9 +581,8 @@ async def sync_all(*, full_refresh: bool = False) -> dict[str, int]:
 
     talents: list[dict[str, Any]] = payload["talents"]
     organizations: list[dict[str, Any]] = payload["organizations"]
-    org_paths = {
-        int(org["id"]): str(org.get("path") or f"/{org['id']}/") for org in organizations
-    }
+    # 与 MySQL organizations.path / dim_organization.path 同口径：只含祖先，不含自身。
+    org_paths = {int(org["id"]): str(org.get("path") or "/") for org in organizations}
 
     counts: dict[str, int] = {
         "fact_talent_snapshot": 0,
@@ -619,10 +600,13 @@ async def sync_all(*, full_refresh: bool = False) -> dict[str, int]:
             if pg is None:
                 raise RuntimeError("PgSQL 会话不可用，请检查 PGSQL_* 配置")
 
+            # 当前月可能有人离职/调岗/学历变更，先删除旧分组再写入，避免残留 stale 计数。
+            await pg.execute(
+                text("DELETE FROM fact_talent_snapshot WHERE snapshot_month = :month"),
+                {"month": snapshot_month},
+            )
             counts["fact_talent_snapshot"] = await _exec_many(
-                pg,
-                _UPSERT_SNAPSHOT,
-                build_snapshot_rows(talents, months),
+                pg, _UPSERT_SNAPSHOT, build_snapshot_rows(talents, [snapshot_month]),
             )
             counts["dim_organization"] = await _exec_many(
                 pg, _UPSERT_ORG, build_org_rows(organizations)
@@ -637,7 +621,7 @@ async def sync_all(*, full_refresh: bool = False) -> dict[str, int]:
                 pg, "dim_organization", "org_id", [int(o["id"]) for o in organizations]
             )
             counts["deleted_talent"] = await _delete_missing(
-                pg, "dim_talent_wide", "talent_id", [int(t["id"]) for t in talents]
+                pg, "dim_talent_wide", "talent_id", [int(t["id"]) for t in talents if t.get("status") != "left"]
             )
             counts["fact_assessment_history"] = await _replace_window(
                 pg,
@@ -646,7 +630,7 @@ async def sync_all(*, full_refresh: bool = False) -> dict[str, int]:
                 start,
                 end,
                 _assessment_rows(payload["assessments"], start, end),
-                "submitted_at",
+                "scored_at",
                 full_refresh,
             )
             counts["fact_training_track"] = await _replace_window(
@@ -656,18 +640,22 @@ async def sync_all(*, full_refresh: bool = False) -> dict[str, int]:
                 start,
                 end,
                 _training_rows(payload["training"], start, end),
-                "learn_date",
+                "event_at",
                 full_refresh,
             )
-            # fact_behavior_event：无 MySQL 来源，保持 0（见模块 docstring）
+            # 当前没有可靠的人才行为来源，清除历史导入/演示行，禁止继续作为真实分析结果。
+            await pg.execute(text("DELETE FROM fact_behavior_event"))
 
             # pg_session() 是只读语义（不 commit），写入必须显式提交，
             # 否则会话关闭时 SQLAlchemy 会回滚，同步结果全部丢失。
             await pg.commit()
     except Exception as exc:  # noqa: BLE001 - 记录失败状态后原样抛出
-        await _write_state(
-            status="failed", counts=counts, window=(start, end), note=str(exc)[:500]
-        )
+        try:
+            await _write_state(
+                status="failed", counts=counts, window=(start, end), note=str(exc)[:500]
+            )
+        except Exception as state_exc:  # noqa: BLE001
+            logger.warning("记录同步失败状态也失败：%s", state_exc)
         raise
 
     # 成功才推进水位（失败保留旧水位，下轮自动补上这段窗口）

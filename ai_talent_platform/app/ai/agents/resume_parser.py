@@ -1,19 +1,18 @@
 """
+标签：[Agent组] [P0]
 模块：app/ai/agents/resume_parser.py
 职责：从简历文本中抽取关键字（岗位/学校/薪资/年限/技能），推断试卷难度，
      并基于题库标签做轻量 RAG 检索，输出匹配难度的试卷。
 
 ============================ 替换说明 ============================
-- 当前「题库检索」是基于标签/关键词的轻量匹配（本地内置题库）；
-  >>> RAG 替换点 <<< 后续接入 Milvus 向量库后，把 retrieve_questions() 内部
-      换成「简历关键字 embedding -> 题库集合相似度 top-k」即可，对外签名不变。
-- 简历关键字抽取先用规则（正则），后续可换成 LLM 抽取（llm_manager）。
+- 题目与标准答案只来自已发布且当前身份可读的数据库题库；语义通道失败时
+  仍从同一授权范围随机选题，绝不使用代码内置试卷。
+- 简历关键字优先走 ResumeAgent/LLM，失败时降级本地规则并显式返回解析模式。
 ==================================================================
 """
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from typing import Any
@@ -64,7 +63,7 @@ async def parse_resume_llm(resume_text: str) -> dict[str, Any]:
             "seniority": data.get("seniority", "中级"),
             "education": education or data.get("school", "未识别"),
             "school": data.get("school", ""),
-            "school_tier": _SCHOOL_TIER.get(education, 3),
+            "school_tier": _SCHOOL_TIER.get(education),
             "salary_min": float(data.get("salary_min", 0) or 0),
             "years": float(data.get("years", 0) or 0),
             "skills": data.get("skills", []),
@@ -126,7 +125,7 @@ def parse_resume(resume_text: str) -> dict[str, Any]:
 
     # --- 学历 / 院校 ---
     education = ""
-    school_tier = 3  # 默认本科
+    school_tier = None  # 未识别学历时不虚构学校层级
     for kw, tier in _SCHOOL_TIER.items():
         if kw in text:
             education = kw
@@ -196,78 +195,20 @@ def infer_difficulty(kw: dict[str, Any]) -> str:
     return "初级"
 
 
-# ================================================================ 3. 题库（轻量 RAG）
-# 每张题带 difficulty 标签与 skill_tags，按难度+技能命中检索
-_QUESTION_BANK: list[dict[str, Any]] = [
-    {"question_id": "E1", "type": "single", "difficulty": "初级", "skill_tags": ["Java"],
-     "content": "Java 中用于定义常量的关键字是？",
-     "options": [{"key": "A", "text": "static"}, {"key": "B", "text": "final"},
-                 {"key": "C", "text": "const"}, {"key": "D", "text": "volatile"}],
-     "answer": "B", "score": 10, "dimension": "专业基础"},
-    {"question_id": "E2", "type": "single", "difficulty": "中级", "skill_tags": ["Java", "Spring"],
-     "content": "Spring 框架中 Bean 默认作用域是？",
-     "options": [{"key": "A", "text": "prototype"}, {"key": "B", "text": "singleton"},
-                 {"key": "C", "text": "request"}, {"key": "D", "text": "session"}],
-     "answer": "B", "score": 10, "dimension": "专业基础"},
-    {"question_id": "E3", "type": "multiple", "difficulty": "高级", "skill_tags": ["微服务", "分布式"],
-     "content": "微服务架构下保证分布式事务一致性的常用方案有？",
-     "options": [{"key": "A", "text": "2PC"}, {"key": "B", "text": "TCC"},
-                 {"key": "C", "text": "本地消息表"}, {"key": "D", "text": "忽略一致性"}],
-     "answer": ["A", "B", "C"], "score": 15, "dimension": "架构设计"},
-    {"question_id": "E4", "type": "text", "difficulty": "高级", "skill_tags": ["高并发"],
-     "content": "请描述你处理过的最高并发系统，QPS 多少、做了哪些优化？",
-     "options": None, "answer": None, "score": 25, "dimension": "实战经验"},
-    {"question_id": "E5", "type": "text", "difficulty": "专家", "skill_tags": ["AI", "MLOps"],
-     "content": "设计一个企业级 LLM 应用平台，从数据治理到模型上线，你会怎么规划？",
-     "options": None, "answer": None, "score": 30, "dimension": "架构设计"},
-    {"question_id": "E6", "type": "single", "difficulty": "中级", "skill_tags": ["MySQL"],
-     "content": "MySQL InnoDB 中，B+ 树索引适合以下哪种场景？",
-     "options": [{"key": "A", "text": "全表扫描"}, {"key": "B", "text": "范围查询"},
-                 {"key": "C", "text": "模糊查询"}, {"key": "D", "text": "无索引"}],
-     "answer": "B", "score": 10, "dimension": "专业基础"},
-    {"question_id": "E7", "type": "text", "difficulty": "中级", "skill_tags": ["团队协作"],
-     "content": "描述一次你主导跨部门项目协作，遇到的最大冲突及解决方式。",
-     "options": None, "answer": None, "score": 20, "dimension": "综合素质"},
-]
-
-
+# ================================================================ 3. 题库入口
+# 题目和标准答案只允许来自持久化题库。同步入口保留给旧调用方，但不再内置试卷。
 def retrieve_questions(difficulty: str, skills: list[str], count: int = 5) -> list[dict[str, Any]]:
-    """轻量 RAG：按难度 + 技能标签检索题目。
+    """旧同步入口无法执行授权查库；调用异步入口 retrieve_questions_rag。"""
+    from app.core.exceptions import BusinessRuleError
 
-    >>> RAG 替换点 <<< 接入 Milvus 后：
-        query_emb = await llm.embed([" ".join(skills) + " " + difficulty])
-        hits = await milvus.search(collection="question_bank", vectors=query_emb, top_k=count)
-        return [q for q in hits]
-    当前用标签匹配打分排序：难度匹配 +2，技能命中 +1，取 top-N。
-    """
-    scored = []
-    for q in _QUESTION_BANK:
-        s = 0
-        if q.get("difficulty") == difficulty:
-            s += 2
-        elif q.get("difficulty") in _UPSET(difficulty):
-            s += 1
-        for sk in (skills or []):
-            if any(tag.lower() in sk.lower() for tag in q.get("skill_tags", [])):
-                s += 1
-        scored.append((s, q))
-    scored.sort(key=lambda x: x[0], reverse=True)
-    picked = [q for _, q in scored[:count]]
-    logger.info("[rag] 难度=%s 命中题目=%s", difficulty, [q["question_id"] for q in picked])
-    return picked
-
-
-def _UPSET(difficulty: str) -> list[str]:
-    order = ["初级", "中级", "高级", "专家"]
-    i = order.index(difficulty) if difficulty in order else 1
-    return order[max(0, i - 1): i + 1]
+    raise BusinessRuleError("请通过 retrieve_questions_rag 从数据库题库组卷，服务不再提供内置试题")
 
 
 # ================================================================ RAG 组卷整合（接 RAG 组题库向量检索）
 # 说明：RAG 组已实现「题库 Milvus 向量检索」（QuestionBankService / QuestionBankVectorAdapter），
 # 本函数是 resume_parser 预留的「RAG 替换点」正式落位：优先调用 RAG 组题库检索，
-# 检索失败 / 无结果 / 权限不足时，自动降级到上面的本地内置题库（retrieve_questions），
-# 保证组卷链路在任何环境下都能闭环，且不改动 RAG 组任何代码。
+# 语义通道不可用或候选题不足时，从同一数据库、同一授权范围随机补足。
+# 权限错误直接向上抛出；题库不足明确报错，绝不返回代码内置题目。
 _DIFFICULTY_TO_RAG = {
     "初级": "beginner", "中级": "intermediate", "高级": "advanced", "专家": "advanced",
 }
@@ -292,7 +233,7 @@ def _infer_technology(skills: list[str]) -> str:
 
 
 def _to_questions(items: list[Any]) -> list[dict[str, Any]]:
-    """把 RAG 组 SelectedQuestion 转成组卷统一结构（不含答案字段下发，仅组卷落库用）。"""
+    """把题库记录转换成试卷快照；向量相似度绝不能当作题目分值。"""
     out = []
     for it in items:
         q_type = it.question_type
@@ -303,9 +244,9 @@ def _to_questions(items: list[Any]) -> list[dict[str, Any]]:
         out.append({
             "type": q_type if q_type in ("single", "multiple", "text") else "single",
             "content": it.stem,
-            "options": [{"key": o.key, "text": o.text} for o in (it.options or [])],
+            "options": ([{"key": o.key, "text": o.text} for o in it.options] if it.options else None),
             "answer": it.answer,
-            "score": float(it.score or 10),
+            "score": 10.0,  # 题目分值为确定性评分规则，与检索相似度无关
             "dimension": it.technology or (it.knowledge_points or ["专业能力"])[0],
         })
     return out
@@ -313,36 +254,55 @@ def _to_questions(items: list[Any]) -> list[dict[str, Any]]:
 
 async def retrieve_questions_rag(db: Any, user: Any, difficulty: str,
                                  skills: list[str], count: int = 5) -> list[dict[str, Any]]:
-    """RAG 组卷入口：优先走 RAG 组题库向量检索，失败降级本地内置题库。
+    """从已发布且当前用户可读的数据库题目组卷，语义检索失败时使用数据库随机选题。"""
+    from app.core.exceptions import AIError, BusinessRuleError, ExternalServiceError
+    from app.schemas.question_bank import QuestionSearchRequest
+    from app.services.question_bank_service import QuestionBankService
 
-    :param db: 数据库会话（传给 QuestionBankService）
-    :param user: 当前用户（RAG 组做权限校验）
-    :param difficulty: 用户侧难度（初级/中级/高级/专家）
-    :param skills: 简历技能列表
-    :param count: 期望题目总数
-    """
+    if db is None or user is None:
+        raise BusinessRuleError("组卷需要数据库会话和可信登录身份")
+    if not 1 <= count <= 100:
+        raise BusinessRuleError("题目数量必须在1到100之间")
+    multiple = max(1, count // 4) if count >= 3 else 0
+    text = max(1, count // 4) if count >= 2 else 0
+    request = QuestionSearchRequest(
+        technology=_infer_technology(skills),
+        difficulty=_DIFFICULTY_TO_RAG.get(difficulty, "intermediate"),
+        query=(" ".join(skills) + " " + difficulty) if skills else difficulty,
+        counts={"single": count - multiple - text, "multiple": multiple, "text": text},
+        include_answers=True,
+    )
+    service = QuestionBankService(db)
     try:
-        from app.schemas.question_bank import QuestionSearchRequest
-        from app.services.question_bank_service import QuestionBankService
-
-        request = QuestionSearchRequest(
-            technology=_infer_technology(skills),
-            difficulty=_DIFFICULTY_TO_RAG.get(difficulty, "intermediate"),
-            query=(" ".join(skills) + " " + difficulty) if skills else difficulty,
-            counts={"single": max(1, count // 2), "multiple": max(1, count // 4),
-                    "text": max(1, count // 4)},
-            include_answers=True,  # 组卷需标准答案落库，前端下发时再剥离
+        result = await service.search(request, user)
+    except (AIError, ExternalServiceError) as exc:
+        logger.warning("题库语义通道不可用，改用授权范围内的数据库选题：%s", type(exc).__name__)
+        result = await service.search(request.model_copy(update={"query": None}), user)
+    selected = list(result.items)
+    shortage = dict(result.shortage)
+    # 某一题型不足时用其他已发布题型补足，仍保持相同技术方向、难度和权限范围。
+    while shortage and len(selected) < count:
+        available = [kind for kind in ("single", "multiple", "text") if shortage.get(kind, 0) > 0]
+        if not available:
+            break
+        kind = available[0]
+        request_more = request.model_copy(update={
+            "query": None,
+            "counts": {kind: min(shortage[kind], count - len(selected))},
+            "exclude_question_ids": [item.question_id for item in selected],
+        })
+        more = await service.search(request_more, user)
+        selected.extend(more.items)
+        shortage[kind] -= len(more.items)
+        if not more.items:
+            shortage.pop(kind)
+    if len(selected) != count:
+        raise BusinessRuleError(
+            f"当前权限范围内符合技术方向与难度的已发布题目不足：需要{count}题，实际{len(selected)}题"
         )
-        result = await QuestionBankService(db).search(request, user)
-        questions = _to_questions(result.items)
-        if questions:
-            logger.info("[rag] RAG 组题库命中 %s 题（technology=%s difficulty=%s）",
-                        len(questions), request.technology, request.difficulty)
-            return questions
-        logger.warning("[rag] RAG 组题库无结果，降级本地内置题库")
-    except Exception as exc:  # noqa: BLE001 - RAG 不可用不阻断组卷，降级本地
-        logger.warning("[rag] RAG 组题库检索失败，降级本地内置题库：%s", exc)
-    return retrieve_questions(difficulty, skills, count)
+    logger.info("数据库题库组卷完成：technology=%s difficulty=%s count=%s",
+                request.technology, request.difficulty, len(selected))
+    return _to_questions(selected)
 
 
 # ================================================================ 人才档案解析 Agent 整合
@@ -403,7 +363,7 @@ def _map_agent_result(parsed: dict[str, Any], resume_text: str) -> dict[str, Any
         "seniority": _seniority_of(position_title, years),
         "education": education or "未识别",
         "school": school,
-        "school_tier": _SCHOOL_TIER.get(education, 3),
+        "school_tier": _SCHOOL_TIER.get(education),
         "salary_min": _extract_salary(resume_text),
         "years": years,
         "skills": skills,

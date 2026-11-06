@@ -63,6 +63,13 @@ def offline_agents(monkeypatch):
     import app.ai.workflows.supervisor_workflow as supervisor
 
     monkeypatch.setattr(supervisor, "dispatch", _not_found)
+
+    async def _not_found_stream(*args, **kwargs):
+        raise NotFoundError("Agent 未注册：offline-test")
+        yield ""  # pragma: no cover - 使函数成为异步生成器
+
+    import app.services.agent_service as agent_service
+    monkeypatch.setattr(agent_service, "dispatch_stream", _not_found_stream)
     return _not_found
 
 
@@ -162,7 +169,7 @@ async def test_chat_rejects_unknown_conversation(fake_llm, offline_agents):
     assert resp.conversation_id.startswith("local-")
 
 
-async def test_chat_stream_events_sequence(fake_llm):
+async def test_chat_stream_events_sequence(fake_llm, offline_agents):
     """SSE 事件序列：start → delta* → done；delta 同时带 text 与 delta 键。"""
     service = AgentService(db=None)
     session = await service.prepare_chat(
@@ -372,7 +379,7 @@ async def test_endpoint_chat_and_stream_end_to_end(fake_llm, offline_agents):
                 )
                 events.append((lines.get("event"), json.loads(lines.get("data", "{}"))))
             kinds = [name for name, _ in events]
-            assert kinds[0] == "start" and kinds[-1] == "done"
+            assert kinds[0] == "start" and kinds[-1] == "done", events
             assert "delta" in kinds
             text = "".join(d["text"] for n, d in events if n == "delta")
             assert text

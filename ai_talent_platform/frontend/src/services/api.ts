@@ -4,7 +4,6 @@ import type { ApiResponse } from '../types';
 export const TOKEN_KEY = 'talentos_access_token';
 export const REFRESH_KEY = 'talentos_refresh_token';
 export const USER_KEY = 'talentos_user';
-export const isDemoFallback = import.meta.env.VITE_DEMO_FALLBACK !== 'false';
 
 const client = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
@@ -58,23 +57,12 @@ export class ApiError extends Error {
   }
 }
 
+/** 统一接口契约：所有业务响应均为 { code, message, data, trace_id }，此处只返回 data。 */
 export async function request<T>(config: Parameters<typeof client.request>[0]): Promise<T> {
   try {
     const response = await client.request<ApiResponse<T>>(config);
     return response.data.data;
   } catch (error) { throw new ApiError(error); }
-}
-
-/** 未完成的 501 后端模块使用演示数据；网络错误仅在显式开启时回退。 */
-export async function requestWithFallback<T>(config: Parameters<typeof client.request>[0], fallback: T | (() => T)): Promise<{ data: T; demo: boolean }> {
-  try { return { data: await request<T>(config), demo: false }; }
-  catch (error) {
-    const e = error as ApiError;
-    if (isDemoFallback && (e.code === 501 || e.status === 501 || e.code === 0)) {
-      return { data: typeof fallback === 'function' ? (fallback as () => T)() : fallback, demo: true };
-    }
-    throw error;
-  }
 }
 
 export interface StreamEvent { event: string; data: Record<string, unknown> }
@@ -184,6 +172,6 @@ export function inviteWsUrl(token: string, role: 'candidate' | 'interviewer'): s
   const url = base.startsWith('http') ? new URL(base) : new URL(base, window.location.origin);
   url.protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   url.pathname = `${url.pathname.replace(/\/$/, '')}/invites/ws/${encodeURIComponent(token)}`;
-  url.search = `role=${role}`;
+  url.search = `?role=${role}`;
   return url.toString();
 }

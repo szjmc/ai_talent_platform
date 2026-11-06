@@ -1,4 +1,5 @@
 """
+标签：[架构组] [P1]
 模块：app/adapters/llm/siliconflow_adapter.py
 职责：硅基流动（SiliconFlow）线上大模型适配器（OpenAI 兼容协议）。
 

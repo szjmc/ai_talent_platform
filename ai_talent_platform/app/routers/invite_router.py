@@ -74,7 +74,7 @@ async def create_invite(
     user: CurrentUser,
     service: InvitationService = Depends(get_service),
 ):
-    """创建邀约并按渠道发送链接（SMTP 未配置=mock 发送，send_results.mode 回显）。"""
+    """创建邀约并按渠道真实发送；未配置/失败时 send_results.ok=False，不模拟成功。"""
     invite = await service.create(body, current_user=user)
     return success(data=invite, message="邀约已创建")
 

@@ -8,7 +8,7 @@ import { formatApiError } from '../services/api';
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
-  const { login, enterDemo } = useAuth(); const navigate = useNavigate(); const { message } = App.useApp();
+  const { login } = useAuth(); const navigate = useNavigate(); const { message } = App.useApp();
   const onFinish = async (values: { username: string; password: string; remember: boolean }) => {
     setLoading(true);
     try { await login(values.username, values.password, values.remember); message.success('登录成功，欢迎回来'); navigate('/dashboard'); }
@@ -32,7 +32,6 @@ export default function LoginPage() {
         <div className="login-options"><Form.Item name="remember" valuePropName="checked" noStyle><Checkbox>7 天内保持登录</Checkbox></Form.Item><a className="text-primary">忘记密码？</a></div>
         <Button type="primary" htmlType="submit" block loading={loading}>登录 <ArrowRightOutlined/></Button>
       </Form>
-      <div className="login-demo-tip">尚未部署后端？<Button type="link" size="small" onClick={() => { enterDemo(); navigate('/dashboard'); }} style={{ padding: 0, height: 20 }}>进入产品演示</Button><br/>演示模式仅用于体验界面，不会修改任何业务数据。</div>
       <div className="login-footer">登录即代表您同意《服务协议》和《隐私政策》</div>
     </div></section>
   </div>;

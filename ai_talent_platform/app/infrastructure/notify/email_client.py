@@ -1,16 +1,17 @@
 """
+标签：[架构组] [P1]
 模块：app/infrastructure/notify/email_client.py
 职责：邮件推送客户端（测评邀约通知，SMTP 发送）。
 
 ============================ 实现说明 ============================
 零门槛方案：个人邮箱（QQ/163/企业邮箱）SMTP + 授权码即可，无需企业认证。
-- EMAIL_ENABLED=false 或 SMTP 配置缺失 -> 模拟发送（写日志），业务不中断；
+- EMAIL_ENABLED=false 或 SMTP 配置缺失 -> 拒绝发送并返回 ok=False，业务记录保留；
 - EMAIL_ENABLED=true 且配置齐全 -> 通过 smtplib 真实发送（HTML + 纯文本双格式）；
 - 本地语义模板名（assessment_invite / interview_invite）映射到邮件主题与正文模板。
 
 使用示例：
     await send_email("candidate@example.com", template="assessment_invite",
-                     params={"name": "张三", "paper": "高级Java工程师",
+                     params={"name": "候选人", "paper": "高级Java工程师",
                              "url": "https://exam.example.com/s/abc"})
 返回：
     {"ok": bool, "channel": "email", "simulated": bool, "msg": str}
@@ -50,7 +51,7 @@ _TEMPLATES: dict[str, dict[str, str]] = {
         <div style="{style}">
           <h3 style="margin:0 0 16px;color:#1f2d3d">{name} 您好：</h3>
           <p>恭喜您通过简历初筛，现已进入 <b>{paper}</b> 岗位测评环节。</p>
-          <p>请在 <b>24 小时内</b>登录测评系统完成笔试测评，逾期视为自动放弃。</p>
+          <p>请在邀约有效期内登录测评系统完成笔试测评，逾期视为自动放弃。</p>
           {url_block}
           <p style="margin-top:20px;color:#888;font-size:13px">本邮件由系统自动发送，请勿直接回复。</p>
         </div>
@@ -71,7 +72,7 @@ _TEMPLATES: dict[str, dict[str, str]] = {
 
 
 async def send_email(to_email: str, *, template: str, params: dict[str, Any]) -> dict:
-    """发送邮件（真实优先，缺配置自动降级模拟）。
+    """发送邮件；未配置或发送失败均返回 ok=False，绝不模拟成功。
 
     :param to_email: 收件人邮箱
     :param template: 本地语义模板名（assessment_invite / interview_invite）
@@ -80,28 +81,27 @@ async def send_email(to_email: str, *, template: str, params: dict[str, Any]) ->
     """
     to_email = (to_email or "").strip()
     if not to_email or "@" not in to_email:
-        return {"ok": False, "channel": "email", "simulated": True,
+        return {"ok": False, "channel": "email", "simulated": False,
                 "msg": "未提供有效的收件邮箱"}
 
     tpl = _TEMPLATES.get(template)
     if tpl is None:
-        return {"ok": False, "channel": "email", "simulated": True,
+        return {"ok": False, "channel": "email", "simulated": False,
                 "msg": f"未知邮件模板标识：{template}"}
 
     if not _ready():
-        logger.warning("[email·模拟] to=%s template=%s params=%s（未开启真实发送或 SMTP 未配置）",
-                       to_email, template, params)
-        return {"ok": True, "channel": "email", "simulated": True,
-                "msg": "模拟发送成功（EMAIL_ENABLED=false 或 SMTP 未配置）"}
+        logger.warning("邮件未发送：EMAIL_ENABLED=false 或 SMTP 配置不完整 template=%s", template)
+        return {"ok": False, "channel": "email", "simulated": False,
+                "msg": "邮件发送未启用或 SMTP 配置不完整"}
 
     try:
         msg = _build_message(to_email, tpl, params)
         await asyncio.to_thread(_send_sync, msg)
-        logger.info("[email] 发送成功 to=%s subject=%s", to_email, tpl["subject"])
+        logger.info("[email] 发送成功 template=%s", tpl["subject"])
         return {"ok": True, "channel": "email", "simulated": False, "msg": "发送成功"}
     except Exception as exc:  # noqa: BLE001 - 邮件失败不阻断业务，向上返回失败结果
-        logger.exception("邮件真实发送失败：%s", exc)
-        return {"ok": False, "channel": "email", "simulated": False, "msg": str(exc)}
+        logger.warning("邮件真实发送失败 type=%s", type(exc).__name__)
+        return {"ok": False, "channel": "email", "simulated": False, "msg": "邮件服务发送失败，请检查 SMTP 配置"}
 
 
 def _ready() -> bool:
@@ -155,7 +155,9 @@ def _send_sync(msg: EmailMessage) -> None:
             server.send_message(msg)
     else:
         with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=15) as server:
-            server.starttls()
+            if not settings.SMTP_TLS:
+                raise RuntimeError("SMTP 未启用 TLS/SSL，拒绝明文发送凭据")
+            server.starttls(context=ssl.create_default_context())
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             server.send_message(msg)
 

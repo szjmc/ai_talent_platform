@@ -1,4 +1,5 @@
 """
+标签：[Agent组] [P1]
 模块：tests/unit/test_matching_review.py
 职责：HR 复核流程的规则单测（纯逻辑 + mock 仓储，不依赖数据库）。
 

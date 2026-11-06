@@ -16,7 +16,6 @@
     python scripts/seed_rag_data.py            # 灌入全部样例文档（幂等，重复执行按内容去重）
     python scripts/seed_rag_data.py --user hr01  # 指定入库人用户名
 
-标签：[RAG组] [P2]（灌入 RAG 样例数据的手工脚本）
 """
 from __future__ import annotations
 

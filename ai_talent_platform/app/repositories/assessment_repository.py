@@ -1,4 +1,5 @@
 """
+标签：[Agent组] [P0]
 模块：app/repositories/assessment_repository.py
 职责：测评数据访问层（ORM，禁止裸 SQL）。
 
@@ -42,6 +43,20 @@ class AssessmentRepository(BaseRepository):
     default_order = "-id"
 
     # ------------------------------------------------------------ 查询
+    async def get_by_id_or_404(self, db: AsyncSession, obj_id: int, *,
+                               include_deleted: bool = False, message: str | None = None,
+                               lock: bool = False) -> Assessment:
+        """读取测评；评分写入前可锁定主记录，避免并发覆盖状态。"""
+        from app.core.exceptions import NotFoundError
+
+        stmt = self._base_query(include_deleted=include_deleted).where(Assessment.id == obj_id)
+        if lock:
+            stmt = stmt.with_for_update()
+        obj = (await db.execute(stmt)).scalar_one_or_none()
+        if obj is None:
+            raise NotFoundError(message or f"测评不存在（id={obj_id}）")
+        return obj
+
     async def get_active_by_talent(self, db: AsyncSession, talent_id: int) -> Assessment | None:
         """取人才当前进行中的测评（pending / in_progress）。"""
         stmt = (
@@ -99,7 +114,7 @@ class AssessmentRepository(BaseRepository):
             if scored_by is not None:
                 existing.scored_by = scored_by
             if score is not None:
-                existing.scored_at = datetime.utcnow()
+                existing.scored_at = datetime.now()
             await db.flush()
             return existing
 
@@ -109,7 +124,7 @@ class AssessmentRepository(BaseRepository):
             answer=answer,
             score=score,
             scored_by=scored_by,
-            scored_at=datetime.utcnow() if score is not None else None,
+            scored_at=datetime.now() if score is not None else None,
         )
         db.add(obj)
         await db.flush()
@@ -154,26 +169,48 @@ class AssessmentRepository(BaseRepository):
             )
             .where(Assessment.position_id == position_id)
             .where(Assessment.status == "scored")
+            .where(Assessment.is_deleted.is_(False))
         )
         row = (await db.execute(stmt)).one()
         return {
             "position_id": position_id,
             "total": int(row.total or 0),
-            "avg_score": round(float(row.avg_score or 0), 2),
-            "max_score": round(float(row.max_score or 0), 2),
-            "min_score": round(float(row.min_score or 0), 2),
+            "avg_score": round(float(row.avg_score), 2) if row.avg_score is not None else None,
+            "max_score": round(float(row.max_score), 2) if row.max_score is not None else None,
+            "min_score": round(float(row.min_score), 2) if row.min_score is not None else None,
         }
 
     # ------------------------------------------------------------------ 面试
     async def finish_interview_session(self, db: AsyncSession, session_id: int,
-                                       interview_score: float, summary: dict) -> None:
+                                       interview_score: float, summary: dict,
+                                       *, assessment_id: int | None = None) -> None:
+        from app.core.exceptions import NotFoundError
         from app.models.assessment import InterviewSession
-        row = await db.get(InterviewSession, session_id)
-        if row:
-            row.interview_score = interview_score
-            row.summary = summary
-            row.finished_at = datetime.now(timezone.utc)
-            await db.flush()
+
+        stmt = select(InterviewSession).where(InterviewSession.id == session_id)
+        if assessment_id is not None:
+            stmt = stmt.where(InterviewSession.assessment_id == assessment_id)
+        row = await db.scalar(stmt.with_for_update())
+        if row is None or row.is_deleted:
+            raise NotFoundError("面试会话不存在或不属于本次测评")
+        row.interview_score = interview_score
+        row.summary = summary
+        row.finished_at = datetime.now()
+        await db.flush()
+
+    async def require_interview_session(self, db: AsyncSession, session_id: int,
+                                        assessment_id: int) -> None:
+        """校验面试会话归属，避免把记录挂到其它测评的会话。"""
+        from app.core.exceptions import NotFoundError
+        from app.models.assessment import InterviewSession
+
+        stmt = select(InterviewSession.id).where(
+            InterviewSession.id == session_id,
+            InterviewSession.assessment_id == assessment_id,
+            InterviewSession.is_deleted.is_(False),
+        )
+        if await db.scalar(stmt) is None:
+            raise NotFoundError("面试会话不存在或不属于本次测评")
 
     async def list_interview_records(self, db: AsyncSession, assessment_id: int) -> Sequence[Any]:
         """某测评的全部面试记录表（按 id 倒序，最新在前）。"""
@@ -205,7 +242,7 @@ class AssessmentRepository(BaseRepository):
             "school": getattr(talent, "school", "") or "",
             "education": getattr(talent, "education", "") or "",
             "years": float(getattr(talent, "work_years", 0) or 0),
-            "skills": list(getattr(talent, "skills", None) or []),
+            "skills": list(getattr(talent, "skill_tags", None) or []),
             "school_tier": int(getattr(talent, "school_tier", 0) or 0),
         }
 

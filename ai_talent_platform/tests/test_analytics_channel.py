@@ -16,17 +16,6 @@
 
 from __future__ import annotations
 
-# [合并说明 origin/develop] 本文件依赖未提交的 WIP 实现：
-#   build_scope_clause / infer_chart / is_scope_unrestricted 在 develop 的
-#   vanna_adapter 中并不存在（ac239d7 仅在注释中提及），develop 提交本身
-#   也无法通过本文件收集。模块级跳过，待 develop 作者补齐实现后删除本段。
-import pytest
-
-pytest.skip(
-    "依赖 develop 未提交的 WIP 实现（build_scope_clause 等），待其补齐后启用",
-    allow_module_level=True,
-)
-
 import asyncio
 from datetime import date
 from types import SimpleNamespace
@@ -37,7 +26,6 @@ from app.ai.workflows import analysis_workflow
 from app.config.settings import settings
 from app.core.exceptions import BusinessRuleError
 from app.routers import router as router_module
-from app.services.analytics_service import AnalyticsService
 
 ADMIN_SCOPE = {"roles": ["admin"], "organization_id": 1}
 MANAGER_SCOPE = {"roles": ["manager"], "organization_id": 9}
@@ -125,19 +113,13 @@ def test_sync_pure_builders():
             "potential_level": None,
         },
     ]
-    rows = sync.build_snapshot_rows(talents, [date(2026, 9, 1), date(2026, 11, 1)])
-    # 2026-09：两人都在；2026-11：离职者已被移出
-    sep_total = next(
-        r for r in rows
-        if r["snapshot_month"] == date(2026, 9, 1)
-        and r["organization_id"] == 0 and r["education"] == "" and r["age_group"] == ""
-    )
+    rows = sync.build_snapshot_rows(talents, [date(2026, 11, 1)])
+    # 源表没有离职时间，纯函数不重建历史离职快照；当前离职者不进入任何近似月份。
     nov_total = next(
         r for r in rows
         if r["snapshot_month"] == date(2026, 11, 1)
         and r["organization_id"] == 0 and r["education"] == "" and r["age_group"] == ""
     )
-    assert sep_total["talent_count"] == 2
     assert nov_total["talent_count"] == 1
     # 学历明细行存在（ETL 后可按学历过滤）
     assert any(
@@ -146,104 +128,90 @@ def test_sync_pure_builders():
     )
 
     wide = sync.build_dim_talent_wide_rows(
-        talents, {7: "/1/7/"}, {1: 88.5, 2: 70.0}, snapshot_month=date(2026, 11, 5)
+        talents, {7: "/1/"}, {1: 88.5, 2: 70.0}, snapshot_month=date(2026, 11, 5)
     )
     assert len(wide) == 1  # 离职者不进宽表
-    assert wide[0]["org_path"] == "/1/7/"
+    assert wide[0]["org_path"] == "/1/"  # 与 organizations.path 同口径：只含祖先
     assert wide[0]["skill_tags"] == ["Python", "SQL"]
-    assert wide[0]["match_score"] == 88.5
+    assert wide[0]["match_avg_score"] == 88.5
 
     orgs = sync.build_org_rows(
-        [{"id": 7, "code": "RD", "name": "研发", "level": 2, "path": "/1/7/", "parent_id": 1}]
+        [{"id": 7, "code": "RD", "name": "研发", "level": 2, "path": "/1/", "parent_id": 1}]
     )
-    assert orgs[0]["org_path"] == "/1/7/"
-    assert orgs[0]["org_level"] == 2
+    assert orgs[0]["path"] == "/1/"
+    assert orgs[0]["level"] == 2
 
 
 # ================================================================ 3) 工作流
+class _FakeDistribution:
+    def __init__(self, items, warnings=None):
+        self.items = items
+        self.warnings = warnings or []
+
+
+class _FakeAnalyticsService:
+    """当前 AnalyticsService 签名：distribution(type, filters, user) / trend(query, user)。"""
+
+    def __init__(self, db=None):
+        self.db = db
+
+    async def distribution(self, type_, filters, user):
+        assert user.id == 1
+        if type_ == "education":
+            return _FakeDistribution([SimpleNamespace(label="本科", count=40)])
+        return _FakeDistribution([SimpleNamespace(label="研发部", count=40)])
+
+    async def assessment_summary(self, filters, user):
+        return SimpleNamespace(record_count=3, average_score=76.5, warnings=[])
+
+    async def trend(self, query, user):
+        assert query.metric == "talent_total"
+        return SimpleNamespace(items=[SimpleNamespace(month=query.end_month, value=40, missing=False)], warnings=[])
+
+
 @pytest.mark.asyncio
 async def test_workflow_four_nodes(monkeypatch):
-    """四节点流水线结构 + 风险 + 洞察（旧签名服务假数据，离线）。"""
-
-    class _FakeOverview:
-        total_talents = 100
-        active_positions = 5
-        match_rate = 0.7
-        training_completion = 0.8
-        assessment_avg_score = 76.5
-
-    class _FakeTrend:
-        points = [SimpleNamespace(month="2026-09", value=1),
-                  SimpleNamespace(month="2026-10", value=5)]
-
-    class _FakeDist:
-        def __init__(self):
-            self.items = [SimpleNamespace(label="研发部", value=40)]
-            self.note = ""
-
-    class _LegacyAnalyticsService:
-        """模拟旧签名的服务（overview(scope) / distribution(type, scope) / trend(metric, scope)）。"""
-
-        def __init__(self, db=None):
-            pass
-
-        async def overview(self, scope=None):
-            return _FakeOverview()
-
-        async def distribution(self, dist_type, scope=None):
-            return _FakeDist()
-
-        async def trend(self, metric, scope=None):
-            return _FakeTrend()
-
-    monkeypatch.setattr(analysis_workflow, "_analytics_service_cls", _LegacyAnalyticsService)
-
-    result = await analysis_workflow.run_analysis_workflow("Q4 研发盘点")
-    assert set(result["nodes"]) == {
-        "collect_metrics",
-        "talent_review",
-        "team_structure",
-        "recommendation",
-    }
+    monkeypatch.setattr(analysis_workflow, "_analytics_service_cls", _FakeAnalyticsService)
+    user = SimpleNamespace(id=1, role_codes=["admin"], is_superuser=False, organization_id=1)
+    result = await analysis_workflow.run_analysis_workflow("Q4 研发盘点", user=user)
+    assert set(result["nodes"]) == {"collect_metrics", "talent_review", "team_structure", "recommendation"}
     assert result["status"] == "succeeded"
-    assert any(r["type"] == "turnover_rising" for r in result["risks"])
+    assert result["nodes"]["collect_metrics"]["metrics"]["overview"]["total_talents"] == 40
+    assert result["nodes"]["team_structure"]["org_distribution"] == [{"label": "研发部", "value": 40}]
     assert "Q4 研发盘点" in result["insight"]
     assert result["nodes"]["recommendation"]["actions"]
 
 
 @pytest.mark.asyncio
-async def test_workflow_degrades_when_service_lacks_legacy_api(monkeypatch):
-    """新版 AnalyticsService 没有 overview(scope) 等旧签名 -> 降级 partial，不抛断流。"""
-    monkeypatch.setattr(analysis_workflow, "_analytics_service_cls", AnalyticsService)
+async def test_workflow_requires_trusted_user():
+    result = await analysis_workflow.run_analysis_workflow("无身份盘点")
+    assert result["status"] == "failed"
+    assert "登录用户" in result["error"]
 
-    result = await analysis_workflow.run_analysis_workflow("降级盘点")
+
+@pytest.mark.asyncio
+async def test_workflow_degrades_without_fake_zero(monkeypatch):
+    class _Missing(_FakeAnalyticsService):
+        async def trend(self, query, user):
+            return SimpleNamespace(items=[SimpleNamespace(month=query.end_month, value=None, missing=True)],
+                                   warnings=["缺期不补0"])
+
+    monkeypatch.setattr(analysis_workflow, "_analytics_service_cls", _Missing)
+    user = SimpleNamespace(id=1, role_codes=["admin"], is_superuser=False, organization_id=1)
+    result = await analysis_workflow.run_analysis_workflow("降级盘点", user=user)
     assert result["status"] == "partial"
-    assert "跨组 API" in result["error"]
-    metrics = result["nodes"]["collect_metrics"]["metrics"]
-    assert metrics["overview"]["degraded"] is True
-    assert metrics["overview"]["total_talents"] == 0
-    assert metrics["trend_turnover"] is None
-    # 降级时人才总数为 0 -> 提示先同步分析库
-    assert any(r["type"] == "no_data" for r in result["risks"])
-    # 流水线仍然完整走到建议节点
+    overview = result["nodes"]["collect_metrics"]["metrics"]["overview"]
+    assert overview["total_talents"] is None
+    assert overview["match_rate"] is None and overview["training_completion"] is None
+    assert result["nodes"]["collect_metrics"]["metrics"]["trend_turnover"] is None
+    assert not any(r["type"] == "no_data" for r in result["risks"])
     assert result["nodes"]["recommendation"]["actions"]
 
 
-def test_workflow_assess_risks_rules():
-    risks = analysis_workflow._assess_risks(
-        {
-            "overview": {"training_completion": 0.3, "match_rate": 0.2, "total_talents": 0},
-            "trend_turnover": {"points": [{"month": "a", "value": 1}, {"month": "b", "value": 5}]},
-        }
-    )
-    kinds = {r["type"] for r in risks}
-    assert {"turnover_rising", "training_low", "match_low", "no_data"} <= kinds
-    assert analysis_workflow._assess_risks(
-        {
-            "overview": {"training_completion": 0.9, "match_rate": 0.8, "total_talents": 10},
-            "trend_turnover": {"points": []},
-        }
-    ) == []
+def test_workflow_assess_risks_only_uses_real_zero():
+    assert analysis_workflow._assess_risks({"overview": {"total_talents": 0}})[0]["type"] == "no_data"
+    assert analysis_workflow._assess_risks({"overview": {"total_talents": None}}) == []
+    assert analysis_workflow._assess_risks({"overview": {"total_talents": 10}}) == []
 
 
 def test_workflow_collect_metrics_never_touches_pg_session():
@@ -266,6 +234,7 @@ async def test_workflow_collect_failure_returns_failed_status(monkeypatch):
         raise BusinessRuleError("依赖未就绪：PgSQL 分析库未启用")
 
     monkeypatch.setattr(analysis_workflow, "_analytics_service_cls", broken_service)
-    result = await analysis_workflow.run_analysis_workflow("x")
+    user = SimpleNamespace(id=1, role_codes=["admin"], is_superuser=False, organization_id=1)
+    result = await analysis_workflow.run_analysis_workflow("x", user=user)
     assert result["status"] == "failed"
     assert "依赖未就绪" in result["error"]

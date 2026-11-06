@@ -1,9 +1,10 @@
 """
+标签：[Agent组] [P2]
 模块：scripts/smoke_assessment.py
 职责：人才测评功能「离线冒烟测试」（不连 DB、不打真实 LLM/视觉模型）。
 
 覆盖范围（纯函数 / 本地降级链路）：
-    1. 简历解析（正则） -> 难度推断 -> 本地内置题库组卷
+    1. 简历解析（正则） -> 难度推断；旧同步组卷入口明确拒绝内置题库
     2. 五维雷达评分 + 等级 + 短板 + 提升建议
     3. 面试记录表「兜底正则解析」（视觉模型不可用时的降级路径）
     4. 面试记录向量化（本地哈希嵌入确定性）+ 本地向量库写入/召回
@@ -38,19 +39,22 @@ def _check(name: str, cond: bool, detail: str = "") -> None:
 
 async def _test_resume_and_paper() -> None:
     from app.ai.agents.resume_parser import infer_difficulty, parse_resume, retrieve_questions
+    from app.core.exceptions import BusinessRuleError
 
     resume = ("张三，8年Java开发经验，高级工程师，硕士，"
               "曾负责高并发分布式微服务系统，期望25-35K，熟悉Spring/Redis/MySQL/AI大模型")
     kw = parse_resume(resume)
     diff = infer_difficulty(kw)
-    qs = retrieve_questions(diff, kw.get("skills", []), count=5)
-
-    print("\n【1】简历解析 -> 难度 -> 组卷")
+    print("\n【1】简历解析 -> 难度（数据库组卷见集成脚本/回归测试）")
     _check("正则抽取技能", len(kw.get("skills", [])) >= 5,
            f"skills={kw.get('skills')}")
     _check("难度推断为 专家", diff == "专家", f"difficulty={diff}")
-    _check("组卷返回题目", len(qs) == 5, f"题数={len(qs)}")
-    _check("题目不含标准答案下发结构", all("answer" not in q or q.get("content") for q in qs))
+    try:
+        retrieve_questions(diff, kw.get("skills", []), count=5)
+    except BusinessRuleError:
+        _check("旧同步组卷入口拒绝内置题库", True)
+    else:
+        _check("旧同步组卷入口拒绝内置题库", False)
 
 
 async def _test_radar() -> None:
@@ -104,16 +108,19 @@ async def _test_vector() -> None:
     _check("本地哈希嵌入确定性（同文本同向量）", v1 == v2 and len(v1) == embed_dim(),
            f"dim={len(v1)}")
 
+    from uuid import uuid4
+
     store = get_vector_store()
-    col = "interview_record_vectors"
-    # 清理历史测试数据，保证本用例从干净状态验证（本地降级为 JSON 持久化，会跨次运行累积）
-    await store.drop(col)
+    col = f"interview_record_smoke_{uuid4().hex}"
     await store.create_collection(col, embed_dim())
-    vid = new_vector_id()
-    await store.upsert(col, [vid], [v1],
-                       metadata=[{"assessment_id": 900001, "talent_id": 900001}],
-                       docs=[text])
-    hits = await store.search(col, v1, top_k=3, expr="assessment_id == 900001")
+    try:
+        vid = new_vector_id()
+        await store.upsert(col, [vid], [v1],
+                           metadata=[{"assessment_id": 900001, "talent_id": 900001}],
+                           docs=[text])
+        hits = await store.search(col, v1, top_k=3, expr="assessment_id == 900001")
+    finally:
+        await store.drop(col)
 
     print("\n【4】面试记录向量化 + 本地向量库")
     _check("向量库实例为本地降级或 Milvus", type(store).__name__ in

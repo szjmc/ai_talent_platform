@@ -32,6 +32,8 @@ EXPECTED_MYSQL_TABLES = {
     "interview_sessions",
     "interview_answers",
     "interview_record_sheets",
+    "talent_invitations",
+    "exam_sessions",
     "knowledge_chunks",
     "knowledge_docs",
     "knowledge_revisions",

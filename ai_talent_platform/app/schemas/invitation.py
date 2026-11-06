@@ -52,7 +52,7 @@ class InviteCreateRequest(BaseModel):
 
 
 class InviteSendResult(BaseModel):
-    """单渠道发送结果（mode=mock 时表示演示发送，未真实下发）。"""
+    """单渠道发送结果；mode 由发送端显式返回，当前实现不会返回 mock 成功。"""
 
     channel: str
     ok: bool

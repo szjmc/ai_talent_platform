@@ -82,11 +82,12 @@ class Settings(BaseSettings):
 
     # ------------------------------------------------------------------ 邮件推送（测评组：笔试/面试邀约通知）
     # 个人邮箱 SMTP 方案（QQ/163/企业邮箱 + 授权码），无需企业认证。
-    # EMAIL_ENABLED=false 或 SMTP 配置缺失时自动降级为「模拟发送（写日志）」，业务不中断。
+    # EMAIL_ENABLED=false 或 SMTP 配置缺失时明确返回未发送，不模拟成功。
     EMAIL_ENABLED: bool = False
     SMTP_HOST: str = ""            # 如 smtp.qq.com / smtp.163.com
     SMTP_PORT: int = 465
     SMTP_USE_SSL: bool = True
+    SMTP_TLS: bool = False         # 非 SSL 端口可启用 STARTTLS，与 SMTP_USE_SSL 互斥
     SMTP_USER: str = ""            # 登录账号（发件地址强制取此值，QQ/163 要求发件=登录）
     SMTP_PASSWORD: str = ""        # SMTP 授权码（非邮箱登录密码）
     SMTP_FROM: str = ""            # 历史兼容字段，实际发件地址统一取 SMTP_USER
@@ -290,6 +291,11 @@ class Settings(BaseSettings):
     DIFY_EXPLANATION_API_KEY: str = ""
     # Dify 对话应用 ID（[Agent组]+[Dify组] 共享开关：留空 = 总路由不启用 Dify 分支）
     DIFY_APP_ID_CHAT: str = ""
+    # 测评工作流标识；留空时明确拒绝相应外部能力，不使用测试数据兜底。
+    DIFY_WF_ASSIGN: str = ""
+    DIFY_WF_SCORE: str = ""
+    DIFY_WF_ANALYZE: str = ""
+    DIFY_WF_REPORT: str = ""
 
     # ------------------------------------------------------------------ Vanna 最小问数链路 [架构组合并]
     NL2SQL_MAX_ROWS: int = Field(1000, ge=1, le=1000)
@@ -313,19 +319,13 @@ class Settings(BaseSettings):
     CONVERSATION_WINDOW: int = 10      # 对话记忆窗口（条）
 
     # ------------------------------------------- 人才邀约 / 笔试 / 面试间
-    # [Agent组] 新增配置项（仅追加；短信/邮件默认 mock+日志，配置后走真实 SMTP）
-    INVITE_BASE_URL: str = "http://localhost:5173"   # 候选人公开页前缀（拼 /invite/<token>）
+    # [Agent组] 邀约配置；SMTP 统一使用上方唯一配置块，避免端口/加密方式互相覆盖。
+    INVITE_BASE_URL: str = ""                       # 候选人公开页前缀；生产必须显式配置
     INVITE_TOKEN_TTL_HOURS: int = 72                # 邀约链接有效期（小时）
     INVITE_EXAM_DURATION_MINUTES: int = 60          # 笔试默认时长（分钟）
     INVITE_INTERVIEW_GRACE_MINUTES: int = 15        # 面试可提前进场时间
     INVITE_INTERVIEW_END_GRACE_MINUTES: int = 180   # 面试可延后离场时间
-    SMTP_HOST: str = ""                             # 空 = 邮件按 mock 记录日志（不真发）
-    SMTP_PORT: int = 587
-    SMTP_USER: str = ""
-    SMTP_PASSWORD: str = ""
-    SMTP_FROM: str = ""
-    SMTP_TLS: bool = True
-    SMS_PROVIDER: str = "mock"                      # mock = 记录日志不真发（预留真实网关）
+    SMS_PROVIDER: str = ""                          # 留空表示未接入真实网关，禁止模拟成功
     SMS_ACCESS_KEY: str = ""
     SMS_ACCESS_SECRET: str = ""
     PROCTOR_YOLO_MODEL: str = ""                    # yolov8n.onnx 路径；空 = 自动探测 models/ 目录

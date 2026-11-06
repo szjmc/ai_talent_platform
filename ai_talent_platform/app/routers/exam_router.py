@@ -1,4 +1,5 @@
 """
+标签：[Agent组] [P0]
 模块：app/routers/exam_router.py
 职责：候选人笔试公开入口（邮件链接免登录考试）。
 
@@ -66,9 +67,9 @@ async def exam_submit(assessment_id: int, body: AnswerSubmitRequest, db: DbSessi
     if rule_total >= INTERVIEW_THRESHOLD:
         assessment = await service.repo.get_by_id_or_404(db, assessment_id)
         talent_email = getattr(assessment.talent, "email", "") if assessment.talent else ""
-        await send_email(talent_email or "", template="interview_invite",
-                         params={"name": f"候选人{assessment.talent_id}"})
-        invited = True
+        email_result = await send_email(talent_email or "", template="interview_invite",
+                                         params={"name": assessment.talent.name})
+        invited = bool(email_result.get("ok"))
     return success(data={**result, "interview_invited": invited,
                          "threshold": INTERVIEW_THRESHOLD},
                    message="笔试已提交")

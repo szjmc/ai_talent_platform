@@ -232,8 +232,14 @@ async def test_unknown_agent_type_in_service_validation():
 
 
 # ---------------------------------------------------------------- supervisor 执行
-async def test_full_mode_falls_back_to_generic_llm(fake_llm):
+async def test_full_mode_falls_back_to_generic_llm(fake_llm, monkeypatch):
     """Agent 未注册 + 对话请求 → 降级通用应答（degraded=True）。"""
+    import app.ai.workflows.supervisor_workflow as supervisor
+
+    async def _not_found(*args, **kwargs):
+        raise NotFoundError("Agent 未注册：offline-test")
+
+    monkeypatch.setattr(supervisor, "dispatch", _not_found)
     final = await run_supervisor(
         {"agent_type": "training", "message": "给我一个培训方案"}, mode="full"
     )

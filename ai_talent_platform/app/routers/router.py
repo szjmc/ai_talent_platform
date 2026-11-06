@@ -41,6 +41,8 @@ from app.routers.position_router import router as position_router
 from app.routers.rag_router import router as rag_router  # [合并 lz] 向量检索
 from app.routers.resume_router import router as resume_router  # [合并 lz] 简历解析
 from app.routers.talent_router import router as talent_router
+from app.routers.training_router import router as training_router
+from app.routers.user_router import router as user_router
 from app.routers.knowledge_router import router as knowledge_router
 from app.routers.resume_router import router as resume_router
 from app.routers.text2answer_router import router as text2answer_router
