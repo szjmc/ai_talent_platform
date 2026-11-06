@@ -1,21 +1,35 @@
-"""
-模块：app/infrastructure/vector/milvus.py
-职责：Milvus 客户端连接管理（只负责连接，不做检索语义）。
+# 连接生命周期由基础设施层管理，业务适配器复用客户端。
+"""唯一 Milvus 连接生命周期；不包含检索语义。
+标签：[RAG组] [P0]。"""
+import asyncio
+from app.config.settings import settings
+from app.core.exceptions import ExternalServiceError
+_client = None
+_lock = asyncio.Lock()
 
-标签：[RAG组] [P0]（被 milvus_adapter 依赖：连接管理 / 集合初始化 / 健康检查）
+async def init_milvus():
+    global _client
+    async with _lock:
+        if _client is None and settings.MILVUS_ENABLED:
+            # SDK 在适配层延迟导入，未开启 Milvus 时不要求安装。
+            from app.adapters.vector_store.milvus_adapter import create_client
+            _client = await asyncio.to_thread(create_client, settings.MILVUS_URI, settings.MILVUS_TOKEN)
+    return _client
 
-============================ 实现思路与代码要点 ============================
-1. init_milvus() / get_milvus() / close_milvus()，由 lifespan 在 settings.MILVUS_ENABLED 时调用；
-2. 依赖 pymilvus；未安装或未启用时 get_milvus() 返回 None，上层降级（跳过向量能力）；
-3. 连接参数来自 settings.MILVUS_URI / MILVUS_TOKEN；
-4. 集合创建、索引参数、检索语句都在 adapters/vector_store/milvus_adapter.py 中实现。
+async def get_milvus():
+    client = await init_milvus()
+    if client is None:
+        raise ExternalServiceError("请先配置并启用 MILVUS_ENABLED")
+    return client
 
-待实现清单：
-    - [ ] init_milvus / get_milvus / close_milvus
-    - [ ] health_check（list_collections 探测）
-=========================================================================
-"""
+async def close_milvus():
+    global _client
+    async with _lock:
+        if _client is not None:
+            await asyncio.to_thread(_client.close)
+            _client = None
 
-from __future__ import annotations
-
-# TODO(负责人)：按上述设计实现。
+async def health_check():
+    client = await get_milvus()
+    await asyncio.to_thread(client.list_collections)
+    return {"ok": True}

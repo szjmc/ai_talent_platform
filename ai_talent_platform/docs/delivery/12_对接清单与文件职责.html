@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>对接清单 · 文件职责 · 业务数据流｜岗位人才匹配 Agent</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#ffffff; --ink:#1a1d21; --ink-2:#4a5158; --ink-3:#7a828a;
+    --line:#e5e8ec; --brand:#1f6feb; --brand-soft:#eaf2ff;
+    --ok:#1a7f4b; --ok-soft:#e8f6ee; --warn:#8a5a00; --warn-soft:#fff5e0;
+    --danger:#b42318; --danger-soft:#fdecea; --purple:#6b3fa0; --purple-soft:#f3ecff;
+    --mono:'SFMono-Regular',Consolas,'Liberation Mono',monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.72 -apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;}
+  .layout{display:grid;grid-template-columns:232px minmax(0,1fr);gap:28px;
+    max-width:1260px;margin:0 auto;padding:28px 22px 72px}
+  aside{position:sticky;top:24px;align-self:start;max-height:calc(100vh - 48px);overflow:auto}
+  aside .toc-title{font-size:11.5px;letter-spacing:.14em;color:var(--ink-3);font-weight:700;
+    text-transform:uppercase;margin:0 0 10px 8px}
+  aside a{display:block;padding:7px 10px;border-radius:9px;color:var(--ink-2);
+    text-decoration:none;font-size:13px;line-height:1.4;margin-bottom:2px}
+  aside a:hover{background:#eef2f7;color:var(--ink)}
+  aside a.active{background:var(--brand-soft);color:var(--brand);font-weight:600}
+  aside .toc-sub{margin-left:12px;font-size:12.5px;color:var(--ink-3)}
+
+  header.hero{background:linear-gradient(135deg,#fff 0%,#f0f5ff 100%);border:1px solid var(--line);
+    border-radius:16px;padding:26px 28px;margin-bottom:18px}
+  .eyebrow{font-size:12px;letter-spacing:.14em;color:var(--brand);font-weight:700;text-transform:uppercase}
+  h1{font-size:26px;line-height:1.35;margin:8px 0 6px}
+  .sub{color:var(--ink-2);font-size:14px;margin:0}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .badge{font-size:12.5px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);
+    background:#fff;color:var(--ink-2)}
+  .badge.ok{background:var(--ok-soft);border-color:#bfe5cf;color:var(--ok);font-weight:600}
+  .badge.warn{background:var(--warn-soft);border-color:#f0d9a8;color:var(--warn);font-weight:600}
+  .badge.bad{background:var(--danger-soft);border-color:#f3cfc9;color:var(--danger);font-weight:600}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:18px 0 22px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 17px}
+  .kpi .num{font-size:26px;font-weight:700;letter-spacing:-.02em}
+  .kpi .num small{font-size:13px;font-weight:500;color:var(--ink-3)}
+  .kpi .lbl{font-size:12.5px;color:var(--ink-3);margin-top:2px}
+  .kpi .hint{font-size:11.5px;color:var(--ink-3);margin-top:8px;border-top:1px dashed var(--line);padding-top:7px}
+
+  section{background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:22px 24px;margin-bottom:18px}
+  h2{font-size:18px;margin:0 0 6px;display:flex;align-items:center;gap:10px}
+  h2 .idx{display:inline-flex;width:26px;height:26px;border-radius:8px;background:var(--brand-soft);
+    color:var(--brand);font:700 13px/1 var(--mono);align-items:center;justify-content:center;flex:none}
+  .lead{color:var(--ink-2);font-size:13.5px;margin:0 0 16px}
+  h3{font-size:14.5px;margin:20px 0 8px;padding-left:9px;border-left:3px solid var(--brand)}
+  h3:first-of-type{margin-top:6px}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;table-layout:auto}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top;
+    word-break:break-word}
+  td code{word-break:break-all}
+  th{font-size:12px;color:var(--ink-3);font-weight:600;background:#fafbfc;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  td code,code{font-family:var(--mono);font-size:12px;background:#f3f5f7;padding:1px 5px;border-radius:5px}
+  .nowrap{white-space:nowrap}
+
+  .pill{display:inline-block;font-size:11.5px;padding:2px 9px;border-radius:999px;font-weight:600;white-space:nowrap}
+  .pill.ok{background:var(--ok-soft);color:var(--ok)}
+  .pill.warn{background:var(--warn-soft);color:var(--warn)}
+  .pill.bad{background:var(--danger-soft);color:var(--danger)}
+  .pill.info{background:var(--brand-soft);color:var(--brand)}
+  .pill.mute{background:#eef1f5;color:var(--ink-3)}
+
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-3);margin:10px 0 0}
+  .legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:1px}
+
+  .soft{background:#fafbfc;border:1px solid var(--line);border-radius:11px;padding:13px 15px;
+    font-size:13px;color:var(--ink-2);margin:12px 0}
+  .soft b{color:var(--ink)}
+  .soft.warn{background:var(--warn-soft);border-color:#f0d9a8;color:#6b4a00}
+  .soft.danger{background:var(--danger-soft);border-color:#f3cfc9;color:#7a1a12}
+  .soft.info{background:var(--brand-soft);border-color:#cfe0ff;color:#164a9e}
+
+  pre{background:#0f1419;color:#d7e0e8;font-family:var(--mono);font-size:12.5px;line-height:1.66;
+    padding:14px 16px;border-radius:11px;overflow:auto;margin:10px 0}
+  pre .c{color:#7d8b99}
+  pre .k{color:#79c0ff}
+  pre .s{color:#a5d6a7}
+  pre .n{color:#ffab70}
+
+  /* ---------------- 业务数据流 ---------------- */
+  .flow{position:relative;margin:8px 0 4px;padding-left:6px}
+  .step{display:grid;grid-template-columns:38px minmax(0,1fr) 250px;gap:12px;
+    position:relative;padding-bottom:16px}
+  .step:last-child{padding-bottom:0}
+  .step .dot{width:30px;height:30px;border-radius:50%;background:var(--brand-soft);color:var(--brand);
+    font:700 12.5px/30px var(--mono);text-align:center;position:relative;z-index:2}
+  .step.off .dot{background:#eef1f5;color:var(--ink-3);border:1px dashed #cfd6de}
+  .step:not(:last-child)::before{content:'';position:absolute;left:14px;top:30px;bottom:0;
+    width:2px;background:linear-gradient(#dbe4ef,#eef2f7)}
+  .step .body{padding-top:3px}
+  .step .t{font-size:14px;font-weight:600;margin:0 0 2px}
+  .step .d{font-size:12.8px;color:var(--ink-2);margin:0}
+  .step .files{display:flex;flex-direction:column;gap:4px;padding-top:3px}
+  .step .files code{font-size:11.5px;background:#f3f5f7;color:var(--ink-2);
+    display:inline-block;padding:2px 6px;border-radius:5px;line-height:1.45}
+  .step .files code.new{background:var(--ok-soft);color:var(--ok)}
+  .step .files code.miss{background:var(--danger-soft);color:var(--danger)}
+
+  .branch{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0 6px}
+  .br{border:1px solid var(--line);border-radius:11px;padding:11px 12px;background:#fcfcfd}
+  .br .h{font:700 11.5px/1.4 var(--mono);letter-spacing:.03em;margin-bottom:4px}
+  .br .x{font-size:12px;color:var(--ink-2);line-height:1.55}
+  .br.pass{border-color:#bfe5cf;background:#f4fbf7}.br.pass .h{color:var(--ok)}
+  .br.fail{border-color:#f3cfc9;background:#fff8f7}.br.fail .h{color:var(--danger)}
+  .br.unk{border-color:#f0d9a8;background:#fffcf3}.br.unk .h{color:var(--warn)}
+  .br.rev{border-color:#cfe0ff;background:#f6faff}.br.rev .h{color:var(--brand)}
+
+  .role{border:1px solid var(--line);border-radius:12px;margin-bottom:12px;overflow:hidden}
+  .role .rh{display:flex;align-items:center;gap:9px;padding:10px 14px;background:#fafbfc;
+    border-bottom:1px solid var(--line);font-size:13.5px;font-weight:600}
+  .role .rh .who{font-size:12px;font-weight:500;color:var(--ink-3);margin-left:auto}
+  .role .rb{padding:2px 0}
+  .role table{font-size:13px}
+  .role td{padding:8px 14px}
+
+  ul.clean{margin:8px 0 0;padding-left:19px;color:var(--ink-2);font-size:13.5px}
+  ul.clean li{margin:5px 0}
+  ul.clean li b{color:var(--ink)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  footer{color:var(--ink-3);font-size:12.5px;text-align:center;margin-top:24px;line-height:1.9}
+  @media (max-width:1000px){
+    .layout{grid-template-columns:1fr} aside{display:none}
+    .kpis{grid-template-columns:1fr 1fr}
+    .two{grid-template-columns:1fr}
+    .step{grid-template-columns:34px minmax(0,1fr)} .step .files{grid-column:2;flex-direction:row;flex-wrap:wrap}
+    .branch{grid-template-columns:1fr 1fr}
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+<aside>
+  <p class="toc-title">目录</p>
+  <a href="#ports">1 · 端口与服务现状</a>
+  <a href="#who">2 · 找谁确认（按角色）</a>
+  <a href="#data">3 · 需要接入的数据</a>
+  <a href="#dify">4 · Dify 工作流配合</a>
+  <a href="#llm">5 · LLM 现状（新发现）</a>
+  <a href="#flow">6 · 业务数据流</a>
+  <a href="#files">7 · 文件清单与职责</a>
+  <a href="#gap">8 · 闭环缺口与优先级</a>
+</aside>
+<main>
+
+<header class="hero">
+  <div class="eyebrow">INTEGRATION CHECKLIST · 2026-11-04</div>
+  <h1>对接清单 · 文件职责 · 业务数据流</h1>
+  <p class="sub">所有端口均为本机实测（14:06），所有行数取自当前工作区 <code>wc -l</code>，业务规则取自真实代码而非文档。
+    适合直接按「找谁确认」那节分派任务。</p>
+  <div class="badges">
+    <span class="badge ok">MySQL 3306 已通</span>
+    <span class="badge ok">真实服务 8010 / 沙箱 8011 运行中</span>
+    <span class="badge ok">Ollama 11434 在跑</span>
+    <span class="badge bad">Dify 未部署</span>
+    <span class="badge bad">Milvus 未部署</span>
+    <span class="badge warn">183 测试通过</span>
+  </div>
+</header>
+
+<div class="kpis">
+  <div class="kpi"><div class="num">41</div><div class="lbl">API 接口总数</div>
+    <div class="hint">其中 8 个仍是 501 占位（他人模块）</div></div>
+  <div class="kpi"><div class="num">20</div><div class="lbl">改动的 Python 文件</div>
+    <div class="hint">13 改 + 7 新增，共 6.4k 行</div></div>
+  <div class="kpi"><div class="num">5<small>/9</small></div><div class="lbl">端口就绪</div>
+    <div class="hint">3306 / 8010 / 8011 / 11434 / 443</div></div>
+  <div class="kpi"><div class="num">4</div><div class="lbl">P0 闭环缺口</div>
+    <div class="hint">岗位建档、人才写入、人工决策、JD 留档</div></div>
+</div>
+
+<!-- ============================================ 1 端口 -->
+<section id="ports">
+  <h2><span class="idx">01</span>端口与服务现状（本机实测）</h2>
+  <p class="lead">「缺端口」这件事要分两类看：<b>网络端口</b>（能不能连）和<b>业务接口</b>（连上了有没有得用）。
+    下面每个状态都是刚才用 socket / HTTP 真实探测的结果，不是照配置抄的。</p>
+
+  <h3>网络端口</h3>
+  <table>
+    <thead><tr><th>端口</th><th>服务</th><th>配置位置</th><th>实测</th><th>是否阻塞</th></tr></thead>
+    <tbody>
+      <tr><td class="nowrap"><code>3306</code></td><td>MySQL 主库</td><td><code>.env</code> DB_HOST/DB_PORT</td>
+        <td><span class="pill ok">OPEN</span></td><td>不阻塞，匹配主链路就靠它</td></tr>
+      <tr><td class="nowrap"><code>8010</code></td><td>真实服务（本项目）</td><td>启动命令指定</td>
+        <td><span class="pill ok">OPEN</span></td><td>不阻塞，运行中</td></tr>
+      <tr><td class="nowrap"><code>8011</code></td><td>沙箱 Mock</td><td><code>sandbox/mock_api.py</code></td>
+        <td><span class="pill ok">OPEN</span></td><td>不阻塞，本地假数据</td></tr>
+      <tr><td class="nowrap"><code>11434</code></td><td>Ollama 本地模型</td><td><code>LLM_PROVIDER=ollama</code> 时生效</td>
+        <td><span class="pill ok">OPEN</span></td><td>不阻塞；<b>模型选型有问题，见第 5 节</b></td></tr>
+      <tr><td class="nowrap"><code>443</code></td><td>通义千问 API（出网）</td><td><code>LLM_BASE_URL</code></td>
+        <td><span class="pill ok">OPEN</span></td><td>出网通，但<b>没有 API Key</b></td></tr>
+      <tr><td class="nowrap"><code>80</code></td><td>Dify</td><td><code>DIFY_BASE_URL=http://127.0.0.1/v1</code></td>
+        <td><span class="pill bad">CLOSED</span></td><td><b>阻塞「自然语言解释」</b>，降级为规则</td></tr>
+      <tr><td class="nowrap"><code>19530</code></td><td>Milvus 向量库</td><td><code>MILVUS_ENABLED=false</code></td>
+        <td><span class="pill bad">CLOSED</span></td><td>不阻塞：召回走 SQL，<code>recall_mode=sql_fallback</code></td></tr>
+      <tr><td class="nowrap"><code>5432</code></td><td>PgSQL 分析库</td><td><code>PGSQL_ENABLED=false</code></td>
+        <td><span class="pill mute">CLOSED</span></td><td>不阻塞，分析功能自动降级</td></tr>
+      <tr><td class="nowrap"><code>6379</code></td><td>Redis 缓存</td><td><code>REDIS_ENABLED=false</code></td>
+        <td><span class="pill mute">CLOSED</span></td><td>不阻塞，用进程内缓存</td></tr>
+    </tbody>
+  </table>
+  <div class="soft info"><b>一句话结论：</b>匹配主链路只依赖 3306，<b>现在就能跑</b>。
+    Dify 与 Milvus 不通只影响「解释文字的自然度」和「语义召回」，不影响四态判定、打分、排序、落库的正确性——
+    响应里 <code>channel=rule_fallback</code>、<code>recall_mode=sql_fallback</code> 就是如实标注。</div>
+
+  <h3>业务接口缺口（比端口更卡人）</h3>
+  <p class="lead" style="margin-bottom:8px">端口通了但接口是 501，等于「门开了屋里没家具」。当前 41 个接口里有 8 个占位：</p>
+  <table>
+    <thead><tr><th>缺失接口</th><th>现状</th><th>卡住什么</th><th>该找谁</th></tr></thead>
+    <tbody>
+      <tr><td class="nowrap"><code>POST/PUT /positions</code></td><td><span class="pill bad">不存在</span></td>
+        <td>新岗位进不来，只能手写 SQL</td><td>岗位模块负责人</td></tr>
+      <tr><td class="nowrap"><code>/api/v1/talents</code></td><td><span class="pill bad">501 占位</span></td>
+        <td>HR 无法维护候选人，只能脚本造数</td><td>人才模块负责人</td></tr>
+      <tr><td class="nowrap"><code>PATCH /matchings/records/{id}/review</code></td><td><span class="pill bad">不存在</span></td>
+        <td>匹配完没有「通过/待定/淘汰」的业务结论</td><td>产品 + DBA（要加 2 列）</td></tr>
+      <tr><td class="nowrap">结果导出 CSV</td><td><span class="pill bad">不存在</span></td>
+        <td>HR 没法拿给用人部门</td><td>你自己可做（不越界）</td></tr>
+      <tr><td class="nowrap"><code>/resumes</code> <code>/assessments</code> <code>/agents</code> <code>/analytics</code>
+        <code>/files</code> <code>/knowledge</code> <code>/trainings</code></td>
+        <td><span class="pill mute">501 占位</span></td><td>不在匹配闭环内，属平台其他模块</td><td>各自负责人</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================ 2 找谁 -->
+<section id="who">
+  <h2><span class="idx">02</span>找谁确认 · 按角色分派清单</h2>
+  <p class="lead">每一行只问对方一件事：<b>「这个接口的字段和枚举值，能不能按这个结构给我」</b>。
+    比开会描述需求有效得多。</p>
+
+  <div class="role">
+    <div class="rh">🟥 DBA<span class="who">必须在上线前完成</span></div>
+    <div class="rb"><table>
+      <tr><td class="nowrap"><b>执行 DDL</b></td>
+        <td><code>docs/sql/2026-11-04_matching_records_trace.sql</code>：给 <code>matching_records</code>
+          新增 5 个<b>可空</b>列（requirement_version / recall_mode / hard_results / explanation / stats），
+          含回滚段。不改唯一键、旧行为 NULL，可安全重跑。</td>
+        <td><span class="pill bad">P0</span></td></tr>
+      <tr><td class="nowrap"><b>新增 review 两列</b></td>
+        <td>做「人工决策」时需要 <code>review_status</code> + <code>review_note</code>，同样是可空列。</td>
+        <td><span class="pill warn">P1</span></td></tr>
+    </table></div>
+  </div>
+
+  <div class="role">
+    <div class="rh">🟦 岗位模块负责人<span class="who">卡住「新岗位进场」</span></div>
+    <div class="rb"><table>
+      <tr><td class="nowrap"><b>岗位 CRUD 契约</b></td>
+        <td><code>POST/GET/PUT /positions</code>、<code>PATCH /positions/{id}/status</code>。
+          我需要：字段清单、<code>status</code> 枚举（open/closed/paused？）、谁能改。</td>
+        <td><span class="pill bad">P0</span></td></tr>
+      <tr><td class="nowrap"><b>JD 原文落库</b></td>
+        <td>现在 <code>positions.description</code> 长度是 <b>0</b>，画像没有原文依据。
+          建议在确认画像时把 <code>jd_text</code> 一起存，否则半年后没人能回答「这版画像依据哪份 JD」。</td>
+        <td><span class="pill warn">P1</span></td></tr>
+      <tr><td class="nowrap"><b>谁是权威</b></td>
+        <td><code>positions.requirements</code> 与 <code>position_requirements.dimensions</code>
+          存的内容有重叠。我目前以「已确认的 position_requirements 最新版本」为唯一权威，
+          需要岗位模块确认这个口径。</td>
+        <td><span class="pill warn">P2</span></td></tr>
+    </table></div>
+  </div>
+
+  <div class="role">
+    <div class="rh">🟪 人才模块负责人<span class="who">卡住「新候选人进场」</span></div>
+    <div class="rb"><table>
+      <tr><td class="nowrap"><b>人才写接口</b></td>
+        <td><code>POST/PUT /talents</code> + 批量导入。我需要：学历枚举、<code>work_years</code> 是否允许空
+          （现在 NOT NULL default 0，导致「未填」和「应届生」分不清）、<code>skill_tags</code> 书写规范。</td>
+        <td><span class="pill bad">P0</span></td></tr>
+      <tr><td class="nowrap"><b>status 枚举</b></td>
+        <td>我按 <code>active</code> / <code>reserve</code> 参与匹配，其余（如 <code>left</code>）排除。
+          请确认枚举全集，避免「离职人员被推荐」。</td>
+        <td><span class="pill info">已实现，待确认</span></td></tr>
+      <tr><td class="nowrap"><b>技能标准化词表</b></td>
+        <td><b>这项最影响命中率。</b>若人才侧写 <code>JS</code>/<code>Vue.js</code>，JD 侧解析出
+          <code>JavaScript</code>/<code>Vue</code>，就会「双方都对但匹配不上」。需要统一的别名表与大小写规范。</td>
+        <td><span class="pill bad">P0（业务）</span></td></tr>
+    </table></div>
+  </div>
+
+  <div class="role">
+    <div class="rh">🟨 Dify 管理员<span class="who">决定解释质量</span></div>
+    <div class="rb"><table>
+      <tr><td class="nowrap"><b>两个工作流</b></td>
+        <td><code>job_profile_extraction</code>（入参 <code>jd_text</code>）、
+          <code>match_explanation</code>（入参 <code>evidence_pack</code>）。详见第 4 节。</td>
+        <td><span class="pill warn">P1</span></td></tr>
+      <tr><td class="nowrap"><b>5 样东西</b></td>
+        <td>Base URL、API Key、工作流 ID/名称、入参变量名是否一致、一次真实 curl + 返回样例。
+          <b>少一样都联调不了。</b></td>
+        <td><span class="pill warn">P1</span></td></tr>
+    </table></div>
+  </div>
+
+  <div class="role">
+    <div class="rh">🟩 运维<span class="who">可选增强</span></div>
+    <div class="rb"><table>
+      <tr><td class="nowrap"><b>Milvus 部署</b></td>
+        <td>部署后把 <code>MILVUS_ENABLED</code> 打开，召回从 <code>sql_fallback</code> 升级为向量召回。
+          <b>不部署也能用</b>，只是召回靠技能标签精确匹配，覆盖面窄。</td>
+        <td><span class="pill mute">P2</span></td></tr>
+      <tr><td class="nowrap"><b>出网白名单</b></td>
+        <td>若改用云端 LLM，需放行 <code>dashscope.aliyuncs.com:443</code>（实测已通，仅确认长期有效）。</td>
+        <td><span class="pill mute">P3</span></td></tr>
+    </table></div>
+  </div>
+
+  <div class="role">
+    <div class="rh">🟧 HR / 产品<span class="who">定业务口径，不定技术</span></div>
+    <div class="rb"><table>
+      <tr><td class="nowrap"><b>必备技能判定口径</b></td>
+        <td><code>required_skill_mode</code>：JD 写 3 项必备、候选人只会 2 项 —— 直接淘汰，还是保留待人工？</td>
+        <td><span class="pill warn">需签字</span></td></tr>
+      <tr><td class="nowrap"><b>UNKNOWN 降权系数</b></td>
+        <td>档案缺失项按 <code>unknown_penalty=0.15</code> 处理，即缺失维度按 85% 计。是否需要调？</td>
+        <td><span class="pill warn">需签字</span></td></tr>
+      <tr><td class="nowrap"><b>年限 0 的含义</b></td>
+        <td><code>zero_work_years_as_review=true</code>：年限为 0 视为「待复核」而非「不满足」。
+          这是为避免把「档案没填」误判成「年限不够」而设的。</td>
+        <td><span class="pill warn">需签字</span></td></tr>
+      <tr><td class="nowrap"><b>技能标签是否算硬条件</b></td>
+        <td><code>skill_tags_as_hard</code>：企业技能标签能否作为硬门槛，还是只做加分。</td>
+        <td><span class="pill warn">需签字</span></td></tr>
+    </table></div>
+  </div>
+  <div class="soft warn"><b>好消息：</b>上面 4 个口径全部做成了<b>配置项</b>，定不下来也能跑（用默认值）。
+    上线前签字即可，不需要改代码 —— 这是我特意留的伸缩点。</div>
+</section>
+
+<!-- ============================================ 3 数据 -->
+<section id="data">
+  <h2><span class="idx">03</span>需要接入什么数据</h2>
+  <p class="lead">「数据」比「接口」更底层：接口是管子，数据是水。当前库里能跑，但水的来源不可复现。</p>
+  <table>
+    <thead><tr><th>数据</th><th>从哪来</th><th>当前真实状态</th><th>缺了会怎样</th><th>找谁</th></tr></thead>
+    <tbody>
+      <tr><td><b>JD 原文</b></td><td>岗位模块 / HR 录入</td>
+        <td><span class="pill bad">未留存</span> positions.description 长度全为 0</td>
+        <td>画像无法回溯依据，审计时说不清</td><td>岗位模块</td></tr>
+      <tr><td><b>人才档案</b></td><td>人才模块 / 简历解析</td>
+        <td><span class="pill warn">仅 5 条</span> 由历史脚本一次性写入</td>
+        <td>换台机器起服务就是空库，且无法通过 API 补</td><td>人才模块</td></tr>
+      <tr><td><b>技能标准化词表</b></td><td>业务方定义</td>
+        <td><span class="pill bad">不存在</span></td>
+        <td>同一技能不同写法 → 静默匹配失败（最难排查的一类）</td><td>HR / 产品</td></tr>
+      <tr><td><b>岗位画像版本</b></td><td>本模块产出</td>
+        <td><span class="pill ok">已就绪</span> 1 个岗位 11 个版本</td>
+        <td>—</td><td>—</td></tr>
+      <tr><td><b>组织架构 + 用户角色</b></td><td>平台已有</td>
+        <td><span class="pill ok">已就绪</span> admin / hr 可正常跑通</td>
+        <td>—</td><td>不动</td></tr>
+      <tr><td><b>Dify 工作流配置</b></td><td>Dify 后台</td>
+        <td><span class="pill bad">全空</span> DIFY_API_KEY 未配置</td>
+        <td>解释退化为规则模板（正确但生硬）</td><td>Dify 管理员</td></tr>
+      <tr><td><b>LLM 模型</b></td><td>本地 Ollama 或云端</td>
+        <td><span class="pill warn">部分可用</span> 见第 5 节</td>
+        <td>同上</td><td>你自己</td></tr>
+    </tbody>
+  </table>
+  <div class="soft danger"><b>最该先解决的一条：技能词表。</b>
+    它不需要写任何代码，但决定匹配率。举个真实例子：我修过一个 bug——
+    <code>java</code> 会命中 <code>javascript</code>（因为用了子串匹配），已改成英文词元精确相等。
+    但如果数据侧把技能写成 <code>JS</code>，而 JD 解析出 <code>JavaScript</code>，系统不会报错，只会「安静地匹配不上」。</div>
+</section>
+
+<!-- ============================================ 4 Dify -->
+<section id="dify">
+  <h2><span class="idx">04</span>Dify 工作流怎么配合</h2>
+  <p class="lead">代码里的调用规格已经固定（<code>app/adapters/dify/dify_adapter.py</code>），
+    Dify 侧只要按这个契约交付，我这边不用改代码。</p>
+
+  <h3>两个工作流的分工</h3>
+  <table>
+    <thead><tr><th>工作流 key</th><th>干什么</th><th>入参变量名</th><th>出参必须能被谁解析</th></tr></thead>
+    <tbody>
+      <tr><td><code>job_profile_extraction</code></td>
+        <td>自然语言 JD → 结构化岗位信息（学历/年限/必备技能/优先技能/地点/薪资）</td>
+        <td><code>jd_text</code>（string）</td>
+        <td><code>JobProfileParsed</code>（Pydantic）</td></tr>
+      <tr><td><code>match_explanation</code></td>
+        <td>结构化证据包 → 自然语言解释（summary / highlights / gaps / 面试建议）</td>
+        <td><code>evidence_pack</code>（string，JSON 文本）</td>
+        <td><code>MatchExplanation</code>（Pydantic）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>实际发出的请求长这样</h3>
+<pre><span class="c">// POST {DIFY_BASE_URL}/workflows/run</span>
+{
+  <span class="k">"inputs"</span>: { <span class="k">"jd_text"</span>: <span class="s">"岗位职责：… 任职要求：本科及以上，3 年经验，熟悉 Python…"</span> },
+  <span class="k">"response_mode"</span>: <span class="s">"blocking"</span>,   <span class="c">// 同步等待，超时可重试</span>
+  <span class="k">"user"</span>: <span class="s">"ai-talent-platform"</span>
+}
+<span class="c">// 期望返回：outputs 里是一个能被 JobProfileParsed 直接校验通过的 JSON</span></pre>
+
+  <h3>向 Dify 管理员索取 5 样（缺一不可）</h3>
+  <ul class="clean">
+    <li><b>① DIFY_BASE_URL</b> —— 完整到 <code>/v1</code>，例如 <code>https://dify.example.com/v1</code></li>
+    <li><b>② DIFY_API_KEY</b> —— 两个工作流是否共用同一个 Key（也支持按工作流分别配置）</li>
+    <li><b>③ 工作流标识</b> —— 是走「工作流 API」还是「应用 API」，对应的 ID 或名称</li>
+    <li><b>④ 入参变量名</b> —— 必须就是 <code>jd_text</code> / <code>evidence_pack</code>；
+      若对方用了别的名字，我改一行映射即可，但<b>要提前知道</b></li>
+    <li><b>⑤ 一次真实 curl 的返回体样例</b> —— 这个最重要：我要拿它验证 <code>_normalize</code> 能否吃掉</li>
+  </ul>
+
+  <h3>联调节奏（建议按这个顺序，别跳步）</h3>
+  <table>
+    <thead><tr><th>步骤</th><th>动作</th><th>验收标准</th></tr></thead>
+    <tbody>
+      <tr><td class="nowrap">1</td><td>对方发布工作流，给你 curl</td><td>能返回 200</td></tr>
+      <tr><td class="nowrap">2</td><td>你把返回体贴给我</td><td>我用 <code>JobProfileParsed</code> / <code>MatchExplanation</code> 离线校验通过</td></tr>
+      <tr><td class="nowrap">3</td><td>填 <code>.env</code> 的 <code>DIFY_API_KEY</code> 并重启 8010</td><td>响应里 <code>channel</code> 从 <code>rule_fallback</code> 变 <code>dify</code></td></tr>
+      <tr><td class="nowrap">4</td><td>跑一次完整匹配 + 解释</td><td>解释里每条结论都有 <code>evidence_ids</code>，且没有编造的 ID</td></tr>
+    </tbody>
+  </table>
+
+  <h3>三条不能让的红线（已在代码里固定）</h3>
+  <ul class="clean">
+    <li><b>Dify 只做「表达」不做「判定」</b>：硬条件、分数、排序全部由 Python 规则计算，
+      Dify 拿不到也不会拿到打分权。</li>
+    <li><b>Dify 不能绕过 Service 直接访问数据库</b>：它只接收证据包、返回文字。</li>
+    <li><b>失败必须降级且如实标注</b>：Dify 超时/结构不合法 → 自动回落规则解释，
+      <code>source</code> 标 <code>rule_fallback</code>，绝不伪装成 Dify 输出。</li>
+  </ul>
+  <div class="soft info"><b>失败时会看到什么：</b>不会 500，也不会空响应。你会看到
+    <code>channel=rule_fallback</code>，以及 <code>errors</code> 里一条人话原因（如「Dify 返回结构不合法」）。
+    这条降级链已有 6 个用例覆盖（超时、5xx、4xx、非 JSON、缺字段、编造证据）。</div>
+</section>
+
+<!-- ============================================ 5 LLM -->
+<section id="llm">
+  <h2><span class="idx">05</span>LLM 现状：不是缺端口，是模型选型</h2>
+  <p class="lead">这一节是我在整理文档时实测发现的，和之前的结论不同，所以单独列出来。</p>
+
+  <div class="soft warn"><b>实测事实：</b>本机 <code>11434</code> 端口是通的，Ollama <b>v0.40.13</b> 在跑，
+    已装两个模型：<code>qwen3:0.6b</code>（对话，751M）和 <code>bge-m3</code>（向量，1.1G）。
+    项目本身也有 <code>app/adapters/llm/ollama_adapter.py</code>，且
+    <code>explanation_service._llm_configured()</code> 明确写了「Ollama 本地模型不需要 Key」。</div>
+
+  <h3>但直接切过去会失败，原因很具体</h3>
+  <table>
+    <thead><tr><th>测试</th><th>参数</th><th>结果</th></tr></thead>
+    <tbody>
+      <tr><td>默认调用</td><td><code>num_predict=400</code></td>
+        <td><span class="pill bad">content 为空</span> 400 token 全被思考过程吃掉</td></tr>
+      <tr><td>关闭思考</td><td><code>think=false</code></td>
+        <td><span class="pill ok">正常输出</span> 但只有 200 token 就结束，内容偏短</td></tr>
+      <tr><td>看适配器代码</td><td><code>ollama_adapter.chat</code></td>
+        <td><span class="pill bad">不传 think</span> payload 只有 model/messages/stream/options，
+          <code>think</code> 是顶层字段，透过 <code>**kwargs</code> 塞不进 <code>options</code></td></tr>
+    </tbody>
+  </table>
+  <div class="soft">结论：<b>不是网络问题，是 qwen3 系列的 thinking 机制 + 适配器没暴露该参数</b>。
+    0.6B 的模型对着「证据包 JSON」这种长输入，可靠性和字段遵循度也不够，做演示可以，做生产不行。</div>
+
+  <h3>两个可选方案（都不影响现在的规则兜底）</h3>
+  <table>
+    <thead><tr><th>方案</th><th>动作</th><th>成本</th><th>效果</th></tr></thead>
+    <tbody>
+      <tr><td><b>A. 换非 thinking 模型（推荐）</b></td>
+        <td><code>ollama pull qwen2.5:1.5b</code>（约 1GB）或 <code>qwen2.5:7b</code>，
+          再把 <code>.env</code> 改成 <code>LLM_PROVIDER=ollama</code>、<code>LLM_MODEL=qwen2.5:1.5b</code>、
+          <code>LLM_BASE_URL=http://127.0.0.1:11434</code></td>
+        <td>零代码改动，只改配置 + 下载模型</td>
+        <td>能出中文解释；7b 质量明显更好，但需要更多显存</td></tr>
+      <tr><td><b>B. 给适配器加 think 开关</b></td>
+        <td>在 <code>ollama_adapter.chat</code> 的 payload 里加 <code>"think": False</code>（1 行 + 1 个用例）</td>
+        <td>要改代码，需你批准</td>
+        <td>qwen3 也能用，但 0.6B 仍偏弱</td></tr>
+    </tbody>
+  </table>
+  <div class="soft danger"><b>我没有动配置。</b>按我们之前的约定，改 <code>.env</code> 或代码前要先经过你确认。
+    要试的话告我选 A 还是 B，我改完会用真实请求验证 <code>channel</code> 是否真的变成 <code>llm_fallback</code>。</div>
+</section>
+
+<!-- ============================================ 6 数据流 -->
+<section id="flow">
+  <h2><span class="idx">06</span>业务数据流（每一步对应哪个文件）</h2>
+  <p class="lead">从「HR 拿到一份 JD」到「页面上看到排序结果和解释」，一共 9 个阶段。
+    绿色标签是本次新增的文件，红色是当前缺失的环节。</p>
+
+  <div class="flow">
+    <div class="step off">
+      <div class="dot">1</div>
+      <div class="body"><p class="t">岗位建档 <span class="pill bad">缺接口</span></p>
+        <p class="d">HR 新建岗位（名称、部门、HC、状态）。目前只能靠 SQL 或历史脚本，新岗位进不来。</p></div>
+      <div class="files"><code class="miss">POST /positions（不存在）</code><code>position_repository.py</code></div>
+    </div>
+
+    <div class="step">
+      <div class="dot">2</div>
+      <div class="body"><p class="t">JD 录入并解析（只出草稿，不落库）</p>
+        <p class="d">把 JD 原文交给解析器：抽学历、年限、必备/优先技能、地点、薪资，剔除噪声（如「25k-35k」不会被当成技能）。</p></div>
+      <div class="files"><code>routers/position_router.py</code><code class="new">services/jd_parser.py</code></div>
+    </div>
+
+    <div class="step">
+      <div class="dot">3</div>
+      <div class="body"><p class="t">HR 确认画像（版本 +1）</p>
+        <p class="d">确认才生效，避免「解析即上线」。版本号递增，确认人/时间/备注写入 <code>_meta</code>，同时同步岗位当前要求。
+          <b>未确认的岗位禁止跑匹配。</b></p></div>
+      <div class="files"><code class="new">services/position_profile_service.py</code><code>position_requirements</code></div>
+    </div>
+
+    <div class="step">
+      <div class="dot">4</div>
+      <div class="body"><p class="t">候选人召回</p>
+        <p class="d">按岗位和候选池取人，只保留 <code>active</code>/<code>reserve</code>（离职的不参与）。
+          Milvus 未部署时走 SQL 召回，响应里标 <code>recall_mode=sql_fallback</code>。</p></div>
+      <div class="files"><code class="new">services/matching_pipeline.py</code><code>repositories/talent_repository.py</code></div>
+    </div>
+
+    <div class="step">
+      <div class="dot">5</div>
+      <div class="body"><p class="t">硬条件四态判定</p>
+        <p class="d">学历 / 年限 / 必备技能三项，每项出 PASS、FAIL、UNKNOWN、NEEDS_REVIEW 之一。
+          <b>只有 FAIL 能淘汰</b>；档案缺失是 UNKNOWN，不是 FAIL。</p></div>
+      <div class="files"><code class="new">services/matching_rules.py</code><code>patterns/strategy.py</code></div>
+    </div>
+
+    <div class="step">
+      <div class="dot">6</div>
+      <div class="body"><p class="t">软性打分与排序</p>
+        <p class="d">技能 / 经验 / 学历 / 素质四维加权（权重可配、自动归一化），缺失维度按 85% 计，
+          得出 0~100 的相对适配度并按分数排序、截断 top_k。</p></div>
+      <div class="files"><code class="new">services/matching_rules.py</code><code>patterns/strategy.py</code></div>
+    </div>
+
+    <div class="step">
+      <div class="dot">7</div>
+      <div class="body"><p class="t">证据构建（把字段变成可追溯的 EVID）</p>
+        <p class="d">每条判定生成 <code>EVID-{岗位}-{人才}-{序号}</code>，标注 fact / derived / missing 三种类型，
+          指向具体字段与原值。<b>missing 类型禁止携带能力术语</b>。</p></div>
+      <div class="files"><code class="new">services/evidence_builder.py</code></div>
+    </div>
+
+    <div class="step">
+      <div class="dot">8</div>
+      <div class="body"><p class="t">证据校验（防编造、防误用）</p>
+        <p class="d">五层校验：ID 是否存在、术语是否越界、有没有拿「缺失」证明「具备」、
+          结论是否引用有效证据、断言是否超出证据范围。不合格的结论剔除并记原因。</p></div>
+      <div class="files"><code class="new">services/evidence_verifier.py</code></div>
+    </div>
+
+    <div class="step">
+      <div class="dot">9</div>
+      <div class="body"><p class="t">生成解释（Dify → LLM → 规则，三通道降级）</p>
+        <p class="d">把证据包写成自然语言。外部通道不可用时回落规则模板，<code>source</code> 如实标注。
+          输出含 highlights、gaps、pending_verification、rejected_claims。</p></div>
+      <div class="files"><code class="new">services/explanation_service.py</code><code>adapters/dify/dify_adapter.py</code></div>
+    </div>
+
+    <div class="step">
+      <div class="dot">10</div>
+      <div class="body"><p class="t">落库 + 回读</p>
+        <p class="d">整批写入 <code>matching_records</code>，连同画像版本、召回方式、四态明细、解释、统计一起留痕。
+          页面刷新后从库里还原，结果与执行时逐字一致。</p></div>
+      <div class="files"><code>services/matching_service.py</code><code>repositories/matching_repository.py</code></div>
+    </div>
+  </div>
+
+  <h3>阶段 5 的分叉：四态怎么走</h3>
+  <div class="branch">
+    <div class="br pass"><div class="h">PASS</div><div class="x">条件满足<br>正常进入打分排序</div></div>
+    <div class="br fail"><div class="h">FAIL</div><div class="x"><b>唯一可淘汰态</b><br>进 excluded，必带原因</div></div>
+    <div class="br unk"><div class="h">UNKNOWN</div><div class="x">档案缺失<br>保留 + 该维度按 85% 计</div></div>
+    <div class="br rev"><div class="h">NEEDS_REVIEW</div><div class="x">年限为 0 等存疑<br>保留，转人工复核</div></div>
+  </div>
+  <div class="soft warn"><b>这条是业务红线，也是我最容易被质疑的设计：</b>
+    「不确定」不等于「不合格」。所以 UNKNOWN 和 NEEDS_REVIEW 一律保留，宁可让人多看一眼，
+    也不能因为档案没填就把人筛掉 —— 之前正是这个 bug 把一位档案空白但条件不错的候选人误杀了。</div>
+
+  <h3>三个关键设计（值得单独记住）</h3>
+  <ul class="clean">
+    <li><b>两处刻意不落库：</b>JD 解析只是草稿（<code>POST /jd/parse</code> 不写库），解释只是即时计算
+      （<code>POST /explain</code> 不写库）。只有「确认画像」和「跑批结果」写库。</li>
+    <li><b>跑批钉住画像版本：</b><code>requirement_version</code> 随结果一起存，半年后能回答「当时按哪版要求筛的」。</li>
+    <li><b>所有判断都能回到字段：</b>每条结论挂 <code>evidence_ids</code>，能反查到人才的原始字段值；
+      编造或越界的结论会被校验器剔除并记录原因。</li>
+  </ul>
+</section>
+
+<!-- ============================================ 7 文件 -->
+<section id="files">
+  <h2><span class="idx">07</span>你调整的文件清单与职责</h2>
+  <p class="lead">共 <b>20 个 Python 文件</b>（13 个修改 + 7 个新增），另加 2 个脚本、9 个测试文件、1 份 SQL。
+    行数为当前真实值。</p>
+
+  <h3>契约层（前后端对齐的唯一依据）</h3>
+  <table>
+    <thead><tr><th>文件</th><th>行数</th><th>类型</th><th>职责</th></tr></thead>
+    <tbody>
+      <tr><td><code>app/schemas/matching.py</code></td><td>333</td><td><span class="pill warn">改</span></td>
+        <td>四态、证据、解释、跑批请求/响应、历史条目；<code>extra="forbid"</code> 保证字段不漂移</td></tr>
+      <tr><td><code>app/schemas/position.py</code></td><td>174</td><td><span class="pill warn">改</span></td>
+        <td>JD 解析请求、画像确认请求、画像视图、解析响应</td></tr>
+      <tr><td><code>app/models/matching.py</code></td><td>109</td><td><span class="pill warn">改</span></td>
+        <td>ORM 模型；新增 5 个<b>可空</b>列（版本/召回方式/四态/解释/统计），不改唯一键</td></tr>
+    </tbody>
+  </table>
+
+  <h3>数据访问层（只读写，不写业务规则）</h3>
+  <table>
+    <thead><tr><th>文件</th><th>行数</th><th>类型</th><th>职责</th></tr></thead>
+    <tbody>
+      <tr><td><code>repositories/talent_repository.py</code></td><td>136</td><td><span class="pill warn">改</span></td>
+        <td>按 ID 批量取人、候选池召回、状态过滤（active/reserve）</td></tr>
+      <tr><td><code>repositories/position_repository.py</code></td><td>123</td><td><span class="pill warn">改</span></td>
+        <td>取最新/指定版本画像、用 <code>func.max</code> 算下一个版本号（避免并发重号）</td></tr>
+      <tr><td><code>repositories/matching_repository.py</code></td><td>126</td><td><span class="pill warn">改</span></td>
+        <td>批次写入、按批次读、最新批次、人才历史</td></tr>
+    </tbody>
+  </table>
+
+  <h3>领域服务层（业务规则都在这，也是最值得读的部分）</h3>
+  <table>
+    <thead><tr><th>文件</th><th>行数</th><th>类型</th><th>职责</th></tr></thead>
+    <tbody>
+      <tr><td><code>services/jd_parser.py</code></td><td>603</td><td><span class="pill ok">新增</span></td>
+        <td>JD 规则解析：学历/年限/技能必备优先拆分、剔除薪资噪声、能力短语不误升为硬条件</td></tr>
+      <tr><td><code>services/position_profile_service.py</code></td><td>223</td><td><span class="pill ok">新增</span></td>
+        <td>解析草稿、确认落版本、同步岗位、未确认则拒绝匹配</td></tr>
+      <tr><td><code>services/matching_rules.py</code></td><td>593</td><td><span class="pill ok">新增</span></td>
+        <td>四态判定、完整度、综合分、UNKNOWN 降权；<b>纯函数，最好测也最该测</b></td></tr>
+      <tr><td><code>services/evidence_builder.py</code></td><td>726</td><td><span class="pill ok">新增</span></td>
+        <td>把档案字段变成带 ID 的证据，分 fact / derived / missing</td></tr>
+      <tr><td><code>services/evidence_verifier.py</code></td><td>715</td><td><span class="pill ok">新增</span></td>
+        <td>五层校验：ID 存在性、术语越界、缺失误用、引用有效性、断言范围</td></tr>
+      <tr><td><code>services/explanation_service.py</code></td><td>338</td><td><span class="pill ok">新增</span></td>
+        <td>三通道解释（Dify → LLM → 规则），统一结构、统一标注来源</td></tr>
+      <tr><td><code>services/matching_pipeline.py</code></td><td>451</td><td><span class="pill ok">新增</span></td>
+        <td>六节点编排：载入 → 召回 → 判定打分 → 证据 → 解释 → 组装</td></tr>
+      <tr><td><code>services/matching_service.py</code></td><td>531</td><td><span class="pill warn">改</span></td>
+        <td>对外门面：跑批、落库、最新结果、分页、历史、解释</td></tr>
+    </tbody>
+  </table>
+
+  <h3>编排、接口、适配</h3>
+  <table>
+    <thead><tr><th>文件</th><th>行数</th><th>类型</th><th>职责</th></tr></thead>
+    <tbody>
+      <tr><td><code>ai/workflows/matching_workflow.py</code></td><td>89</td><td><span class="pill warn">改</span></td>
+        <td>LangGraph StateGraph 装配；依赖缺失时降级为顺序执行</td></tr>
+      <tr><td><code>patterns/strategy.py</code></td><td>408</td><td><span class="pill warn">改</span></td>
+        <td>hard / soft / hybrid 三策略 + 工厂；soft 也产出四态但不淘汰</td></tr>
+      <tr><td><code>adapters/dify/dify_adapter.py</code></td><td>465</td><td><span class="pill warn">改</span></td>
+        <td>Dify 调用、超时重试、错误码细分、出参归一化</td></tr>
+      <tr><td><code>routers/matching_router.py</code></td><td>149</td><td><span class="pill warn">改</span></td>
+        <td>5 个匹配接口 + 过滤参数（position_id / talent_id / min_score）</td></tr>
+      <tr><td><code>routers/position_router.py</code></td><td>113</td><td><span class="pill warn">改</span></td>
+        <td>3 个画像接口：解析、确认、查询</td></tr>
+      <tr><td><code>routers/router.py</code></td><td>121</td><td><span class="pill warn">改</span></td>
+        <td>把 positions / matchings 从 501 占位切到真实路由</td></tr>
+    </tbody>
+  </table>
+
+  <h3>脚本与测试</h3>
+  <div class="two">
+    <table>
+      <thead><tr><th>脚本</th><th>行数</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td><code>scripts/e2e_matching_check.py</code></td><td>277</td><td>真实 HTTP 端到端验收，22 项断言</td></tr>
+        <tr><td><code>scripts/diagnose_api.py</code></td><td>309</td><td>接口巡检，覆盖 10 类负向场景</td></tr>
+      </tbody>
+    </table>
+    <table>
+      <thead><tr><th>测试</th><th>规模</th><th>覆盖</th></tr></thead>
+      <tbody>
+        <tr><td><code>tests/unit/</code></td><td>9 文件 / 146 例</td><td>四态、证据、校验、解析、策略、Schema</td></tr>
+        <tr><td><code>tests/integration/</code></td><td>3 文件 / 37 例</td><td>真实 MySQL：链路 + 接口 + 边界</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="soft info"><b>合计 183 例全部通过</b>（5.35s）。全仓 265 passed / 3 failed，
+    这 3 条是 <code>tests/test_common_layer.py</code> 的既有失败，已用 git worktree 在基线
+    <code>f29ac08</code> 复现同样失败，非本次引入。</div>
+</section>
+
+<!-- ============================================ 8 缺口 -->
+<section id="gap">
+  <h2><span class="idx">08</span>闭环缺口与建议顺序</h2>
+  <p class="lead">把「一次真实招聘」拆成 9 个环节后，匹配算法本身是完整的，缺的是「人怎么进来、结论怎么出去」。</p>
+  <table>
+    <thead><tr><th>优先级</th><th>缺口</th><th>影响</th><th>工作量</th><th>是否越界</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill bad">P0</span></td><td>岗位 CRUD</td>
+        <td>新岗位只能手写 SQL</td><td>Repository 已有通用 CRUD，补 Service + 路由 + 用例</td>
+        <td>岗位模块，需授权</td></tr>
+      <tr><td><span class="pill bad">P0</span></td><td>人才写入接口</td>
+        <td>新候选人进不来，演示只能靠脚本造数</td><td>同上</td>
+        <td>人才模块，<b>需授权</b></td></tr>
+      <tr><td><span class="pill bad">P0</span></td><td>人工决策回写</td>
+        <td>跑完匹配不是业务结论，只是一张分表</td>
+        <td>2 个可空列 + 1 个 PATCH 接口</td><td>不越界，但需 DDL</td></tr>
+      <tr><td><span class="pill warn">P1</span></td><td>JD 原文留档</td>
+        <td>画像无法回溯依据</td><td>确认时多存一个字段</td><td>需岗位模块配合</td></tr>
+      <tr><td><span class="pill warn">P1</span></td><td>批次对比视图</td>
+        <td>调参前后谁升谁降看不出来</td><td><code>stats.weights</code> 已留痕，只差一个对比接口</td><td>不越界</td></tr>
+      <tr><td><span class="pill warn">P1</span></td><td>结果导出 CSV</td>
+        <td>HR 没法拿给用人部门</td><td>一个接口 + 一次查询</td><td>不越界</td></tr>
+      <tr><td><span class="pill mute">P2</span></td><td>Milvus 向量召回</td>
+        <td>召回覆盖面窄（只靠标签）</td><td>运维部署 + 打开开关</td><td>不越界</td></tr>
+      <tr><td><span class="pill mute">P3</span></td><td>前端页面</td>
+        <td>目前只有接口，没有界面</td><td>需前端介入</td><td>他人负责</td></tr>
+    </tbody>
+  </table>
+  <div class="soft info"><b>最小闭环路线：</b>P0 的三项做完，
+    就能跑通「新建岗位 → 录入 JD → 确认画像 → 新候选人入库 → 跑匹配 → 给出人工结论」。
+    其中岗位 CRUD 和人才写入属于别人负责的模块，我按边界没有动 —— 需要你点头我才开始。</div>
+</section>
+
+<footer>
+  数据采集时间 2026-11-04 14:06 · 端口状态为 socket 实测 · 文件行数取自 <code>wc -l</code> ·
+  业务规则取自当前分支 <code>lz_agent</code> 的真实代码（未提交）<br>
+  本文件为静态说明，不含外部依赖，可直接发给同事或打印。
+</footer>
+
+</main>
+</div>
+<script>
+var links = document.querySelectorAll('aside a');
+var secs = document.querySelectorAll('section[id]');
+function sync() {
+  var y = window.scrollY + 130, cur = null;
+  secs.forEach(function (s) { if (s.offsetTop <= y) cur = s.id; });
+  links.forEach(function (a) { a.classList.toggle('active', a.getAttribute('href') === '#' + cur); });
+}
+window.addEventListener('scroll', sync); sync();
+</script>
+</body>
+</html>

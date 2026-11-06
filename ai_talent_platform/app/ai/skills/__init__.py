@@ -60,6 +60,12 @@ from app.ai.skills.resume_skill import (
     parse_resume,
 )
 from app.ai.skills.sql_skill import SqlQuerySkill, query_database
+from app.ai.skills.training_skill import (
+    TrainingLagScanSkill,
+    TrainingPlanGenerateSkill,
+    generate_training_plan,
+    scan_training_lag,
+)
 
 __all__ = [
     # 基类与异常
@@ -102,4 +108,9 @@ __all__ = [
     # 数据查询技能
     "SqlQuerySkill",
     "query_database",
+    # 培训赋能技能
+    "TrainingPlanGenerateSkill",
+    "TrainingLagScanSkill",
+    "generate_training_plan",
+    "scan_training_lag",
 ]

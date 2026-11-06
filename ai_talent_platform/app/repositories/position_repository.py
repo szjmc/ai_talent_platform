@@ -12,41 +12,127 @@
     sortable_fields = {...}        # 可排序字段白名单
     default_order = "-id"
 
-- requirements 是 JSON 列，MySQL 8 下可用 func.json_contains 查询；
-- 开发/测试环境统一 MySQL 8，json_contains 可用；单测中建议用真实 MySQL 测试库而非内存库；
-- 岗位创建/更新后需触发向量化（在 Service 层做，不放这里）。
-方法清单（按顺序实现，勾选表示已完成）：
-    - [ ] list_open_by_org(db, org_id)                   部门在招岗位
-    - [ ] search_by_title(db, keyword)                   标题模糊搜索
-    - [ ] get_requirements(db, position_id)              岗位结构化要求
-    - [ ] count_open_by_org(db, org_ids)                 批量统计在招岗位数
-    - [ ] list_by_skill(db, skill)                       按技能筛选岗位（JSON 字段）
+- 岗位结构化要求存在 positions.requirements(JSON)，多版本能力模型存 position_requirements；
+- 匹配只使用「已确认」的画像版本（确认标记见 PositionProfileService）；
+- 岗位状态约束：closed 不参与匹配，paused 需要提示（由 Service 判定）。
 
-实现约束：
-- 不写业务判断（是否允许操作由 Service 决定）；
-- 不 commit / rollback（事务由 core 的依赖与 transaction 管理）；
-- 聚合统计用 SQLAlchemy func，不要在 Python 中循环统计；
-- 返回 ORM 对象，序列化交给 Schema。
+* 实装说明（匹配 Agent）：
+- 原文件为骨架（model 未指定），岗位读取与画像版本管理全部缺失；
+- 本次只补匹配链路需要的读/写能力，不改表结构、不改既有字段语义。
 =========================================================================
 """
 
 from __future__ import annotations
 
-from app.models.base import Base
+from collections.abc import Sequence
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.position import Position, PositionRequirement
 from app.repositories.base import BaseRepository
 
-# 模型实现后取消注释：
-# from app.models.position import Position
 
-# TODO(负责人)：按上述方法清单实现。
+class PositionRepository(BaseRepository[Position]):
+    """岗位仓库。"""
 
+    model = Position
 
-class PositionRepository(BaseRepository):
-    """岗位仓库（骨架）。"""
-
-    # 注意：未指定 model 前调用任何方法都会抛 NotImplementedError
-    # model = <Model>
-    filterable_fields: set[str] = set()
-    searchable_fields: set[str] = set()
-    sortable_fields: set[str] = {"id", "created_at", "updated_at"}
+    # *kwq* 新增：白名单字段（岗位列表按部门/状态/层级筛选）。
+    filterable_fields: set[str] = {"organization_id", "status", "level"}
+    searchable_fields: set[str] = {"title", "code"}
+    sortable_fields: set[str] = {"id", "title", "created_at", "updated_at", "publish_at"}
     default_order = "-id"
+
+    # [岗位匹配接入] 反向匹配/预警批量读岗位；其他模块可复用，默认排除软删。
+    async def get_by_ids(
+        self, db: AsyncSession, position_ids: Sequence[int], *, include_deleted: bool = False
+    ) -> list[Position]:
+        """批量读取岗位：空ID不查库；默认排除软删除，状态判断交给业务层。"""
+        # 步骤1：去重并限制到指定ID，避免误查全部岗位。
+        ids = list(dict.fromkeys(int(pid) for pid in position_ids))
+        if not ids:
+            return []
+        # 步骤2：复用公共查询的软删除约束，一次SQL完成批量读取。
+        stmt = self._base_query(include_deleted=include_deleted).where(Position.id.in_(ids))
+        return list((await db.execute(stmt)).scalars().all())
+
+    # ---------------------------------------------------------------- 画像版本
+    # *kwq* 新增：查询岗位最新画像版本。
+    # 用途：匹配时必须把「当时用的版本号」写进结果，否则后续无法解释分数变化。
+    async def latest_requirement(
+        self, db: AsyncSession, position_id: int
+    ) -> PositionRequirement | None:
+        """取岗位最新一版能力模型（无版本记录返回 None）。"""
+        stmt = (
+            select(PositionRequirement)
+            .where(PositionRequirement.position_id == position_id)
+            .order_by(PositionRequirement.version.desc())
+            .limit(1)
+        )
+        return (await db.execute(stmt)).scalar_one_or_none()
+
+    # *kwq* 新增：按版本号取画像（指定版本复算历史结果时使用）。
+    async def get_requirement(
+        self, db: AsyncSession, position_id: int, version: int
+    ) -> PositionRequirement | None:
+        """取指定版本的岗位能力模型。"""
+        stmt = (
+            select(PositionRequirement)
+            .where(
+                PositionRequirement.position_id == position_id,
+                PositionRequirement.version == version,
+            )
+            .limit(1)
+        )
+        return (await db.execute(stmt)).scalar_one_or_none()
+
+    # *kwq* 新增：计算下一个版本号。
+    # 原因：版本号必须由数据库当前最大值推导（而不是内存计数），
+    #      否则并发确认会写出重复版本（唯一键冲突抛 500）。
+    async def next_requirement_version(self, db: AsyncSession, position_id: int) -> int:
+        """返回该岗位下一个可用版本号（无记录时为 1）。"""
+        stmt = select(func.max(PositionRequirement.version)).where(
+            PositionRequirement.position_id == position_id
+        )
+        current = (await db.execute(stmt)).scalar()
+        return int(current or 0) + 1
+
+    # *kwq* 新增：列出岗位的全部画像版本（倒序，供审计与回滚）。
+    async def list_requirements(
+        self, db: AsyncSession, position_id: int, limit: int = 20
+    ) -> Sequence[PositionRequirement]:
+        """按版本倒序列出画像版本。"""
+        stmt = (
+            select(PositionRequirement)
+            .where(PositionRequirement.position_id == position_id)
+            .order_by(PositionRequirement.version.desc())
+            .limit(max(1, int(limit)))
+        )
+        return list((await db.execute(stmt)).scalars().all())
+
+    # *kwq* 新增：新增一版画像（只 flush，事务由 get_db 统一提交）。
+    async def add_requirement(
+        self,
+        db: AsyncSession,
+        *,
+        position_id: int,
+        version: int,
+        dimensions: dict,
+        weights: dict | None = None,
+        source: str = "manual",
+    ) -> PositionRequirement:
+        """写入一版岗位能力模型。"""
+        obj = PositionRequirement(
+            position_id=position_id,
+            version=version,
+            dimensions=dimensions,
+            weights=weights,
+            source=source,
+        )
+        db.add(obj)
+        await db.flush()
+        return obj
+
+
+__all__ = ["PositionRepository"]

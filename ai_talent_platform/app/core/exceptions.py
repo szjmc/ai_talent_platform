@@ -153,3 +153,29 @@ class FileError(BusinessException):
     code = 5003
     status_code = 400
     message = "文件处理失败"
+
+
+# ---------------------------------------------------------------- RAG 角色 B (文档解析与入库)
+class DocumentParseError(FileError):
+    """文档解析失败（格式不支持、内容为空、加密无法读取等）。"""
+    code = 5004
+    status_code = 400
+    message = "文档解析失败，请检查文件内容或格式"
+
+
+class EmbeddingServiceError(AIError):
+    """硅基流动 Embedding API 调用失败（超时、限流、Key 错误）。"""
+    code = 5005
+    message = "向量化服务调用失败，请稍后重试"
+
+
+class VectorStoreError(ExternalServiceError):
+    """Milvus 向量数据库操作失败（写入失败、删除失败、集合未找到）。"""
+    code = 5006
+    message = "向量库操作异常"
+
+
+class MinIOAccessError(ExternalServiceError):
+    """MinIO 对象存储读取失败。"""
+    code = 5007
+    message = "文件存储读取失败"

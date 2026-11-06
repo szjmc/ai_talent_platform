@@ -36,6 +36,7 @@ from app.ai.core.model_selector import (
     select_provider,
 )
 from app.ai.core.token_manager import token_manager
+from app.ai.utils.retry_handler import is_permanent_http_error
 from app.config.settings import settings
 from app.core.exceptions import AIError
 from app.patterns.registry import llm_registry
@@ -48,6 +49,7 @@ _ADAPTER_MODULES = (
     "app.adapters.llm.qwen_adapter",
     "app.adapters.llm.deepseek_adapter",
     "app.adapters.llm.ollama_adapter",
+    "app.adapters.llm.siliconflow_adapter",
 )
 
 
@@ -103,6 +105,7 @@ class LLMManager:
                 f"未注册的 LLM provider：{provider}，可用：{llm_registry.keys()}",
                 data={"available": llm_registry.keys(), "provider": provider},
             )
+        # 密钥/地址交由BaseLLM按专属配置、当前供应商通用配置和目录默认值解析。
         instance = adapter_cls(model=target_model)
         self._providers[cache_key] = instance
         logger.info("创建 LLM 适配器：provider=%s model=%s purpose=%s", provider, target_model, purpose)
@@ -163,6 +166,8 @@ class LLMManager:
                 **kwargs,
             )
         except Exception as exc:  # noqa: BLE001 - 需要按降级链兜底
+            if is_permanent_http_error(exc):
+                raise self._wrap_error(exc)
             fallback = self._next_fallback(target_model)
             if fallback is None:
                 raise self._wrap_error(exc)
@@ -263,9 +268,10 @@ class LLMManager:
 
         if isinstance(exc, BusinessException):
             return exc
+        # 带异常类型，避免底层异常 str 为空（如部分网络/TLS 故障）时错误信息只剩空串
         if isinstance(exc, TimeoutError):
-            return ExternalServiceError(f"大模型调用超时：{exc}")
-        return AIError(f"大模型调用失败：{exc}")
+            return ExternalServiceError(f"大模型调用超时：{type(exc).__name__}: {exc}")
+        return AIError(f"大模型调用失败：{type(exc).__name__}: {exc}")
 
     async def _record(
         self,

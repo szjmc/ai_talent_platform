@@ -1,52 +1,49 @@
 """
 模块：app/routers/position_router.py
-职责：岗位管理接口层（岗位管理）。
+职责：岗位管理接口层（本阶段实现「JD 解析 / 岗位画像确认 / 版本查询」）。
 
 标签：[Agent组] [P1]（当前 501 占位）
 
 ============================ 实现思路与代码要点 ============================
 统一写法：
     router = APIRouter(prefix="/positions", tags=["岗位管理"], responses=COMMON_ERROR_RESPONSES)
+    def get_service(db: AsyncSession = Depends(get_db)) -> XxxService: ...
 
-    def get_service(db: AsyncSession = Depends(get_db)) -> PositionService:
-        return PositionService(db)
+本阶段只实现匹配链路依赖的画像接口（岗位 CRUD 仍由岗位负责人推进）：
+    POST /positions/{id}/jd/parse       JD 智能解析（草稿，不落库）
+    POST /positions/{id}/profile/confirm 确认画像并生成新版本（生效动作）
+    GET  /positions/{id}/profile        查询最新 / 指定版本画像
 
-    @router.get("", summary="...", response_model=ApiResponse[PageResult[XxxResponse]],
-                dependencies=[Depends(require_permission(PermissionEnum.XXX_READ))])
-    async def list_xxx(page: PageParams = Depends(), service: PositionService = Depends(get_service)):
-        result = await service.page_list(page)
-        return success(data=build_page_result(result.items, result.total, page))
+权限：
+    解析与确认：position:manage（HR / 管理员）
+    查询：position:read
 
-接口清单：
+注意：
+- 解析结果不落库，必须显式确认后才生效（未确认画像不得参与匹配）；
+- 接口不返回 500 给前端猜：Dify 不可用会降级为规则解析，并在 channel 中如实标注。
 
-    POST   /positions                创建岗位（position:manage）
-    GET    /positions                分页列表（keyword/org_id/level/status）
-    GET    /positions/{id}           岗位详情（含结构化 requirements）
-    PUT    /positions/{id}           更新岗位
-    PATCH  /positions/{id}/status    上架 / 关闭岗位
-    DELETE /positions/{id}           删除岗位（逻辑删除）
-    POST   /positions/{id}/parse     上传岗位说明书 -> AI 解析 requirements
-实现要点：
-- Router 不写 SQL、不写业务规则；参数校验交给 Schema，业务校验交给 Service；
-- 查询列表统一分页（PageParams + build_page_result），返回 PageResult；
-- 每个写接口都要挂权限依赖：dependencies=[Depends(require_permission(...))]；
-- 上传/下载类接口使用 UploadFile / FileResponse，并对 MIME 与大小做校验；
-- 长耗时任务（AI 解析、向量化、批处理）接口立即返回任务号，不要同步等待。
+影响范围：仅新增接口；router.py 中把 positions 从占位路由切换为本路由。
 =========================================================================
 """
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db, require_permission
-from app.core.pagination import PageParams, build_page_result
 from app.core.permissions import PermissionEnum
-from app.core.response import ApiResponse, PageResult, success
-from app.routers._stub import not_implemented_response
-from app.schemas.common import COMMON_ERROR_RESPONSES
-from app.services.position_service import PositionService
+from app.core.response import success
+from app.models.user import User
+from app.schemas.common import COMMON_ERROR_RESPONSES, SuccessResponse
+from app.schemas.position import (
+    JdParseRequest,
+    JdParseResponse,
+    JobProfileConfirmRequest,
+    JobProfileView,
+)
+from app.services.jd_parser import summarize_missing
+from app.services.position_profile_service import PositionProfileService
 
 router = APIRouter(
     prefix="/positions",
@@ -55,21 +52,64 @@ router = APIRouter(
 )
 
 
-def get_service(db: AsyncSession = Depends(get_db)) -> PositionService:
-    """PositionService 依赖。"""
-    return PositionService(db)
+def get_service(db: AsyncSession = Depends(get_db)) -> PositionProfileService:
+    """岗位画像服务依赖。"""
+    return PositionProfileService(db)
 
 
-@router.get(
-    "",
-    summary="岗位管理列表（占位）",
+# *kwq* 新增：JD 智能解析（草稿）。
+# 说明：解析结果不写库 —— 避免「解析即生效」绕过 HR 确认。
+@router.post(
+    "/{position_id}/jd/parse",
+    summary="JD 智能解析（生成岗位画像草稿）",
+    response_model=SuccessResponse[JdParseResponse],
 )
-async def list_positions():
-    """占位接口：与 routers/_stub.py 同一 501 契约（未登录也能看到实现位置）。
+async def parse_jd(
+    position_id: int,
+    payload: JdParseRequest,
+    service: PositionProfileService = Depends(get_service),
+    _: User = Depends(require_permission(PermissionEnum.POSITION_MANAGE)),
+):
+    """把 JD 原文解析为结构化岗位画像（Dify 优先，规则兜底）。"""
+    profile, channel = await service.parse(position_id, payload.jd_text, payload.job_title)
+    data = JdParseResponse(
+        channel=channel,  # type: ignore[arg-type]
+        profile=profile,
+        message=summarize_missing(profile),
+    )
+    return success(data=data, message=data.message)
 
-    主责组实现后替换为真实分页查询，并挂回权限依赖：
-        dependencies=[Depends(require_permission(PermissionEnum.XXX_READ))]
-        result = await service.page_list(page)
-        return success(data=build_page_result(result.items, result.total, page))
-    """
-    return not_implemented_response("岗位管理", "Agent组", "岗位 CRUD、岗位说明书 AI 解析、岗位向量化（见 routers/position_router.py）")
+
+# *kwq* 新增：确认画像并生成新版本。
+# 说明：这是唯一让画像「生效」的入口，写操作需要 position:manage 权限。
+@router.post(
+    "/{position_id}/profile/confirm",
+    summary="确认岗位画像（生成新版本，生效后可用于匹配）",
+    response_model=SuccessResponse[JobProfileView],
+)
+async def confirm_profile(
+    position_id: int,
+    payload: JobProfileConfirmRequest,
+    service: PositionProfileService = Depends(get_service),
+    current_user: User = Depends(require_permission(PermissionEnum.POSITION_MANAGE)),
+):
+    """确认岗位画像（HR 可先修订再确认）。"""
+    view = await service.confirm(position_id, payload, user_id=current_user.id)
+    return success(data=view, message=f"岗位画像 v{view.version} 已确认")
+
+
+# *kwq* 新增：查询画像（默认最新版本）。
+@router.get(
+    "/{position_id}/profile",
+    summary="查询岗位画像（含版本与确认状态）",
+    response_model=SuccessResponse[JobProfileView],
+)
+async def get_profile(
+    position_id: int,
+    version: int | None = Query(None, ge=1, description="画像版本号；不传取最新"),
+    service: PositionProfileService = Depends(get_service),
+    _: User = Depends(require_permission(PermissionEnum.POSITION_READ)),
+):
+    """查询岗位画像。"""
+    view = await service.get_profile(position_id, version)
+    return success(data=view, message="OK")

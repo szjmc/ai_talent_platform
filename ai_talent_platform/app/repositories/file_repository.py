@@ -45,7 +45,8 @@ class FileRepository(BaseRepository):
     """文件仓库（骨架）。"""
 
     # 注意：未指定 model 前调用任何方法都会抛 NotImplementedError
-    # model = <Model>
+    from app.models.file import File
+    model = File
     filterable_fields: set[str] = set()
     searchable_fields: set[str] = set()
     sortable_fields: set[str] = {"id", "created_at", "updated_at"}

@@ -151,7 +151,7 @@ class CosStorageAdapter(ObjectStorageAdapter):
 
 1. 环境变量按用途覆盖：`LLM_MODEL_<PURPOSE>`，供应商级 `LLM_MODEL_<PROVIDER>_<PURPOSE>`；
 2. `LLM_MODEL_MAP` 显式映射：`chat=deepseek-chat,talent=deepseek-reasoner`（或 JSON）；
-3. `LLM_MODEL`（与当前供应商匹配且不是目录默认值 → 视为显式指定）；
+3. 供应商专属模型（如 `DEEPSEEK_MODEL`、`OPENAI_MODEL`），其次是 `LLM_MODEL`（与当前供应商匹配且不是目录默认值 → 视为显式指定）；
 4. 供应商目录中的「用途推荐模型」；
 5. `LLM_MODEL`（与供应商匹配时）；
 6. 供应商目录默认模型。
@@ -161,6 +161,26 @@ class CosStorageAdapter(ObjectStorageAdapter):
 同理，若 `LLM_BASE_URL` 填的是其他供应商的默认地址（例如残留的 DashScope 地址），
 切换供应商后会被自动忽略；需要用代理 / 私有网关时请填写 `DEEPSEEK_BASE_URL` 等专属地址（或非默认的通用地址）。
 `LLM_API_KEY` 同理只对当前供应商生效，跨供应商（如对话 DeepSeek、向量 qwen）必须配置各自的专属密钥变量。
+
+#### OpenAI 兼容服务与完整模型 ID
+
+`LLM_PROVIDER=openai` 也表示使用 OpenAI 兼容协议。配置了非默认的 `LLM_BASE_URL` 或 `OPENAI_BASE_URL` 时，显式模型可以是 `组织名/模型名` 或私有模型别名，不要求以 `gpt-` 开头。为兼容旧环境，通用模型若仍是其他厂商的目录默认值（如 `qwen-plus`），继续视为残留配置；若兼容端点确实使用这个别名，用 `OPENAI_MODEL` 或用途映射明确指定。原生 OpenAI 地址仍保留模型前缀检查；qwen、DeepSeek、Ollama 的原有推荐策略保持不变。Vanna 的 `sql`、`summary` 及其他用途统一走上述优先级，不在业务代码写死模型名。
+
+管理器和直接创建适配器使用同一套地址/密钥解析：显式调用参数 > 供应商专属配置 > 当前供应商通用配置 > 目录默认值；非当前供应商不会借用通用地址或密钥。修改配置后重启服务（或由调用方明确清理实例缓存），不依赖修改环境变量自动更新已缓存实例。
+
+#### 备用模型与兼容写法
+
+原生默认模型保留原有降级链，使用标准 GPT 模型名的 OpenAI 代理也保留原有备用模型。兼容服务的自定义完整模型 ID 不根据品牌自动推导官方别名，只有显式配置的备用模型才会被尝试，且沿用同一服务地址和凭据；请确认备用模型在该端点可用。
+
+`LLM_FALLBACK_MODELS` 保留原有常用厂商别名的斜杠写法，如 `qwen-max=qwen-plus/qwen-turbo`。带命名空间的模型使用 JSON 数组或竖线分隔：
+
+```text
+LLM_FALLBACK_MODELS={"org/main": ["Qwen/backup", "other/backup"]}
+# 或
+LLM_FALLBACK_MODELS=org/main=Qwen/backup|other/backup
+```
+
+未知的 `namespace/model` 按一个完整 ID 保留；旧配置若用 `/` 分隔多个自定义别名，存在语义歧义，应改用 `|` 或 JSON，不靠猜测拆分。配置 `qwen-plus=` 或 JSON 中的 `"qwen-plus": []` 可明确关闭该模型的备用链。400/401/403/404/422 等不可恢复 HTTP 错误直接返回，不反复重试或切换备用模型；408/409/429及5xx保留原有重试/降级行为。
 
 ### 2.2 DeepSeek 配置
 

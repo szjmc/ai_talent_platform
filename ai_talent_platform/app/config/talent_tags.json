@@ -1,0 +1,768 @@
+{
+  "version": "gxd-v1",
+  "description": "业务标签词表：命中标签必须有档案证据，不要求每个人具有全部标签，不作为客观能力评分。",
+  "tags": [
+    {
+      "name": "Python",
+      "category": "skill",
+      "aliases": [
+        "python3"
+      ]
+    },
+    {
+      "name": "Java",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "JavaScript",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "TypeScript",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Go",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Rust",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "C",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "C++",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "C#",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "SQL",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "R",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Scala",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Swift",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Kotlin",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "PHP",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "HTML",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "CSS",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Vue",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "React",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Angular",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Node.js",
+      "category": "skill",
+      "aliases": [
+        "NodeJS"
+      ]
+    },
+    {
+      "name": "FastAPI",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Django",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Flask",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Spring Boot",
+      "category": "skill",
+      "aliases": [
+        "SpringBoot"
+      ]
+    },
+    {
+      "name": "Spring Cloud",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "MyBatis",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": ".NET",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "MySQL",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "PostgreSQL",
+      "category": "skill",
+      "aliases": [
+        "postgres",
+        "pgsql"
+      ]
+    },
+    {
+      "name": "SQLite",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Oracle",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "SQL Server",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Redis",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "MongoDB",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Elasticsearch",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Milvus",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Kafka",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "RabbitMQ",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Docker",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Kubernetes",
+      "category": "skill",
+      "aliases": [
+        "k8s"
+      ]
+    },
+    {
+      "name": "Linux",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Git",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Jenkins",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Nginx",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Prometheus",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Grafana",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Terraform",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Ansible",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "AWS",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "阿里云",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "腾讯云",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Azure",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "机器学习",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "深度学习",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "自然语言处理",
+      "category": "skill",
+      "aliases": [
+        "NLP"
+      ]
+    },
+    {
+      "name": "计算机视觉",
+      "category": "skill",
+      "aliases": [
+        "CV"
+      ]
+    },
+    {
+      "name": "大语言模型",
+      "category": "skill",
+      "aliases": [
+        "LLM",
+        "大模型"
+      ]
+    },
+    {
+      "name": "RAG",
+      "category": "skill",
+      "aliases": [
+        "检索增强生成"
+      ]
+    },
+    {
+      "name": "LangChain",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "LangGraph",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "PyTorch",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "TensorFlow",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Scikit-learn",
+      "category": "skill",
+      "aliases": [
+        "sklearn"
+      ]
+    },
+    {
+      "name": "Pandas",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "NumPy",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Spark",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Hadoop",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Flink",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Hive",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "ClickHouse",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "数据分析",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "数据治理",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "数据建模",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "数据仓库",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "ETL",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "特征工程",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "推荐系统",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "知识图谱",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "模型部署",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "模型微调",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "提示词工程",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "向量检索",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "API设计",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "系统设计",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "性能优化",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "自动化测试",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "单元测试",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "接口测试",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "安全测试",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "需求分析",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "原型设计",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "交互设计",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Figma",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Axure",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "项目管理",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "敏捷开发",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Scrum",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "产品规划",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "用户研究",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "运营分析",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "电商运营",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "内容运营",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "用户运营",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "供应链管理",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "财务分析",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "风险管理",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "CRM",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "ERP",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Excel",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Power BI",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "Tableau",
+      "category": "skill",
+      "aliases": []
+    },
+    {
+      "name": "数字化转型项目",
+      "category": "experience",
+      "aliases": []
+    },
+    {
+      "name": "AI项目交付",
+      "category": "experience",
+      "aliases": []
+    },
+    {
+      "name": "电商平台开发",
+      "category": "experience",
+      "aliases": []
+    },
+    {
+      "name": "数据平台建设",
+      "category": "experience",
+      "aliases": []
+    },
+    {
+      "name": "系统迁移",
+      "category": "experience",
+      "aliases": []
+    },
+    {
+      "name": "流程自动化",
+      "category": "experience",
+      "aliases": []
+    },
+    {
+      "name": "知识库建设",
+      "category": "experience",
+      "aliases": []
+    },
+    {
+      "name": "客户需求调研",
+      "category": "experience",
+      "aliases": []
+    },
+    {
+      "name": "跨部门项目",
+      "category": "experience",
+      "aliases": []
+    },
+    {
+      "name": "团队管理",
+      "category": "experience",
+      "aliases": []
+    },
+    {
+      "name": "技术培训",
+      "category": "experience",
+      "aliases": []
+    },
+    {
+      "name": "售前方案",
+      "category": "experience",
+      "aliases": []
+    },
+    {
+      "name": "供应链优化",
+      "category": "experience",
+      "aliases": []
+    },
+    {
+      "name": "营销增长项目",
+      "category": "experience",
+      "aliases": []
+    },
+    {
+      "name": "质量改进项目",
+      "category": "experience",
+      "aliases": []
+    },
+    {
+      "name": "团队协作",
+      "category": "quality",
+      "aliases": []
+    },
+    {
+      "name": "沟通协调",
+      "category": "quality",
+      "aliases": []
+    },
+    {
+      "name": "问题解决",
+      "category": "quality",
+      "aliases": []
+    },
+    {
+      "name": "文档编写",
+      "category": "quality",
+      "aliases": []
+    },
+    {
+      "name": "知识分享",
+      "category": "quality",
+      "aliases": []
+    },
+    {
+      "name": "客户服务",
+      "category": "quality",
+      "aliases": []
+    },
+    {
+      "name": "后端工程师",
+      "category": "position",
+      "aliases": []
+    },
+    {
+      "name": "前端工程师",
+      "category": "position",
+      "aliases": []
+    },
+    {
+      "name": "全栈工程师",
+      "category": "position",
+      "aliases": []
+    },
+    {
+      "name": "数据工程师",
+      "category": "position",
+      "aliases": []
+    },
+    {
+      "name": "数据分析师",
+      "category": "position",
+      "aliases": []
+    },
+    {
+      "name": "算法工程师",
+      "category": "position",
+      "aliases": []
+    },
+    {
+      "name": "AI应用工程师",
+      "category": "position",
+      "aliases": []
+    },
+    {
+      "name": "测试工程师",
+      "category": "position",
+      "aliases": []
+    },
+    {
+      "name": "运维工程师",
+      "category": "position",
+      "aliases": []
+    },
+    {
+      "name": "产品经理",
+      "category": "position",
+      "aliases": []
+    },
+    {
+      "name": "项目经理",
+      "category": "position",
+      "aliases": []
+    },
+    {
+      "name": "技术负责人",
+      "category": "position",
+      "aliases": []
+    },
+    {
+      "name": "解决方案工程师",
+      "category": "position",
+      "aliases": []
+    },
+    {
+      "name": "运营专员",
+      "category": "position",
+      "aliases": []
+    },
+    {
+      "name": "业务分析师",
+      "category": "position",
+      "aliases": []
+    }
+  ]
+}

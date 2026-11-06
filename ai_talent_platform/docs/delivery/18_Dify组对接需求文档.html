@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>18 · Dify 组对接需求文档（岗位 Agent 匹配链路）</title>
+<style>
+  :root {
+    --ink: #1f2933; --sub: #52606d; --line: #cbd2d9;
+    --bg: #f5f7fa; --card: #ffffff;
+    --blue: #2563eb; --blue-bg: #eff6ff;
+    --green: #059669; --green-bg: #ecfdf5;
+    --amber: #b45309; --amber-bg: #fffbeb;
+    --red: #dc2626; --red-bg: #fef2f2;
+    --purple: #7c3aed; --purple-bg: #f5f3ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: var(--bg); color: var(--ink);
+    font-size: 15px; line-height: 1.75; padding: 32px 16px 64px;
+  }
+  .page { max-width: 1080px; margin: 0 auto; }
+  header.doc {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 28px 32px; margin-bottom: 24px;
+  }
+  header.doc h1 { font-size: 24px; margin-bottom: 8px; }
+  header.doc .meta { color: var(--sub); font-size: 13px; display: flex; flex-wrap: wrap; gap: 18px; }
+  h2 {
+    font-size: 19px; margin: 32px 0 14px; padding-left: 12px;
+    border-left: 4px solid var(--blue);
+  }
+  h3 { font-size: 16px; margin: 20px 0 10px; color: var(--ink); }
+  p { margin: 8px 0; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 18px 22px; margin: 12px 0;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; background: var(--card); font-size: 13.5px; }
+  th, td { border: 1px solid var(--line); padding: 9px 12px; text-align: left; vertical-align: top; }
+  th { background: #eef1f5; font-weight: 600; white-space: nowrap; }
+  code, pre {
+    font-family: Consolas, "Courier New", monospace;
+  }
+  code { background: #eef1f5; border-radius: 4px; padding: 1px 6px; font-size: 13px; color: #b91c1c; }
+  pre {
+    background: #1e293b; color: #e2e8f0; border-radius: 8px;
+    padding: 14px 18px; overflow-x: auto; font-size: 12.5px; line-height: 1.6; margin: 12px 0;
+  }
+  pre .c { color: #94a3b8; }
+  .tag {
+    display: inline-block; border-radius: 999px; padding: 1px 10px;
+    font-size: 12px; font-weight: 600; margin-right: 6px; white-space: nowrap;
+  }
+  .t-blue  { background: var(--blue-bg);  color: var(--blue); }
+  .t-green { background: var(--green-bg); color: var(--green); }
+  .t-amber { background: var(--amber-bg); color: var(--amber); }
+  .t-red   { background: var(--red-bg);   color: var(--red); }
+  .t-purple{ background: var(--purple-bg);color: var(--purple); }
+  .note {
+    border-radius: 8px; padding: 12px 16px; margin: 12px 0; font-size: 14px;
+  }
+  .n-amber { background: var(--amber-bg); border-left: 4px solid var(--amber); }
+  .n-red   { background: var(--red-bg);   border-left: 4px solid var(--red); }
+  .n-green { background: var(--green-bg); border-left: 4px solid var(--green); }
+  .n-blue  { background: var(--blue-bg);  border-left: 4px solid var(--blue); }
+  ol li, ul li { margin: 5px 0 5px 22px; }
+  .flow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+  .flow .step {
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 14px; font-size: 13px; font-weight: 600;
+  }
+  .flow .step.dim { color: var(--sub); font-weight: 400; }
+  .flow .arrow { color: var(--sub); font-weight: 700; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+  footer { margin-top: 40px; color: var(--sub); font-size: 12.5px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="doc">
+  <h1>Dify 组对接需求文档 —— 岗位 Agent 匹配链路（两条工作流）</h1>
+  <div class="meta">
+    <span>文档编号：18</span>
+    <span>提出方：岗位人才匹配 Agent 组</span>
+    <span>接收方：Dify 工作流组</span>
+    <span>日期：2026-11-04</span>
+    <span>状态：待 Dify 组确认契约 → 联调</span>
+  </div>
+</header>
+
+<h2>〇、一页速览（给赶时间的同学）</h2>
+<div class="card">
+  <p>平台侧代码已 100% 就绪（适配器、降级链、五层校验、测试全部完成并标注「暂定·待联调」）。<b>Dify 组要做的事：</b></p>
+  <ol>
+    <li>按本文档的字段契约，在 Dify 上创建 <b>2 个工作流</b>：<code>job_profile_extraction</code>（JD 解析）、<code>match_explanation</code>（匹配解释）。</li>
+    <li>提交一份<b>契约确认单</b>（见第 6 节 6 问），逐项书面确认。</li>
+    <li>交付 <b>Base URL + 两个应用的 API Key</b>（放入平台 <code>.env</code> 即通）。</li>
+    <li>与平台联调，验收判据：解析响应 <code>source="dify"</code>、解释响应 <code>channel="dify"</code>，且所有 <code>evidence_ids</code> 通过五层校验。</li>
+  </ol>
+  <p style="margin-top:10px"><span class="tag t-red">最重要的一条</span><b>向量维度式的一次性契约冻结：inputs 变量名、outputs 字段名一经联调确认即冻结，后续改名 = 双方同步改代码 + 全量回归。</b></p>
+</div>
+
+<h2>一、背景与调用关系</h2>
+<p>岗位 Agent 匹配链路中有两个环节依赖 Dify 工作流，其余环节（召回、四态判定、四维打分、证据构建、五层校验、落库）均由平台自身完成：</p>
+
+<div class="flow">
+  <span class="step dim">JD 原文</span><span class="arrow">→</span>
+  <span class="step" style="border-color:var(--purple)">① Dify：JD 解析<br><small>job_profile_extraction</small></span><span class="arrow">→</span>
+  <span class="step dim">画像确认（HR）</span><span class="arrow">→</span>
+  <span class="step dim">召回 → 判定 → 打分 → 证据包</span><span class="arrow">→</span>
+  <span class="step" style="border-color:var(--purple)">② Dify：匹配解释<br><small>match_explanation</small></span><span class="arrow">→</span>
+  <span class="step dim">五层校验 → 展示</span>
+</div>
+
+<div class="note n-blue">
+  <b>分工铁律（需求文档已明确）：</b>Dify <b>只做语义提取与自然语言表达</b>，<b>不做业务判定、不算分</b>。
+  四态判定（FAIL/NEEDS_REVIEW/UNKNOWN/PASS）、0-100 打分、证据 ID 生成全部在平台侧。
+  Dify 输出只是「素材」，平台会做白名单过滤与五层校验，校验不过的结论会被剔除并记录到 <code>rejected_claims</code>。
+</div>
+
+<h3>降级链（平台侧已实现，Dify 无需关心，但需要理解为什么契约必须严格）</h3>
+<table>
+  <tr><th>场景</th><th>JD 解析实际通道</th><th>解释实际通道</th><th>响应标识</th></tr>
+  <tr><td>Dify 正常</td><td>Dify 工作流</td><td>Dify 工作流</td><td><code>source="dify"</code> / <code>channel="dify"</code></td></tr>
+  <tr><td>Dify 失败（超时/5xx/结构错误）</td><td>规则提取兜底</td><td>LLM 降级 → 规则兜底</td><td><code>rule_fallback</code> / <code>llm_fallback</code></td></tr>
+  <tr><td>未配置 Key（本地开发常态）</td><td>直接跳过 Dify</td><td>直接跳过 Dify</td><td>同上，不发无意义请求</td></tr>
+</table>
+<p>平台不会伪装降级结果，所以 <code>source="dify"</code> 出现即代表真实联通。联调成功的唯一判据就是这两个字段出现真实值。</p>
+
+<h2>二、对接方式（平台侧已定死，Dify 按此实现即可）</h2>
+<table>
+  <tr><th style="width:180px">项目</th><th>约定</th><th>说明</th></tr>
+  <tr><td>接口路径</td><td><code>POST {DIFY_BASE_URL}/workflows/run</code></td><td>Dify 标准工作流执行接口；<code>DIFY_BASE_URL</code> 形如 <code>https://xxx/v1</code>（自建版与云端版去掉 /v1 需在确认单中说明）</td></tr>
+  <tr><td>鉴权</td><td><code>Authorization: Bearer {DIFY_API_KEY}</code></td><td>每个工作流应用一个独立 API Key（共 2 个）</td></tr>
+  <tr><td>响应模式</td><td><code>response_mode: "blocking"</code></td><td>平台不做流式；如需改 streaming 必须提前提出，涉及适配器改造</td></tr>
+  <tr><td>user 字段</td><td>固定 <code>"ai-talent-platform"</code></td><td>用于 Dify 侧用量统计</td></tr>
+  <tr><td>平台超时</td><td>60s（<code>DifyAdapter._timeout</code>）</td><td>平台侧 408/504 视为超时并触发降级重试（最多 3 次，指数退避）</td></tr>
+  <tr><td>请求体</td><td><code>{"inputs": {...}, "response_mode": "blocking", "user": "ai-talent-platform"}</code></td><td>inputs 内变量名见下文，<b>变量名就是契约</b></td></tr>
+</table>
+
+<h3>平台侧对响应的解析规则（Dify 侧输出必须满足其一）</h3>
+<pre>
+<span class="c"># 形态 A：单字段输出（Dify Cloud 默认）—— outputs.result 为 JSON 字符串或对象</span>
+{ "workflow_finished": true, "outputs": { "result": "{...业务 JSON...}" } }
+
+<span class="c"># 形态 B：多字段输出（自建版常见）—— outputs 本身就是业务对象</span>
+{ "workflow_finished": true, "outputs": { "job_title": "...", "required_skills": [...] } }
+
+<span class="c"># 平台解析顺序：outputs.result（可 JSON.parse 则解析）→ 直接取 outputs 本体</span>
+<span class="c"># 两种形态都支持，但必须在契约确认单中声明用哪种，避免联调时互相猜</span>
+</pre>
+
+<h2>三、工作流 ①：job_profile_extraction（JD 解析）</h2>
+
+<h3>3.1 功能定义</h3>
+<p>输入 JD 自然语言文本，输出结构化岗位信息。<b>只做语义提取，不做判定</b>（不判断候选人、不算分、不筛选）。HR 后续会在画像确认页人工核对，Dify 提取错误可被人工修正，但<b>缺字段会导致 HR 反工</b>，所以「字段宁全勿缺、拿不准就留空并说明」。</p>
+
+<h3>3.2 inputs（变量名必须完全一致）</h3>
+<table>
+  <tr><th style="width:130px">变量名</th><th>类型</th><th>必填</th><th>说明</th></tr>
+  <tr><td><code>jd_text</code></td><td>string</td><td>是</td><td>JD 全文（平台保证 ≥ 20 字，上限约 2 万字）。可能含「岗位职责 / 任职要求 / 加分项」等段落标记，也可能完全无结构</td></tr>
+</table>
+<p style="font-size:13.5px;color:var(--sub)">注：岗位名称提示（job_title）当前不传入 Dify。若 Dify 侧希望增加此可选输入变量，请在确认单中提出，平台侧加一行即可。</p>
+
+<h3>3.3 outputs（业务 JSON 字段契约）</h3>
+<p>平台按<b>白名单 + 别名映射</b>接收（兼容下表「别名」列的写法，但<b>推荐直接用首选名</b>，别名命中会降低可读性）：</p>
+<table>
+  <tr><th style="width:190px">字段（首选名）</th><th>类型</th><th>必填</th><th>约束 / 说明</th><th>兼容别名</th></tr>
+  <tr><td><code>job_title</code></td><td>string</td><td><span class="tag t-red">必须</span></td><td>缺失时平台直接报错要求人工补录，画像无法构建</td><td><code>title</code></td></tr>
+  <tr><td><code>responsibilities</code></td><td>string[]</td><td>建议</td><td>岗位职责短句列表，缺失记入 <code>missing_fields</code></td><td><code>duties</code></td></tr>
+  <tr><td><code>required_conditions</code></td><td>string[]</td><td>条件必填</td><td>必备硬条件短句；<b>当 required_skills 已抽出时可为空</b>，两者都空才记缺失</td><td><code>must_have</code> / <code>conditions</code></td></tr>
+  <tr><td><code>preferred_conditions</code></td><td>string[]</td><td>否</td><td>优先/加分条件短句</td><td><code>nice_to_have</code></td></tr>
+  <tr><td><code>required_skills</code></td><td>string[]</td><td>建议</td><td>必备技能（技能名，非句子）</td><td><code>skills</code> / <code>must_skills</code></td></tr>
+  <tr><td><code>preferred_skills</code></td><td>string[]</td><td>否</td><td>优先技能</td><td><code>plus_skills</code></td></tr>
+  <tr><td><code>min_education</code></td><td>string</td><td>建议</td><td><b>枚举值：<code>不限 / 大专 / 本科 / 硕士 / 博士</code></b>（平台按这 5 档归一化；写「全日制本科」等变体会进 conflicts 待人工确认）</td><td><code>education</code></td></tr>
+  <tr><td><code>min_work_years</code></td><td>int | null</td><td>建议</td><td>最低工作年限，0~50；「应届」→ 0，未提 → null</td><td><code>experience_years</code></td></tr>
+  <tr><td><code>location</code></td><td>string</td><td>否</td><td>工作地点</td><td>—</td></tr>
+  <tr><td><code>salary_range</code></td><td>string</td><td>否</td><td>薪资范围原文（如「25k-35k」）</td><td>—</td></tr>
+  <tr><td><code>prompt_version</code></td><td>string</td><td>建议</td><td>Dify 侧提示词版本号（≤20 字符），平台原样入库用于审计与 prompt 迭代追踪</td><td>—</td></tr>
+</table>
+
+<div class="note n-amber">
+  <b>三条硬性约束（违反会直接产生业务问题）：</b>
+  ① <code>job_title</code> 缺失 = 平台报错，画像构建失败；
+  ② 同一技能不得同时出现在 required_skills 与 preferred_skills（平台会记入 conflicts 强制人工确认）；
+  ③ <b>禁止补值</b>——JD 里没写的字段就留空/null，不要猜「本科以上默认」「默认 3 年经验」，猜错比缺失更糟（缺失只是提示，补值会错误淘汰候选人）。
+</div>
+
+<h3>3.4 输出示例</h3>
+<pre>
+{
+  "job_title": "高级 Python 后端工程师",
+  "responsibilities": ["负责人才匹配平台后端服务设计开发", "参与匹配算法优化"],
+  "required_conditions": ["3 年以上 Python 后端经验"],
+  "preferred_conditions": ["有 LangChain / RAG 项目经验者优先"],
+  "required_skills": ["Python", "FastAPI", "MySQL"],
+  "preferred_skills": ["LangChain", "Milvus"],
+  "min_education": "本科",
+  "min_work_years": 3,
+  "location": "深圳",
+  "salary_range": "25k-35k",
+  "prompt_version": "jd-extract-v1"
+}
+</pre>
+
+<h2>四、工作流 ②：match_explanation（匹配解释）</h2>
+
+<h3>4.1 功能定义</h3>
+<p>输入一份<b>结构化证据包</b>（岗位 × 人才 × 判定 × 打分 × 证据清单），输出自然语言匹配解释。<b>只做表达，不算分、不改判定</b>。平台拿到输出后执行<b>五层证据校验</b>：每条结论必须引用真实存在的 <code>evidence_ids</code>，无依据结论一律剔除并记录。</p>
+
+<h3>4.2 inputs</h3>
+<table>
+  <tr><th style="width:150px">变量名</th><th>类型</th><th>必填</th><th>说明</th></tr>
+  <tr><td><code>evidence_pack</code></td><td>string(JSON) 或 object</td><td>是</td><td>完整证据包 JSON。建议 Dify 侧输入变量用 string 类型、内部自行解析；若 Dify 支持 object 类型直传请确认后声明（两种平台都能给，确认单里定一种）</td></tr>
+</table>
+
+<h3>4.3 证据包结构（MatchEvidencePack，平台侧 pydantic 模型，逐字段给出）</h3>
+<table>
+  <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+  <tr><td><code>position_id</code> / <code>talent_id</code></td><td>int</td><td>岗位 / 人才 ID</td></tr>
+  <tr><td><code>requirement_version</code></td><td>int</td><td>本次使用的岗位画像版本号</td></tr>
+  <tr><td><code>job_profile_summary</code></td><td>object</td><td>岗位画像（结构与 3.3 节 outputs 相同，另含 missing_fields / conflicts）</td></tr>
+  <tr><td><code>hard_results</code></td><td>list</td><td>四态判定明细，每条含：<code>condition</code>（条件名）、<code>status</code>（FAIL / NEEDS_REVIEW / UNKNOWN / PASS）、<code>reason</code>、<code>evidence_ids</code></td></tr>
+  <tr><td><code>dimension_scores</code></td><td>object</td><td>四维分数：<code>skill / experience / education / quality</code>（0-100）</td></tr>
+  <tr><td><code>data_completeness</code></td><td>float</td><td>档案完整度 0~1。<b>低于 0.7 时请 Dify 在解释里显式提示「结论建立在缺失数据上」</b>（missing 类证据见下）</td></tr>
+  <tr><td><code>evidences</code></td><td>list</td><td>证据清单，每条：<code>evidence_id</code>（格式 <code>EVID-{position_id}-{talent_id}-{seq}</code>）、<code>claim</code>（证据支撑的结论短句）、<code>source_table</code> / <code>source_field</code> / <code>source_value</code>（来源表/字段/原值）、<code>requirement_ref</code>（对应岗位要求字段）、<code>evidence_type</code>（<b>fact 档案原值 / derived 代码推导 / missing 依据缺失</b>）</td></tr>
+</table>
+
+<h3>4.4 outputs（解释 JSON 契约 —— 五层校验会逐条核对）</h3>
+<table>
+  <tr><th style="width:200px">字段</th><th>类型</th><th>约束</th></tr>
+  <tr><td><code>summary</code></td><td>string</td><td>综合匹配结论，1~1000 字，<b>必填非空</b></td></tr>
+  <tr><td><code>highlights</code></td><td>list&lt;claim&gt;</td><td>核心优势，每条 = <code>{text, evidence_ids, claim_type}</code></td></tr>
+  <tr><td><code>gaps</code></td><td>list&lt;claim&gt;</td><td>能力差距，同上</td></tr>
+  <tr><td><code>risks</code></td><td>list&lt;claim&gt;</td><td>潜在风险，同上</td></tr>
+  <tr><td><code>interview_suggestions</code></td><td>string[]</td><td>建议面试问题（无需挂证据）</td></tr>
+  <tr><td><code>pending_verification</code></td><td>string[]</td><td>待人工核实事项（含 UNKNOWN 项、与缺失数据相关的说明）</td></tr>
+  <tr><td><code>prompt_version</code></td><td>string</td><td>解释提示词版本（≤20 字符）</td></tr>
+</table>
+<p>其中单条 claim 的结构：</p>
+<table>
+  <tr><th>字段</th><th>类型</th><th>约束</th></tr>
+  <tr><td><code>text</code></td><td>string</td><td>1~500 字</td></tr>
+  <tr><td><code>evidence_ids</code></td><td>string[]</td><td><b>至少 1 条，且必须逐字存在于入参 evidences 的 evidence_id 中</b>——校验器逐 ID 比对，编造 / 拼错的 ID 会导致整条结论被剔除并记入 rejected_claims</td></tr>
+  <tr><td><code>claim_type</code></td><td>enum</td><td><code>fact</code>（档案事实陈述）/ <code>inference</code>（推断，前端会标注「需人工复核」）</td></tr>
+</table>
+
+<div class="note n-red">
+  <b>证据使用规则（校验器的剔除原因即来源，请写进 Dify 侧 prompt）：</b>
+  ① <code>evidence_type="missing"</code> 的证据（如「档案无技能字段」）<b>只能用于说明「信息缺失、无法判断」</b>，拿它证明人才具备某能力 = <code>missing_evidence_misuse</code>，整条剔除；
+  ② 结论不得超出证据 <code>claim</code> 与 <code>source_value</code> 的语义范围（越界 = <code>term_out_of_scope</code> 剔除）；
+  ③ 结论不得与 <code>hard_results</code> 中 FAIL 判定冲突（冲突 = <code>conflict_with_hard_result</code> 剔除）；
+  ④ 被剔除不是异常，是设计——<code>rejected_claims</code> 越少说明 Dify prompt 质量越高，这是双方共同的迭代指标。
+</div>
+
+<h3>4.5 输出示例</h3>
+<pre>
+{
+  "summary": "候选人整体匹配度较高：核心技术栈 Python、FastAPI、MySQL 全部命中且均有档案佐证，工作年限超出要求 2 年。主要差距是岗位要求的 LangChain 仅在优先项且档案未见，属可培养项。",
+  "highlights": [
+    { "text": "5 年 Python 后端经验，超出岗位 3 年的最低要求", "evidence_ids": ["EVID-12-88-1"], "claim_type": "fact" },
+    { "text": "FastAPI 有实际项目产出（订单系统），推断可快速承接匹配服务开发", "evidence_ids": ["EVID-12-88-3"], "claim_type": "inference" }
+  ],
+  "gaps": [
+    { "text": "LangChain 无档案记录，岗位列为优先技能", "evidence_ids": ["EVID-12-88-7"], "claim_type": "fact" }
+  ],
+  "risks": [],
+  "interview_suggestions": ["请描述一个使用 FastAPI 处理高并发写入的场景"],
+  "pending_verification": ["档案完整度 0.83，学历字段缺失，建议面试时核实"],
+  "prompt_version": "match-explain-v1"
+}
+</pre>
+
+<h2>五、非功能性要求</h2>
+<table>
+  <tr><th style="width:160px">项目</th><th>要求</th><th>原因</th></tr>
+  <tr><td>响应时间</td><td>P95 ≤ 30s，硬上限 60s</td><td>平台超时 60s 即降级，跑批场景一次可能串行解释多人，慢会放大</td></tr>
+  <tr><td>错误码语义</td><td>401/403 = Key 无效；404 = 路径错；429 = 限流；5xx = 服务异常</td><td>平台按状态码分类决定重试与降级策略</td></tr>
+  <tr><td>限流</td><td>请告知配额（QPS / 日调用量），写入确认单</td><td>跑批按人才数线性调用，平台侧需要据此做节流</td></tr>
+  <tr><td>输出稳定性</td><td><b>输出必须是可解析的纯 JSON</b>（无 Markdown 围栏、无前后缀文字）。JD 解析若用 LLM 节点，请务必做 JSON 输出约束</td><td>平台解析失败 = 视为 Dify 失败，直接降级，等于白跑</td></tr>
+  <tr><td>幂等性</td><td>同一 inputs 多次调用结果可不同（LLM 特性），但字段结构必须恒定</td><td>结构漂移 = 降级</td></tr>
+  <tr><td>日志留痕</td><td>每条 outputs 必须带 <code>prompt_version</code></td><td>平台入库审计，prompt 迭代效果可量化（rejected_claims 率对比）</td></tr>
+</table>
+
+<h2>六、契约确认单（请 Dify 组逐项书面回复）</h2>
+<div class="card">
+  <ol>
+    <li><b>部署形态与 Base URL</b>：自建版还是云端版？完整 Base URL（含 /v1 与否）？网络是否与平台服务器互通（内网 / 公网 + 白名单）？</li>
+    <li><b>两个应用的 API Key</b>：每个工作流独立一个 Key，通过安全渠道交付（不要进 git / 群聊，直接给到平台配置人）。</li>
+    <li><b>outputs 形态</b>：走「单字段 result」（形态 A）还是「多字段 outputs」（形态 B）？若 result 是字符串，确认它是合法 JSON 文本。</li>
+    <li><b>inputs 变量名</b>：确认 <code>jd_text</code>、<code>evidence_pack</code> 两个变量名，以及 evidence_pack 是 string(JSON) 还是 object 直传。</li>
+    <li><b>超时与限流配额</b>：工作流内部模型链路的最大耗时、QPS / 日调用配额。</li>
+    <li><b>错误语义</b>：Dify 侧业务失败（如 LLM 拒答、内容审核拦截）时返回的 HTTP 状态码与响应体格式是什么？平台需要区分「重试能好」和「重试也没用」。</li>
+  </ol>
+</div>
+
+<h2>七、交付物清单与验收流程</h2>
+<h3>7.1 Dify 组交付物</h3>
+<table>
+  <tr><th style="width:60px">#</th><th>交付物</th><th>验收标准</th></tr>
+  <tr><td>1</td><td>契约确认单（第 6 节 6 问逐项回复）</td><td>平台组确认无歧义后冻结</td></tr>
+  <tr><td>2</td><td>两个已发布工作流（<code>job_profile_extraction</code>、<code>match_explanation</code>）</td><td>按本文档 inputs/outputs 建好并发布（非草稿）</td></tr>
+  <tr><td>3</td><td>Base URL + 2 个 API Key</td><td>平台写入 .env 后冒烟可调通</td></tr>
+  <tr><td>4</td><td>每条工作流的 3 组自测样例（输入 + 期望输出）</td><td>含 1 组「字段不全的残缺 JD」与 1 组「含 missing 证据的证据包」边界样例</td></tr>
+</table>
+
+<h3>7.2 联调验收判据（平台侧执行，双方共同查看）</h3>
+<table>
+  <tr><th style="width:80px">环节</th><th>操作</th><th>通过标准</th></tr>
+  <tr><td>冒烟</td><td>平台配置 Key 后调 <code>POST /positions/parse-jd</code> 传样例 JD</td><td>响应 <code>source="dify"</code>，字段与 3.3 契约一致，<code>missing_fields</code> 符合预期</td></tr>
+  <tr><td>解释链路</td><td>调 <code>POST /matchings/explain</code>（真实跑批产生的证据包）</td><td>响应 <code>channel="dify"</code>，<code>rejected_claims</code> 为空或仅含合理剔除，<code>evidence_ids</code> 全部通过五层校验</td></tr>
+  <tr><td>边界 1</td><td>传字段残缺的 JD</td><td>Dify 不补值；<code>missing_fields</code> 如实反映；HR 确认页可人工补录</td></tr>
+  <tr><td>边界 2</td><td>传含 <code>missing</code> 类证据的证据包</td><td>解释正确使用「信息缺失」表述，无 <code>missing_evidence_misuse</code> 剔除</td></tr>
+  <tr><td>边界 3</td><td>临时停掉 Dify 服务</td><td>平台 ≤ 60s 内降级 <code>rule_fallback</code>/<code>llm_fallback</code>，接口不 500，恢复后自动回到 Dify 通道</td></tr>
+  <tr><td>指标</td><td>各跑 ≥ 20 个真实样本</td><td><code>rejected_claims</code> 率、字段命中率形成基线数字，写入联调报告，作为后续 prompt 迭代对照</td></tr>
+</table>
+
+<h2>八、平台侧对接位置索引（给 Dify 组参考 / 双方排查用）</h2>
+<table>
+  <tr><th style="width:280px">文件</th><th>职责</th></tr>
+  <tr><td><code>app/adapters/dify/dify_adapter.py</code></td><td>HTTP 调用、鉴权、重试（3 次指数退避）、响应归一化、错误分类；「暂定·待联调」标注集中于此</td></tr>
+  <tr><td><code>app/services/jd_parser.py</code></td><td>工作流①调用 + 白名单标准化（别名映射在 <code>normalize_job_profile</code>）+ 缺失/冲突检测</td></tr>
+  <tr><td><code>app/services/explanation_service.py</code></td><td>工作流②调用 + LLM/规则降级链 + 五层校验编排</td></tr>
+  <tr><td><code>app/services/evidence_builder.py</code></td><td>证据包构建（Evidence 结构、EVID-ID 规则）</td></tr>
+  <tr><td><code>app/services/evidence_verifier.py</code></td><td>五层校验与 rejected_claims 产生处（剔除原因枚举见 4.4 注释）</td></tr>
+  <tr><td><code>app/config/settings.py</code></td><td><code>DIFY_BASE_URL</code> / <code>DIFY_API_KEY</code> 配置项</td></tr>
+</table>
+
+<footer>
+  文档 18 · 由岗位 Agent 组提出 · 契约一经双方确认即冻结，任何字段变更需双方书面同步并回归测试
+</footer>
+
+</div>
+</body>
+</html>

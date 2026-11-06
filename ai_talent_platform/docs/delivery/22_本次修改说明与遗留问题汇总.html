@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>22 · 本次修改说明与遗留问题汇总（2026-11-05）</title>
+<style>
+  :root { --ink:#1f2430; --muted:#5b6472; --line:#e4e8ef; --bg:#f6f8fb; --card:#ffffff;
+    --blue:#2563eb; --blue-bg:#eff6ff; --green:#16a34a; --green-bg:#f0fdf4;
+    --amber:#d97706; --amber-bg:#fffbeb; --red:#dc2626; --red-bg:#fef2f2; --purple:#7c3aed; --purple-bg:#f5f3ff; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:var(--ink); background:var(--bg); line-height:1.75; padding:32px 16px 64px; }
+  .wrap { max-width:960px; margin:0 auto; }
+  header.doc { background:linear-gradient(135deg,#1e3a8a,#2563eb); color:#fff; border-radius:14px; padding:28px 32px; margin-bottom:24px; }
+  header.doc h1 { font-size:24px; margin-bottom:8px; }
+  header.doc p { opacity:.92; font-size:14px; }
+  h2 { font-size:20px; margin:36px 0 14px; padding-left:12px; border-left:4px solid var(--blue); }
+  h3 { font-size:16px; margin:20px 0 10px; color:var(--ink); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 22px; margin-bottom:14px; }
+  .tag { display:inline-block; font-size:12px; padding:2px 10px; border-radius:99px; margin-right:8px; font-weight:600; }
+  .t-blue { background:var(--blue-bg); color:var(--blue); }
+  .t-green { background:var(--green-bg); color:var(--green); }
+  .t-amber { background:var(--amber-bg); color:var(--amber); }
+  .t-red { background:var(--red-bg); color:var(--red); }
+  .t-purple { background:var(--purple-bg); color:var(--purple); }
+  table { width:100%; border-collapse:collapse; margin:12px 0; font-size:14px; background:var(--card); }
+  th,td { border:1px solid var(--line); padding:8px 12px; text-align:left; vertical-align:top; }
+  th { background:#eef2f8; white-space:nowrap; }
+  code { background:#eef2f8; padding:1px 6px; border-radius:4px; font-family:Consolas,monospace; font-size:13px; color:#b91c1c; word-break:break-all; }
+  ul,ol { padding-left:22px; margin:8px 0; }
+  li { margin:4px 0; }
+  .callout { border-radius:10px; padding:14px 18px; margin:12px 0; font-size:14px; }
+  .c-amber { background:var(--amber-bg); border:1px solid #fde68a; }
+  .c-red { background:var(--red-bg); border:1px solid #fecaca; }
+  .c-green { background:var(--green-bg); border:1px solid #bbf7d0; }
+  .c-blue { background:var(--blue-bg); border:1px solid #bfdbfe; }
+  .num { display:inline-flex; width:24px; height:24px; border-radius:50%; background:var(--blue); color:#fff; align-items:center; justify-content:center; font-size:13px; font-weight:700; margin-right:8px; flex-shrink:0; }
+  .step { display:flex; margin:10px 0; align-items:flex-start; }
+  .plain { background:#fffbe6; border:1px dashed #f0c419; border-radius:10px; padding:16px 20px; margin-top:10px; font-size:15px; }
+  .muted { color:var(--muted); font-size:13px; }
+  footer { margin-top:40px; text-align:center; color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="doc">
+  <h1>22 · 本次修改说明与遗留问题汇总</h1>
+  <p>日期：2026-11-05 ｜ 范围：环境合并 + 远程库迁移 + Gitee 合并 ｜ 合并 commit：<code>cb6c618</code>（已提交，push 由你自己操作）</p>
+</header>
+
+<h2>〇、一句话总结（大白话）</h2>
+<div class="plain">
+  今天干了三件大事：<b>①把你自己的 .env 和集群的 .env 合并了</b>（只加新键，不乱动你的值）；<b>②数据库切到了云端共享库，并补齐了缺的表和字段</b>；<b>③把伙伴在 Gitee 上传的代码合并进了你的分支</b>，逐个文件把冲突内容补全，测试确认"合并没引入任何新失败"。目前<b>代码已提交但还没 push</b>（push 你自己来）。
+</div>
+
+<h2>一、改了什么（按文件清单）</h2>
+
+<div class="card">
+  <h3><span class="tag t-blue">环境</span>.env（项目根目录）</h3>
+  <ul>
+    <li><b>第一步合并</b>：25 键 → 104 键（+79 个集群新键）。原有 25 个键的值<b>一个都没动</b>，改前备份了 <code>.env.bak-20261105-151835</code>。</li>
+    <li><b>第二步按你 5 组决策改值</b>：实际只改了 3 个键——
+      <ul>
+        <li><code>DB_HOST = 121.43.198.251</code>（MySQL 切远程共享库）</li>
+        <li><code>DB_PASSWORD = 集群的 10 位密码</code></li>
+        <li><code>JWT_SECRET_KEY = 集群的 55 位密钥</code></li>
+      </ul>
+    </li>
+    <li>你没选改的：LLM 保持本地 Ollama、PG/Milvus 开关保持 false、Dify 保持 api.dify.ai。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3><span class="tag t-green">忽略规则</span>.gitignore</h3>
+  <ul>
+    <li>加了 <code>.env*</code> + <code>!.env.example</code>：以后所有 env 文件（含备份）都不会被 git 追踪，只有模板 example 会提交。</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3><span class="tag t-purple">合并冲突补全</span>（Gitee 远程 lz_agent 分支 → 你的分支）</h3>
+  <p>你在 IDE 里 11 个冲突文件全选了"接受您的更改"，等于把伙伴的内容全丢了，我逐个把伙伴部分补了回来：</p>
+  <table>
+    <tr><th>文件</th><th>补回了什么</th></tr>
+    <tr><td><code>app/config/settings.py</code></td><td>存储后端配置（本地/MinIO/OSS/S3）、LLM_MODEL_MAP 多供应商映射、Vanna(NL2SQL) 配置、storage_summary 汇总</td></tr>
+    <tr><td><code>app/routers/router.py</code></td><td>analytics 真实路由、audit 占位路由、system/info 扩展（存储信息）</td></tr>
+    <tr><td><code>app/config/prompt_config.py</code></td><td>NL2SQL 的 2 个提示词模板</td></tr>
+    <tr><td><code>app/ai/core/llm_manager.py</code> + <code>model_selector.py</code></td><td>整体采纳伙伴的 provider_config 体系（按供应商解析 key/base_url/model）；同时<b>保留</b>了你这边 ollama_adapter 的 think:false 修复</td></tr>
+    <tr><td><code>.env.example</code></td><td>+45 个键，顺手修了乱码键 <code>NL2SQL_RNKGO_IIGU</code> → <code>NL2SQL_PGSQL_USER</code></td></tr>
+    <tr><td><code>requirements.txt</code></td><td>从伙伴原版重建（UTF-8），补上 4 个漏写的依赖：reportlab、python-docx、minio、matplotlib</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3><span class="tag t-amber">数据库</span>云端库（121.43.198.251 / ai_talent_platform）执行了 3 个迁移脚本</h3>
+  <ul>
+    <li>云端库是旧结构：缺 <code>matching_batches</code>、<code>reserve_warnings</code> 两张表，且 <code>matching_records</code> 缺 MATCH-009 的 5 个追溯字段。</li>
+    <li>已执行 <code>docs/sql/</code> 下 3 个幂等迁移脚本，全部成功并验证：建 matching_batches（含 4 索引）/ matching_records 加 5 列 / reserve_warnings 建表。</li>
+  </ul>
+</div>
+
+<h2>二、遇到的问题和怎么解决的</h2>
+
+<div class="card">
+  <h3><span class="num">1</span>requirements.txt 编码坑（UTF-16）</h3>
+  <p>伙伴的文件是 UTF-16 编码，我直接按 UTF-8 追加导致接缝全是乱码。<b>解决</b>：放弃追加，用程序检测 BOM、从伙伴原版整个重建为 UTF-8。</p>
+</div>
+
+<div class="card">
+  <h3><span class="num">2</span>键名复制即损坏（NL2SQL_PGSQL_USER → NL2SQL_RNKGO_IIGU）</h3>
+  <p>通过对话输出通道复制这个键名会变成乱码。<b>解决</b>：不再手抄，用正则从 settings.py 里程序化提取正确键名反写。</p>
+</div>
+
+<div class="card">
+  <h3><span class="num">3</span>本地环境缺包 + pip 装包被代理挡</h3>
+  <p>合并后的代码需要 sqlglot、chromadb，本地 venv 没有；默认源被代理挡住装不上。<b>解决</b>：换清华镜像 <code>-i https://pypi.tuna.tsinghua.edu.cn/simple</code> 安装成功。</p>
+</div>
+
+<div class="card">
+  <h3><span class="num">4</span>"合并是否引入新问题"怎么验证？</h3>
+  <p>用 <b>git worktree 对照测试法</b>：临时开一个 worktree 跑伙伴的纯净分支，和合并后的代码在相同环境下各跑一遍全量非集成测试。<b>结果</b>：两边失败集合完全一致（17 个，全是对方分支就有的老问题，多为环境依赖：PG 关闭、chromadb、env 敏感等）。<b>结论：合并零引入新失败。</b></p>
+</div>
+
+<div class="card">
+  <h3><span class="num">5</span>测试发现伙伴遗留问题</h3>
+  <p><code>test_router_stubs</code> 和伙伴自己上传的 router.py 对不上——这是他分支上就挂的，不是合并造成的，不用你修（他的分支自挂）。</p>
+</div>
+
+<h2>三、遗留问题（还没解决的，按紧急程度排）</h2>
+
+<div class="callout c-red"><b>🔴 必须你本人操作</b><br>
+1. <b>push 还没做</b>：合并 commit <code>cb6c618</code> 已提交、工作区干净，push 按约定由你自己执行。<br>
+2. <b>JWT 密钥已换</b>：所有旧登录 token 失效，前后台都要重新登录。</div>
+
+<div class="callout c-amber"><b>🟡 数据层面要注意</b><br>
+3. <b>positions 表是 0 行</b>：这是目前匹配功能跑不通的最大阻塞，需要导入岗位数据。<br>
+4. <b>云端是共享库</b>：多组共连，别在库里乱删乱改；本地 MySQL 的数据后端不再读取了。<br>
+5. <b>脏数据</b>：1 条 education=&quot;string&quot;（占位没替换）、4 条人才画像为空，52 个人才数据本身零缺失。</div>
+
+<div class="callout c-blue"><b>🔵 配置层面暂不生效/有坑</b><br>
+6. <b>PG / Milvus / Redis 三开关都是 false</b>：虽然 env 里指向了远程地址，但不生效，功能仍走本地替代逻辑。哪天要开远程 Milvus，记得把 <code>MILVUS_ENABLED</code> 一起打开。<br>
+7. <b>UPLOAD_DIR / LOG_DIR 变成了相对路径</b>：文件会写到启动目录下，如果发现文件找不到，看这里。<br>
+8. <b>伙伴 env 里的 LLM_PROVIDER=qwen 但 LLM_API_KEY 是空的</b>——你保住了自己的 Ollama 配置所以没踩这个坑，但如果以后切 qwen 供应商，必须先补 key 和 DIFY_JD_API_KEY / DIFY_EXPLANATION_API_KEY。<br>
+9. <b>79 个新增键里 39 个 settings.py 没定义</b>：extra=ignore 会静默忽略，无害但说明伙伴配置超前于代码，将来他代码合过来才会用上。</div>
+
+<div class="callout c-amber"><b>🟡 测试基线</b><br>
+10. 非集成测试 248 用例 / 245 过 / 3 失败（公共层 asyncio 老问题）；集成测试因 2 个用例真实调用本地 Ollama（单个约 3 分钟）全量会超时，最新完整结果待核实（11-04 基线 36/37）。</div>
+
+<h2>四、大白话最终汇总</h2>
+<div class="plain">
+  <p><b>打比方：</b>你的项目原来像一间按自己习惯布置的房间。今天干的事是——</p>
+  <ul>
+    <li><b>合并 env</b>：室友（集群）给了你一份他家钥匙清单，你把他家有的锁都记到你本子上（+79 个），但你家原来的锁一个没换；只有 3 把锁按你点头换成了他家的（数据库地址、数据库密码、门禁密钥）。</li>
+    <li><b>数据库切换</b>：你家客厅（数据库）搬到了大家一起用的公共客厅（云端共享库），搬过去发现客厅少两个柜子（两张表）和一个柜子少几层板（5 个字段），都已经补装好了。</li>
+    <li><b>Gitee 合并</b>：伙伴把他这几天的作业交上来了，你俩改了同一批文件，机器只能选一边，我在选完"你的"之后把他那份内容又抄了回来，两边的活儿都没丢。</li>
+    <li><b>验证</b>：我用"双胞胎对照"的办法——一模一样的环境分别跑他的原版和合并版，错的地方一模一样，证明合并没带来任何新毛病。</li>
+  </ul>
+  <p><b>现在轮到你的三件事：</b>① 自己执行 push；② 重新登录（旧 token 全失效）；③ 尽快往云端 positions 表里导岗位数据，不然匹配功能没米下锅。</p>
+</div>
+
+<footer>22 · 本次修改说明与遗留问题汇总 ｜ 生成于 2026-11-05 ｜ 岗位人才匹配 Agent 交付文档系列</footer>
+</div>
+</body>
+</html>

@@ -1,3 +1,4 @@
+# 技能入口组织简历解析调用，结构化输出契约由简历模块维护。
 """
 模块：app/ai/skills/resume_skill.py
 职责：简历处理技能（解析 / 技能抽取 / 查重），供 Agent 调用。
@@ -169,7 +170,7 @@ class ResumeParseSkill(BaseSkill):
     category = "business"
     version = "1.0.0"
     required_permission = str(PermissionEnum.RESUME_PARSE)
-    requires = ("app.services.resume_service.ResumeService",)
+    requires = ("app.services.talent_resume_service.ResumeService.parse_resume",)
     timeout_seconds = 120.0  # 解析链路较长（OCR / LLM）
 
     async def execute(self, file_id: int | None = None, resume_id: int | None = None, **_: Any) -> dict[str, Any]:
@@ -177,12 +178,15 @@ class ResumeParseSkill(BaseSkill):
         if file_id is None and resume_id is None:
             raise ParamError("file_id 与 resume_id 至少提供一个")
 
+        # 注意：app.services.resume_service.ResumeService 是旧的 HTTP 侧实现，
+        # 既没有 parse_resume，也不能无参构造；真正带工作流的是 talent_resume_service，
+        # 传 db=None 时该服务会自己开 session_scope。
         service_cls = import_dependency(
-            "app.services.resume_service",
+            "app.services.talent_resume_service",
             "ResumeService",
-            hint="RAG 组未实现简历解析服务",
+            hint="Agent 组未实现简历解析服务",
         )
-        service = service_cls()
+        service = service_cls(None, context=context)
         method = getattr(service, "parse_resume", None) or getattr(service, "parse", None)
         require_dependency(method is not None, "ResumeService.parse_resume", hint="RAG 组未实现简历解析")
 
@@ -275,7 +279,7 @@ class ResumeDedupeSkill(BaseSkill):
     category = "business"
     version = "1.0.0"
     required_permission = str(PermissionEnum.RESUME_PARSE)
-    requires = ("app.services.resume_service.ResumeService.dedupe", "Milvus: talent_vectors")
+    requires = ("app.services.talent_resume_service.ResumeService.dedupe_resume", "Milvus: talent_vectors")
     timeout_seconds = 30.0
 
     async def execute(
@@ -289,12 +293,14 @@ class ResumeDedupeSkill(BaseSkill):
         if resume_id is None and not (text or "").strip():
             raise ParamError("resume_id 与 text 至少提供一个")
 
+        # 同上：查重实现挂在 talent_resume_service.ResumeService.dedupe_resume 上，
+        # 旧 resume_service 只有 upload/parse_worker/bind，没有查重能力。
         service_cls = import_dependency(
-            "app.services.resume_service",
+            "app.services.talent_resume_service",
             "ResumeService",
-            hint="RAG 组未实现简历查重（依赖 Milvus talent_vectors）",
+            hint="Agent 组未实现简历查重（依赖 Milvus talent_vectors）",
         )
-        service = service_cls()
+        service = service_cls(None, context=context)
         method = getattr(service, "dedupe_resume", None) or getattr(service, "dedupe", None)
         require_dependency(
             method is not None,

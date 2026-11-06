@@ -1,0 +1,55 @@
+{
+  "description": "开发者编写的合成验收样例，不代表真实业务准确率。每题仅一个预期相关文档。",
+  "documents": [
+    {
+      "key": "backend",
+      "text": "后端工程师岗位要求：掌握Python、FastAPI、MySQL，熟悉异步编程，具有三年以上后端开发经验。"
+    },
+    {
+      "key": "training",
+      "text": "员工培训报销制度：培训完成后十个工作日内提交发票和结业证明，由部门负责人审批，单次报销上限两千元。"
+    },
+    {
+      "key": "leave",
+      "text": "年休假管理制度：累计工作满一年不满十年，享受五天年休假；请假需提前三个工作日向主管申请。"
+    },
+    {
+      "key": "security",
+      "text": "数据安全规范：人才简历仅供授权HR访问，禁止导出到个人设备。账号密码每九十天更新一次。"
+    }
+  ],
+  "queries": [
+    {
+      "question": "后端工程师需要掌握什么技术？",
+      "expected": "backend"
+    },
+    {
+      "question": "Python开发岗位要求几年工作经验？",
+      "expected": "backend"
+    },
+    {
+      "question": "培训结束以后怎么申请报销？",
+      "expected": "training"
+    },
+    {
+      "question": "培训报销最高能报多少钱？",
+      "expected": "training"
+    },
+    {
+      "question": "工作两年可以休几天年假？",
+      "expected": "leave"
+    },
+    {
+      "question": "休假申请要提前多久提交？",
+      "expected": "leave"
+    },
+    {
+      "question": "谁有权限查看人才简历？",
+      "expected": "security"
+    },
+    {
+      "question": "多久需要修改一次账号密码？",
+      "expected": "security"
+    }
+  ]
+}

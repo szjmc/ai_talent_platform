@@ -106,7 +106,9 @@ def test_local_storage_presigned_url_falls_back_to_url():
 
 # ==================================================================== MinIO
 @pytest.mark.asyncio
-async def test_minio_adapter_crud_and_signature():
+async def test_minio_adapter_crud_and_signature(monkeypatch):
+    monkeypatch.setattr(settings, "MINIO_ENDPOINT", "127.0.0.1:9000")
+    monkeypatch.setattr(settings, "MINIO_PUBLIC_URL", "")
     requests: list[httpx.Request] = []
     adapter = MinioStorageAdapter(transport=httpx.MockTransport(_object_handler(requests)))
 
@@ -281,6 +283,9 @@ def test_oss_presigned_url_is_deterministic():
 
 # ==================================================================== DeepSeek
 def test_deepseek_registered_and_model_configurable(monkeypatch):
+    monkeypatch.setattr(settings, "DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1")
+    monkeypatch.setattr(settings, "DEEPSEEK_MODEL", "")
+    monkeypatch.setattr(settings, "LLM_MODEL", "qwen-plus")
     assert "deepseek" in llm_registry
 
     adapter = DeepSeekAdapter()
@@ -397,6 +402,8 @@ async def test_openai_adapter_list_models(monkeypatch):
 # ==================================================================== 模型选择
 def test_model_selector_is_provider_aware(monkeypatch):
     monkeypatch.setattr(settings, "LLM_PROVIDER", "deepseek")
+    # 本用例验证目录默认值，不能受开发者.env中显式模型覆盖影响。
+    monkeypatch.setattr(settings, "DEEPSEEK_MODEL", "")
     # 残留的 qwen 模型名不应被误用
     monkeypatch.setattr(settings, "LLM_MODEL", "qwen-plus")
     monkeypatch.setattr(settings, "LLM_MODEL_MAP", "")
@@ -453,6 +460,9 @@ def test_openai_chat_payload_excludes_internal_options(monkeypatch):
 
 
 def test_fallback_chain_supports_deepseek(monkeypatch):
+    monkeypatch.setattr(settings, "LLM_PROVIDER", "deepseek")
+    monkeypatch.setattr(settings, "DEEPSEEK_BASE_URL", "")
+    monkeypatch.setattr(settings, "LLM_BASE_URL", "https://api.deepseek.com/v1")
     monkeypatch.setattr(settings, "LLM_FALLBACK_MODELS", "")
     assert fallback_models("deepseek-reasoner")[0] == "deepseek-chat"
     assert fallback_models("deepseek-chat")[0] == "deepseek-reasoner"
@@ -498,6 +508,10 @@ def test_qwen_embedding_model_honors_settings(monkeypatch):
 # ==================================================================== LLMManager
 def test_llm_manager_creates_deepseek_adapter(monkeypatch):
     monkeypatch.setattr(settings, "LLM_PROVIDER", "deepseek")
+    monkeypatch.setattr(settings, "DEEPSEEK_MODEL", "")
+    monkeypatch.setattr(settings, "LLM_MODEL_MAP", "")
+    monkeypatch.delenv("LLM_MODEL_CHAT", raising=False)
+    monkeypatch.delenv("LLM_MODEL_DEEPSEEK_CHAT", raising=False)
     monkeypatch.setattr(settings, "LLM_MODEL", "qwen-plus")
     monkeypatch.setattr(settings, "LLM_EMBED_PROVIDER", "")
     monkeypatch.setattr(settings, "LLM_EMBED_MODEL", "")
@@ -511,6 +525,21 @@ def test_llm_manager_creates_deepseek_adapter(monkeypatch):
         with pytest.raises(AIError) as exc:
             llm_manager.get_embedding_llm()
         assert "LLM_EMBED_PROVIDER" in str(exc.value)
+    finally:
+        llm_manager.clear_instances()
+
+
+def test_explicit_deepseek_model_overrides_catalog_default(monkeypatch):
+    monkeypatch.setattr(settings, "LLM_PROVIDER", "deepseek")
+    monkeypatch.setattr(settings, "DEEPSEEK_MODEL", "deepseek-flash")
+    monkeypatch.setattr(settings, "LLM_MODEL", "qwen-plus")
+    monkeypatch.setattr(settings, "LLM_MODEL_MAP", "")
+    monkeypatch.delenv("LLM_MODEL_CHAT", raising=False)
+    monkeypatch.delenv("LLM_MODEL_DEEPSEEK_CHAT", raising=False)
+    llm_manager.clear_instances()
+    try:
+        assert select_model("chat") == "deepseek-flash"
+        assert llm_manager.get_llm("chat").model == "deepseek-flash"
     finally:
         llm_manager.clear_instances()
 

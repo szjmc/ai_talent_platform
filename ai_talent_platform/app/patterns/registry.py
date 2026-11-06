@@ -72,3 +72,6 @@ class Registry(Generic[T]):
 agent_registry: Registry = Registry("agent")
 skill_registry: Registry = Registry("skill")
 llm_registry: Registry = Registry("llm")
+vector_registry: Registry = Registry("vector")  # 向量库适配（milvus/local），见 adapters/vector_store/*
+# *kwq* 新增：向量库注册表（adapters/vector_store/milvus_adapter.py 注册 "milvus"）
+vector_store_registry: Registry = Registry("vector_store")

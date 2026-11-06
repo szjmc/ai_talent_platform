@@ -1,3 +1,7 @@
+"""对象存储手工联调脚本，保留原有运行行为。
+
+标签：[架构组] [P2]（手工诊断，不属于自动化测试入口）
+"""
 import os
 from dotenv import load_dotenv
 from minio import Minio

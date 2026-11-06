@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>agent-system-v1 · 缺口与对接清单</title>
+<style>
+  :root{
+    --ink:#1b2430; --ink2:#4a5766; --ink3:#7b8794;
+    --line:#e3e8ef; --bg:#f7f9fc; --card:#ffffff;
+    --blue:#2f6fed; --blue-bg:#eef4ff;
+    --green:#1f8a5b; --green-bg:#e8f6ef;
+    --amber:#b8770a; --amber-bg:#fdf4e3;
+    --red:#c0392b; --red-bg:#fdeeec;
+    --purple:#6b4fd8; --purple-bg:#f1edfe;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px; line-height:1.75; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding:40px 28px 80px}
+  header.hero{
+    background:linear-gradient(135deg,#1b2b44 0%,#2b4a72 100%);
+    color:#fff; border-radius:16px; padding:34px 36px; margin-bottom:26px;
+  }
+  header.hero .kicker{font-size:12px; letter-spacing:.18em; opacity:.72; text-transform:uppercase}
+  header.hero h1{margin:8px 0 6px; font-size:27px; font-weight:650; letter-spacing:-.01em}
+  header.hero p{margin:0; color:#c8d6e8; font-size:13.5px}
+  header.hero .meta{margin-top:16px; display:flex; gap:22px; flex-wrap:wrap; font-size:12.5px; color:#9fb4cf}
+  header.hero .meta b{color:#e8f0fa; font-weight:600}
+
+  .verdict{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:34px;
+  }
+  .verdict .v{
+    background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 20px;
+  }
+  .verdict .v .n{font-size:26px; font-weight:680; letter-spacing:-.02em; line-height:1.2}
+  .verdict .v .t{font-size:12.5px; color:var(--ink3); margin-top:2px}
+  .verdict .v .d{font-size:12.5px; color:var(--ink2); margin-top:8px}
+  .v.g .n{color:var(--green)} .v.a .n{color:var(--amber)} .v.r .n{color:var(--red)}
+
+  section{margin-bottom:40px}
+  h2{
+    font-size:18px; font-weight:660; margin:0 0 6px; letter-spacing:-.01em;
+    display:flex; align-items:center; gap:10px;
+  }
+  h2 .num{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:24px; height:24px; border-radius:7px; background:var(--ink); color:#fff;
+    font-size:12.5px; font-weight:600; flex:none;
+  }
+  .sub{color:var(--ink3); font-size:13px; margin:0 0 16px; padding-left:34px}
+
+  table{width:100%; border-collapse:separate; border-spacing:0; background:var(--card);
+    border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-bottom:12px}
+  th{
+    background:#f2f5fa; text-align:left; font-weight:640; font-size:12.5px; color:var(--ink2);
+    padding:11px 14px; border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  td{padding:12px 14px; border-bottom:1px solid #eef2f7; vertical-align:top; font-size:13px}
+  tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:#fbfcfe}
+  code{
+    font-family:"JetBrains Mono",Consolas,monospace; font-size:11.8px;
+    background:#f1f4f9; padding:1px 5px; border-radius:4px; color:#33475e;
+    word-break:break-all;
+  }
+  .pill{
+    display:inline-block; padding:1px 8px; border-radius:20px; font-size:11.5px; font-weight:600;
+    white-space:nowrap; line-height:1.7;
+  }
+  .p-ok{background:var(--green-bg); color:var(--green)}
+  .p-mid{background:var(--amber-bg); color:var(--amber)}
+  .p-no{background:var(--red-bg); color:var(--red)}
+  .p-p0{background:var(--red-bg); color:var(--red)}
+  .p-p1{background:var(--amber-bg); color:var(--amber)}
+  .p-p2{background:var(--blue-bg); color:var(--blue)}
+  .p-p3{background:var(--purple-bg); color:var(--purple)}
+
+  .note{
+    background:var(--blue-bg); border-left:3px solid var(--blue); border-radius:0 8px 8px 0;
+    padding:12px 16px; font-size:13px; color:#274b8f; margin:14px 0 0;
+  }
+  .warn{
+    background:var(--red-bg); border-left:3px solid var(--red); border-radius:0 8px 8px 0;
+    padding:12px 16px; font-size:13px; color:#8f2c22; margin:14px 0 0;
+  }
+
+  .phase{display:grid; grid-template-columns:1fr; gap:12px}
+  .ph{
+    background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:16px 20px; display:grid; grid-template-columns:120px 1fr; gap:18px;
+  }
+  .ph .tag{font-size:12px; font-weight:700; color:var(--blue); letter-spacing:.02em; padding-top:2px}
+  .ph .tag small{display:block; color:var(--ink3); font-weight:500; letter-spacing:0; margin-top:2px}
+  .ph h3{margin:0 0 6px; font-size:14.5px; font-weight:650}
+  .ph ul{margin:0; padding-left:18px; color:var(--ink2); font-size:13px}
+  .ph li{margin:2px 0}
+  .ph .why{font-size:12.5px; color:var(--ink3); margin-top:6px}
+
+  ol.q{margin:0; padding-left:20px; color:var(--ink2); font-size:13.2px}
+  ol.q li{margin:7px 0}
+  ol.q b{color:var(--ink)}
+
+  footer{margin-top:44px; padding-top:18px; border-top:1px solid var(--line); color:var(--ink3); font-size:12.5px}
+  @media print{body{background:#fff} .ph,table,.verdict .v{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="kicker">agent-system-v1 · 版本体检</div>
+  <h1>还缺什么 · 要对接什么 · 按什么顺序补</h1>
+  <p>基于真实代码 + 真实执行记录盘点（非文档抄写）：逐文件核对路由注册、适配器实现程度、依赖与提交状态。</p>
+  <div class="meta">
+    <span>盘点时间 <b>2026-11-04</b></span>
+    <span>分支 <b>lz_agent</b>（3 commits）</span>
+    <span>未提交 <b>27 项</b></span>
+    <span>已实现接口 <b>33</b> · 待补 <b>45</b></span>
+  </div>
+</header>
+
+<div class="verdict">
+  <div class="v g">
+    <div class="n">1 / 9</div>
+    <div class="t">业务模块真正跑通</div>
+    <div class="d">只有「岗位画像 + 人岗匹配」这一条链路是完整实现（含四态判定、打分、证据、解释、落库、回读）。</div>
+  </div>
+  <div class="v a">
+    <div class="n">5 条</div>
+    <div class="t">外部依赖未接通</div>
+    <div class="d">Dify、LLM、Embedding、Milvus、Vanna/PgSQL —— 全部走「如实标注的降级」，不是报错，但也不是真实链路。</div>
+  </div>
+  <div class="v r">
+    <div class="n">0 行</div>
+    <div class="t">前端代码</div>
+    <div class="d">仓库里没有任何前端工程，现在只能靠 Swagger 看接口；要给人演示必须先有页面。</div>
+  </div>
+</div>
+
+<!-- ============ 1 ============ -->
+<section>
+  <h2><span class="num">1</span>已经有的东西（别重复做）</h2>
+  <p class="sub">以下都是真实实现并用真实 MySQL + 真实 HTTP 验证过的，可作为后续模块的参照样板。</p>
+  <table>
+    <thead><tr><th style="width:150px">模块</th><th style="width:70px">接口数</th><th>实际能力</th><th style="width:88px">状态</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>认证 auth</td><td>6</td>
+        <td>注册 / 登录 / 刷新令牌 / 当前用户 / 改密；JWT + bcrypt，登录失败锁定</td>
+        <td><span class="pill p-ok">已实现</span></td>
+      </tr>
+      <tr>
+        <td>用户 users</td><td>8</td>
+        <td>CRUD、状态管理、角色分配、权限码校验（RBAC）</td>
+        <td><span class="pill p-ok">已实现</span></td>
+      </tr>
+      <tr>
+        <td>组织 organizations</td><td>7</td>
+        <td>部门树、层级维护、level/path 设计</td>
+        <td><span class="pill p-ok">已实现</span></td>
+      </tr>
+      <tr>
+        <td>岗位 positions</td><td>3</td>
+        <td>JD 智能解析（生成画像草稿）→ 画像确认（版本递增）→ 画像查询</td>
+        <td><span class="pill p-ok">已实现</span></td>
+      </tr>
+      <tr>
+        <td>匹配 matchings</td><td>5</td>
+        <td>执行匹配（LangGraph 6 节点）/ 记录列表 / 岗位最新 / 人才历史 / 解释重算</td>
+        <td><span class="pill p-ok">已实现</span></td>
+      </tr>
+      <tr>
+        <td>系统 system</td><td>4</td>
+        <td><code>/health</code> <code>/health/ready</code> <code>/system/info</code> <code>/system/skills</code>，含 AI 运行时状态自检</td>
+        <td><span class="pill p-ok">已实现</span></td>
+      </tr>
+      <tr>
+        <td>公共层</td><td>—</td>
+        <td>统一响应信封、错误码、分页、中间件（trace/日志/CORS/限流/安全头）、全局异常、事务、审计、Repository 基类</td>
+        <td><span class="pill p-ok">已实现</span></td>
+      </tr>
+      <tr>
+        <td>AI 底座</td><td>—</td>
+        <td>LLM 适配器四件套（base/openai/qwen/ollama）、LLMManager、模型选择降级链、Token 配额、Skills 注册体系、Dify 适配器</td>
+        <td><span class="pill p-ok">已实现</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="note">
+    一句话：<b>框架层几乎全齐，业务层只填了一格。</b>后续 8 个模块不需要再设计架构，照 <code>matching</code> 的分层（router → service → repository）抄结构即可。
+  </div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section>
+  <h2><span class="num">2</span>要对接的外部接口（8 条，按卡人程度排序）</h2>
+  <p class="sub">这 8 条是「不接就没有真实 AI 能力」的硬依赖。每条都写明：找谁要、要什么、代码改哪里、现在什么行为、怎么算接通。</p>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:56px">编号</th><th style="width:130px">对接对象</th><th style="width:180px">需要拿到的</th>
+        <th>对接位置（改这里）</th><th style="width:150px">当前行为</th><th style="width:78px">优先级</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>INT-1</b></td>
+        <td>Dify 工作流<br><small style="color:var(--ink3)">job_profile_extraction</small></td>
+        <td>① <code>DIFY_BASE_URL</code> ② <code>DIFY_API_KEY</code> ③ 工作流 app-id ④ inputs 变量名（暂定 <code>jd_text</code>）⑤ outputs 结构</td>
+        <td><code>app/adapters/dify/dify_adapter.py</code><br>默认规格见 <code>DEFAULT_WORKFLOWS</code>（path <code>/workflows/run</code>）<br>调用侧 <code>app/services/jd_parser.py</code></td>
+        <td>JD 解析走规则提取，<code>source=manual</code></td>
+        <td><span class="pill p-p0">P0</span></td>
+      </tr>
+      <tr>
+        <td><b>INT-2</b></td>
+        <td>Dify 工作流<br><small style="color:var(--ink3)">match_explanation</small></td>
+        <td>同上 + 证据包入参格式（暂定 <code>evidence_pack</code>，JSON 字符串）</td>
+        <td><code>dify_adapter.run_match_explanation()</code><br>调用侧 <code>app/services/explanation_service.py</code></td>
+        <td>解释走规则兜底，<code>channel=rule_fallback</code></td>
+        <td><span class="pill p-p0">P0</span></td>
+      </tr>
+      <tr>
+        <td><b>INT-3</b></td>
+        <td>大模型 LLM</td>
+        <td><code>LLM_API_KEY</code>（qwen-plus / 或 OpenAI / 或本地 Ollama 地址与模型名）</td>
+        <td><code>app/config/settings.py</code> 的 <code>LLM_*</code><br><code>app/ai/core/llm_manager.py</code> 统一出口</td>
+        <td>无 key：连 <code>llm_fallback</code> 也走不通，直接降到规则</td>
+        <td><span class="pill p-p0">P0</span></td>
+      </tr>
+      <tr>
+        <td><b>INT-4</b></td>
+        <td>向量模型 Embedding</td>
+        <td>与 Milvus 集合维度一致的配置（<code>text-embedding-v3</code>，<b>dim=1024</b>）</td>
+        <td><code>app/ai/rag/embedding_service.py</code>（现为 19 行骨架）<br>通道已有：<code>QwenAdapter.embed()</code></td>
+        <td>无向量化能力，语义检索全不可用</td>
+        <td><span class="pill p-p1">P1</span></td>
+      </tr>
+      <tr>
+        <td><b>INT-5</b></td>
+        <td>Milvus 向量库</td>
+        <td><code>MILVUS_URI</code> / <code>MILVUS_TOKEN</code>；集合 <code>talent_vectors</code>、<code>knowledge_vectors</code></td>
+        <td><code>app/adapters/vector_store/milvus_adapter.py</code>（32 行骨架）<br><code>app/infrastructure/vector/milvus.py</code>（19 行骨架）<br>初始化脚本 <code>scripts/init_milvus.py</code></td>
+        <td>召回打 <code>recall_mode=sql_fallback</code>（大库场景召回质量受限）</td>
+        <td><span class="pill p-p1">P1</span></td>
+      </tr>
+      <tr>
+        <td><b>INT-6</b></td>
+        <td>PgSQL + Vanna（NL2SQL）</td>
+        <td>分析库账号、schema（<code>public</code>）、Vanna 训练语料权限</td>
+        <td><code>app/adapters/nl2sql/vanna_adapter.py</code>（27 行骨架）<br><code>sql_validator.py</code>（安全校验，<b>必须先于 Vanna 落地</b>）<br><code>scripts/train_vanna.py</code>、<code>scripts/init_pgsql.py</code></td>
+        <td><code>PGSQL_ENABLED=false</code>，分析类接口全占位</td>
+        <td><span class="pill p-p1">P1</span></td>
+      </tr>
+      <tr>
+        <td><b>INT-7</b></td>
+        <td>Redis</td>
+        <td>连接串即可（已进 <code>docker-compose</code> 的 <code>cache</code> profile）</td>
+        <td><code>app/infrastructure/cache/redis.py</code>（动态 import <code>redis.asyncio</code>）</td>
+        <td><code>REDIS_ENABLED=false</code> 时降级为进程内缓存；<b>多 worker 下限流失效、会话不共享</b></td>
+        <td><span class="pill p-p2">P2</span></td>
+      </tr>
+      <tr>
+        <td><b>INT-8</b></td>
+        <td>对象存储 MinIO / OSS</td>
+        <td>endpoint / bucket / AK / SK（<code>minio</code>、<code>boto3</code> 已在依赖里）</td>
+        <td>新增 <code>app/adapters/storage/minio_storage_adapter.py</code><br>现有仅 <code>local_storage_adapter.py</code>（90 行）</td>
+        <td>只能存本机 <code>./data/uploads</code>，多实例/容器重启即丢</td>
+        <td><span class="pill p-p2">P2</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="warn">
+    <b>Dify 这条最容易假接通。</b>现在适配器能用，但 <code>required_inputs</code> 和 outputs 结构都标着「暂定·待联调确认」。向 Dify 管理员索取时，务必一次问齐 5 样：<b>API Key、Base URL（含 /v1）、工作流 app-id、inputs 变量名与类型、outputs 返回结构（是单字段 result 还是多字段）</b>。少问一样，联调时就得再返工一轮。
+  </div>
+</section>
+
+<!-- ============ 3 ============ -->
+<section>
+  <h2><span class="num">3</span>业务模块缺口：8 个占位模块，45 个接口</h2>
+  <p class="sub">这 8 个模块现在只有 1 条 <code>GET</code> 占位接口，统一返回 <b>501 + 负责人提示</b>。真实路由文件里只有 docstring 设计稿，没有 endpoint。</p>
+  <table>
+    <thead>
+      <tr><th style="width:120px">模块</th><th style="width:64px">缺接口</th><th>需要补齐的接口</th><th style="width:180px">依赖的外部/上游能力</th><th style="width:78px">优先级</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>人才档案</b><br><code>/talents</code></td><td><b>9</b></td>
+        <td>创建 / 分页列表 / 详情 / 画像详情 / 更新 / 逻辑删除 / <b>语义检索</b> / 画像刷新 / 档案合并</td>
+        <td>Milvus（语义检索、画像刷新）；<b>匹配的上游数据源</b></td>
+        <td><span class="pill p-p0">P0</span></td>
+      </tr>
+      <tr>
+        <td><b>简历管理</b><br><code>/resumes</code></td><td><b>6</b></td>
+        <td>上传（校验/秒传）/ 触发 AI 解析（异步）/ 详情 / 解析结果 / 列表 / 绑定到人才档案</td>
+        <td>文件存储、LLM 抽取、Milvus（查重）</td>
+        <td><span class="pill p-p1">P1</span></td>
+      </tr>
+      <tr>
+        <td><b>知识库</b><br><code>/knowledge</code></td><td><b>6</b></td>
+        <td>建文档 / 上传并索引 / 文档列表 / 删除（同步删向量）/ 向量检索 / RAG 问答</td>
+        <td>RAG 5 文件全骨架 + Embedding + Milvus</td>
+        <td><span class="pill p-p2">P2</span></td>
+      </tr>
+      <tr>
+        <td><b>数据分析</b><br><code>/analytics</code></td><td><b>5</b></td>
+        <td>概览指标 / 分布 / 趋势 / <b>NL2SQL 问数</b> / 报告导出（Word、PDF）</td>
+        <td>PgSQL + Vanna + sql_validator；导出需 docx 模板</td>
+        <td><span class="pill p-p2">P2</span></td>
+      </tr>
+      <tr>
+        <td><b>AI 智能体</b><br><code>/agents</code></td><td><b>5</b></td>
+        <td>对话（非流式）/ 对话（<b>SSE 流式</b>）/ 会话列表 / 消息历史 / 指定 Agent 任务</td>
+        <td>LLM + 6 个 Agent 全骨架 + 会话记忆</td>
+        <td><span class="pill p-p2">P2</span></td>
+      </tr>
+      <tr>
+        <td><b>培训管理</b><br><code>/trainings</code></td><td><b>6</b></td>
+        <td>建课程 / 课程列表 / 建培训计划（AI 生成）/ 计划列表（含完成率）/ 学习进度 / 课程推荐</td>
+        <td>LLM（计划生成）；依赖能力缺口数据</td>
+        <td><span class="pill p-p3">P3</span></td>
+      </tr>
+      <tr>
+        <td><b>人才测评</b><br><code>/assessments</code></td><td><b>5</b></td>
+        <td>创建测评 / 列表 / 开始（返回题目、不含答案）/ 提交 / 结果（维度 + AI 报告）</td>
+        <td>LLM（报告生成）</td>
+        <td><span class="pill p-p3">P3</span></td>
+      </tr>
+      <tr>
+        <td><b>文件管理</b><br><code>/files</code></td><td><b>3</b></td>
+        <td>上传 / 下载 / 预览<br><small style="color:var(--red)">注意：<code>file_router.py</code> 根本不存在，stub 描述里却指向它</small></td>
+        <td>本地存储已实现，改远端只换适配器</td>
+        <td><span class="pill p-p1">P1</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="note">
+    <b>为什么人才档案是 P0：</b>匹配链路自己读 <code>Talent</code> 表，所以匹配能跑；但页面无法新建/维护人才，演示时只能靠 <code>scripts/seed_data.py</code> 造数。<b>人才 CRUD 不通，整个平台就没法自助使用。</b>
+  </div>
+</section>
+
+<!-- ============ 4 ============ -->
+<section>
+  <h2><span class="num">4</span>AI 能力层缺口：19 个骨架文件</h2>
+  <p class="sub">这些文件不是「写了一半」，而是<b>只有 docstring 设计稿</b>（19–32 行），没有一行实现。Skills 层已经写好了，但它们调用的下游全部为空，因此会抛 <code>SkillUnavailableError</code>。</p>
+  <table>
+    <thead><tr><th style="width:150px">子系统</th><th style="width:64px">文件数</th><th>骨架文件</th><th>影响</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>RAG 管线</b></td><td>5</td>
+        <td><code>document_loader</code> · <code>document_splitter</code> · <code>embedding_service</code> · <code>retriever</code> · <code>rag_pipeline</code></td>
+        <td>知识库问答、语义检索全部不可用</td>
+      </tr>
+      <tr>
+        <td><b>Agent 实现</b></td><td>6</td>
+        <td><code>assistant</code> · <code>resume</code> · <code>talent</code> · <code>matching</code> · <code>assessment</code> · <code>training</code></td>
+        <td><code>/agents/*</code> 五个接口无法落地；调度器已就绪但无 agent 可调</td>
+      </tr>
+      <tr>
+        <td><b>Prompt 模板</b></td><td>4</td>
+        <td><code>matching</code> · <code>resume</code> · <code>assessment</code> · <code>assistant</code></td>
+        <td>LLM 无稳定提示词，输出质量不可控、无法做版本对比</td>
+      </tr>
+      <tr>
+        <td><b>NL2SQL</b></td><td>2</td>
+        <td><code>vanna_adapter</code> · <code>sql_validator</code></td>
+        <td>问数功能不可用；<b>校验器必须先做</b>，否则是注入风险</td>
+      </tr>
+      <tr>
+        <td><b>向量库适配</b></td><td>1</td>
+        <td><code>adapters/vector_store/milvus_adapter.py</code> + <code>infrastructure/vector/milvus.py</code></td>
+        <td>Milvus 无法被任何业务调用</td>
+      </tr>
+      <tr>
+        <td><b>工作流</b></td><td>3</td>
+        <td><code>resume_workflow</code> · <code>analysis_workflow</code> · <code>graph_builder</code></td>
+        <td>只有 <code>matching_workflow</code> 是真的</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============ 5 ============ -->
+<section>
+  <h2><span class="num">5</span>需求写了但代码里没有的功能（容易被漏掉）</h2>
+  <p class="sub">对照 <code>需求输出版.html</code> 的五个模块，这两个是整块缺失，不只是接口没写。</p>
+  <table>
+    <thead><tr><th style="width:170px">缺失功能</th><th>需求原文要求</th><th>当前状态</th><th style="width:78px">优先级</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>双向匹配</b><br>（人才找岗位）</td>
+        <td>输入一个人才，反查「他还适合哪些岗位」，与岗位找人才共用打分内核但差异化规则</td>
+        <td><span class="pill p-no">完全缺失</span> 代码中无反向查询入口，<code>matching_router</code> 只有单向 5 个接口</td>
+        <td><span class="pill p-p1">P1</span></td>
+      </tr>
+      <tr>
+        <td><b>岗位储备预警</b></td>
+        <td>人才离职/储备不足/长期空缺三类预警，需预警记录表与定时扫描</td>
+        <td><span class="pill p-no">完全缺失</span> <code>Talent.status</code> 已有 <code>reserve</code> 值，但没有预警逻辑与表</td>
+        <td><span class="pill p-p2">P2</span></td>
+      </tr>
+      <tr>
+        <td>报告导出（Word/PDF）</td>
+        <td>分析报告、匹配报告可导出</td>
+        <td><span class="pill p-mid">接口在清单里</span> 无实现，无模板</td>
+        <td><span class="pill p-p3">P3</span></td>
+      </tr>
+      <tr>
+        <td>画像刷新（异步任务）</td>
+        <td>人才画像随简历/测评更新而刷新</td>
+        <td><span class="pill p-mid">接口占位</span> 无任务队列、无 Celery/后台 worker</td>
+        <td><span class="pill p-p2">P2</span></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============ 6 ============ -->
+<section>
+  <h2><span class="num">6</span>工程闭环缺口（不补会出事）</h2>
+  <table>
+    <thead><tr><th style="width:150px">问题</th><th>实际情况</th><th style="width:200px">风险</th><th style="width:78px">优先级</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>代码未提交</b></td>
+        <td><b>27 项</b>未纳入版本库：13 个新文件（<code>matching_pipeline</code> / <code>matching_rules</code> / <code>jd_parser</code> / <code>evidence_*</code> / <code>explanation_service</code> / 整个 <code>docs/delivery/</code> / <code>tests/unit/</code> / <code>tests/integration/</code>）+ 14 个修改文件</td>
+        <td><b>一次误操作全丢</b>；别人拉不到，无法评审、无法联调</td>
+        <td><span class="pill p-p0">P0</span></td>
+      </tr>
+      <tr>
+        <td><b>DDL 未审批</b></td>
+        <td><code>docs/sql/2026-11-04_matching_records_trace.sql</code>（5 个可空列）只在开发库执行</td>
+        <td>测试/生产缺列，落库直接失败</td>
+        <td><span class="pill p-p0">P0</span></td>
+      </tr>
+      <tr>
+        <td>3 条既有测试失败</td>
+        <td><code>tests/test_common_layer.py</code>，基线 <code>f29ac08</code> 同样失败（非本次引入）</td>
+        <td>CI 一开就红，掩盖新问题</td>
+        <td><span class="pill p-p1">P1</span></td>
+      </tr>
+      <tr>
+        <td>无 CI / 无 Dockerfile</td>
+        <td>无 <code>.gitlab-ci.yml</code>、无 <code>Dockerfile</code>、无 <code>Makefile</code>（只有 <code>docker-compose</code> 起数据库）</td>
+        <td>无法做到「提交即验证」，回归靠人工</td>
+        <td><span class="pill p-p1">P1</span></td>
+      </tr>
+      <tr>
+        <td>依赖文件编码异常</td>
+        <td><code>requirements.txt</code> 是 <b>UTF-16LE + BOM</b>（PowerShell 重定向产物），git 视为二进制</td>
+        <td>pip 能读，但 diff/审计/CI 脚本按文本处理会乱码</td>
+        <td><span class="pill p-p2">P2</span></td>
+      </tr>
+      <tr>
+        <td>无并发压测</td>
+        <td>只验证了解释阶段的信号量限流</td>
+        <td>批量匹配（1000 人）耗时不详，演示可能超时</td>
+        <td><span class="pill p-p2">P2</span></td>
+      </tr>
+      <tr>
+        <td>前端为零</td>
+        <td>仓库内无任何前端工程，只有 Swagger 与静态 HTML 文档</td>
+        <td>能给开发看，不能给业务看</td>
+        <td><span class="pill p-p2">P2</span></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============ 7 ============ -->
+<section>
+  <h2><span class="num">7</span>建议的推进顺序</h2>
+  <p class="sub">顺序不是按优先级硬排，而是<b>按依赖关系排</b>——前一批不通，后一批做了也验证不了。</p>
+  <div class="phase">
+    <div class="ph">
+      <div class="tag">第 1 批<small>本周内</small></div>
+      <div>
+        <h3>把已有的东西「落地」：提交 + DDL + 密钥</h3>
+        <ul>
+          <li>提交 27 项改动，推 <code>lz_agent</code> → 提 MR 到 <code>develop</code>，让别人能 review</li>
+          <li>DBA 审批 5 个可空列的 DDL，测试库同步执行</li>
+          <li>拿 <code>LLM_API_KEY</code> + <code>DIFY_*</code>（5 样一次问齐），先把 <code>llm_fallback</code> 通道打通</li>
+        </ul>
+        <div class="why">为什么先做这批：零开发量，但决定后面所有联调能不能开始。Dify 契约不定，写再多解释逻辑都是猜。</div>
+      </div>
+    </div>
+    <div class="ph">
+      <div class="tag">第 2 批<small>1–2 周</small></div>
+      <div>
+        <h3>补齐匹配的上游：人才档案 + 文件上传</h3>
+        <ul>
+          <li><code>/talents</code> 9 个接口（先做 CRUD + 列表 + 详情，语义检索留到 Milvus 到位后）</li>
+          <li><code>/files</code> 3 个接口 + 补 <code>file_router.py</code>（现在文件根本不存在）</li>
+          <li><code>/resumes</code> 上传 + 解析（解析走 JD 解析同一套 Dify 通道，可复用）</li>
+        </ul>
+        <div class="why">为什么：匹配能跑但没有数据入口。人才建档 + 简历导入通了，平台才算「能自助使用」。</div>
+      </div>
+    </div>
+    <div class="ph">
+      <div class="tag">第 3 批<small>2–4 周</small></div>
+      <div>
+        <h3>接真 AI：Milvus + Embedding + RAG</h3>
+        <ul>
+          <li>Milvus 部署 → <code>init_milvus.py</code> 建集合（dim 与 embedding 对齐 1024）</li>
+          <li><code>embedding_service</code> → <code>retriever</code> → <code>rag_pipeline</code> 按依赖顺序实现（不能跳）</li>
+          <li>召回切换：<code>sql_fallback</code> → 向量召回，用同一批数据对比召回质量</li>
+          <li>顺带打通人才语义检索、简历查重</li>
+        </ul>
+        <div class="why">为什么放第三：Milvus 是知识库、语义检索、查重三个功能的共同前置，一次性解锁三块。</div>
+      </div>
+    </div>
+    <div class="ph">
+      <div class="tag">第 4 批<small>可并行</small></div>
+      <div>
+        <h3>外壳与延伸：Agent 对话、分析问数、双向匹配、前端</h3>
+        <ul>
+          <li><code>/agents</code> 5 接口（6 个 Agent 先做 assistant 一个，跑通 SSE 再复制）</li>
+          <li><code>/analytics</code>：<b>先写 <code>sql_validator</code></b>，再接 Vanna</li>
+          <li>双向匹配（复用 <code>MatchingPipeline</code> 反查）+ 储备预警（新表 + 定时任务）</li>
+          <li>前端：优先「岗位画像确认 → 匹配结果列表 → 匹配解释」三步，够演示</li>
+        </ul>
+        <div class="why">为什么最后：这些都建立在前面数据与 AI 通道之上，早做只会做出「假数据页面」。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 8 ============ -->
+<section>
+  <h2><span class="num">8</span>跨组联调必须当面问清的 6 件事</h2>
+  <p class="sub">问不清就会各写一套，最后靠人肉对字段。</p>
+  <ol class="q">
+    <li><b>Dify 契约</b>：两个工作流的 app-id、inputs 变量名与类型、outputs 是单字段 <code>result</code> 还是多字段、超时与错误码怎么区分？</li>
+    <li><b>Embedding 维度</b>：向量模型定哪个？dim 定 1024 还是 768？<b>必须与 Milvus collection 一次定死</b>，改一次要重建全库。</li>
+    <li><b>人才档案的数据契约</b>：谁负责写 <code>Talent</code> 表？简历解析结果绑定时，字段冲突以谁为准？</li>
+    <li><b>语义检索的权限过滤</b>：Milvus 的 <code>expr</code> 按部门还是按角色？跨部门检索是否允许？</li>
+    <li><b>NL2SQL 的库边界</b>：Vanna 只能查 PgSQL 分析库，还是也能查 MySQL 业务库？<b>能否写？必须只读</b>。</li>
+    <li><b>文件存哪</b>：本地磁盘还是 MinIO？决定了 <code>/files</code> 的下载实现和部署方式（本地盘在多实例下必坏）。</li>
+  </ol>
+</section>
+
+<footer>
+  盘点依据：<code>app/routers/router.py</code> 的真实路由注册 · 各 <code>*_router.py</code> 的实际 endpoint 数 · 适配器与 AI 层文件行数（骨架 vs 实现）· <code>git status</code> 27 项未提交 · <code>.env</code> 中 5 个外部依赖的开关状态 · <code>docs/delivery/09_最终交付验收报告.md</code> 的实测记录。
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,33 @@
+[PASS] GET /health                        HTTP 200  {"status": "up", "version": "1.0.0"}
+[PASS] GET /health/ready                  HTTP 200  {"status": "up"}
+[PASS] POST /matchings/run 无 token        HTTP 401  请先登录
+[PASS] POST /auth/login                   HTTP 200  token 长度=285
+[PASS] GET /auth/me                       HTTP 200  {"id": 2, "username": "admin", "roles": ["super_admin", "admin"]}
+[PASS] GET /system/info                   HTTP 200  {"implemented_modules": ["auth", "users", "organizations", "positions", "matchings"]}
+[PASS] POST /positions/1/jd/parse         HTTP 200  channel=rule_fallback 必备=['Python', 'FastAPI', 'MySQL'] 优先=['Redis']
+[PASS] POST /jd/parse 过短文本                HTTP 422  请求参数校验失败
+[PASS] POST /positions/9999/jd/parse      HTTP 404  岗位不存在（id=9999）
+[PASS] GET /positions/1/profile           HTTP 200  version=10 confirmed=True 必备=['Python', 'FastAPI', 'MySQL']
+[PASS] POST /profile/confirm              HTTP 200  version=11 期望=11
+[PASS] POST /profile/confirm 版本冲突         HTTP 400  画像版本已变化（期望 1，当前 11），请刷新后重试
+[PASS] POST /matchings/run                HTTP 200  batch=5c328297 recall=sql_fallback stats={"candidates": 5, "excluded_by_hard": 2, "unknown": 1, "needs_review": 1, "output": 3}
+       #1 张伟 99.5 整体=PASS 完整度=100% 学历=PASS 年限=PASS 技能=PASS
+       #2 陈晨 98.0 整体=PASS 完整度=100% 学历=PASS 年限=PASS 技能=PASS
+       #3 王强 24.22 整体=NEEDS_REVIEW 完整度=33% 学历=UNKNOWN 年限=NEEDS_REVIEW 技能=UNKNOWN
+[PASS] GET /matchings/positions/1         HTTP 200  batch 一致=True 条数=3 淘汰=2
+[PASS] GET /matchings?page=1&page_size=2  HTTP 200  total=57 pages=29 本页=2
+[PASS] GET /matchings/talents/1           HTTP 200  记录数=17
+[PASS] POST /matchings/explain            HTTP 200  source=rule_fallback 结论=3 全部引用证据=True 被剔除=0
+[PASS] POST /matchings/run strategy=soft  HTTP 200  items=5 unknown=1 needs_review=1 excluded=0
+[PASS] POST /matchings/run top_k=0        HTTP 422  请求参数校验失败
+[PASS] POST /matchings/run min_score=999  HTTP 422  返回条数=0
+[PASS] POST /matchings/run 版本=999         HTTP 404  岗位画像版本不存在（position_id=1, version=999）
+[PASS] POST /matchings/run 岗位=9999        HTTP 404  岗位不存在（id=9999）
+       [占位] GET /talents -> 501 人才档案模块尚未实现，请对接负责人
+       [占位] GET /resumes -> 501 简历管理模块尚未实现，请对接负责人
+       [占位] GET /assessments -> 501 人才测评模块尚未实现，请对接负责人
+
+========================================================================
+接口体检：22/22 通过
+未发现接口层问题。
+========================================================================

@@ -40,6 +40,10 @@ EVENT_ASSESSMENT_SUBMITTED = "assessment.submitted"
 EVENT_ASSESSMENT_SCORED = "assessment.scored"
 EVENT_MATCHING_FINISHED = "matching.finished"
 EVENT_TRAINING_PLAN_CREATED = "training.plan_created"
+EVENT_TRAINING_LAG_ALERT = "training.lag.alert"
+EVENT_TRAINING_LAG_REMIND = "training.lag.remind"
+EVENT_TRAINING_RETEST_REQUIRED = "training.retest.required"
+EVENT_TRAINING_PLAN_ADJUST = "training.plan.adjust"
 EVENT_KNOWLEDGE_INDEXED = "knowledge.indexed"
 EVENT_AI_CALL_FINISHED = "ai.call_finished"
 EVENT_AUDIT_LOG = "audit.log"
@@ -53,7 +57,13 @@ ALL_EVENTS: tuple[str, ...] = (
     EVENT_ASSESSMENT_SUBMITTED,
     EVENT_ASSESSMENT_SCORED,
     EVENT_MATCHING_FINISHED,
+    # 培训模块五事件：必须全部登记，否则按 ALL_EVENTS 批量订阅（审计/日志）会漏掉
+    # 落后提醒、HR 预警、复测回流、计划调整这四条——它们恰恰是节点 5/6 的对外承诺。
     EVENT_TRAINING_PLAN_CREATED,
+    EVENT_TRAINING_LAG_ALERT,
+    EVENT_TRAINING_LAG_REMIND,
+    EVENT_TRAINING_RETEST_REQUIRED,
+    EVENT_TRAINING_PLAN_ADJUST,
     EVENT_KNOWLEDGE_INDEXED,
     EVENT_AI_CALL_FINISHED,
     EVENT_AUDIT_LOG,

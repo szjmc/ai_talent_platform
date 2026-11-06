@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>岗位人才匹配 Agent｜交付验收看板</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#ffffff; --ink:#1a1d21; --ink-2:#4a5158; --ink-3:#7a828a;
+    --line:#e5e8ec; --brand:#1f6feb; --brand-soft:#eaf2ff;
+    --ok:#1a7f4b; --ok-soft:#e8f6ee; --warn:#8a5a00; --warn-soft:#fff5e0;
+    --danger:#b42318; --danger-soft:#fdecea; --mono:'SFMono-Regular',Consolas,'Liberation Mono',monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.7 -apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 22px 64px}
+  header.hero{background:linear-gradient(135deg,#ffffff 0%,#f0f5ff 100%);
+    border:1px solid var(--line);border-radius:16px;padding:26px 28px;margin-bottom:20px}
+  .eyebrow{font-size:12px;letter-spacing:.14em;color:var(--brand);font-weight:700;text-transform:uppercase}
+  h1{font-size:26px;line-height:1.35;margin:8px 0 6px}
+  .sub{color:var(--ink-2);font-size:14px;margin:0}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+  .badge{font-size:12.5px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink-2)}
+  .badge.ok{background:var(--ok-soft);border-color:#bfe5cf;color:var(--ok);font-weight:600}
+  .badge.warn{background:var(--warn-soft);border-color:#f0d9a8;color:var(--warn);font-weight:600}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:18px 0 26px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+  .kpi .num{font-size:28px;font-weight:700;letter-spacing:-.02em}
+  .kpi .num small{font-size:14px;font-weight:500;color:var(--ink-3)}
+  .kpi .lbl{font-size:12.5px;color:var(--ink-3);margin-top:2px}
+  .kpi .hint{font-size:12px;color:var(--ink-3);margin-top:8px;border-top:1px dashed var(--line);padding-top:8px}
+  section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin-bottom:18px}
+  h2{font-size:17px;margin:0 0 4px;display:flex;align-items:center;gap:9px}
+  h2 .idx{display:inline-flex;width:24px;height:24px;border-radius:7px;background:var(--brand-soft);color:var(--brand);
+    font-size:12.5px;font-weight:700;align-items:center;justify-content:center}
+  .note{color:var(--ink-3);font-size:13px;margin:0 0 14px}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:12.5px;color:var(--ink-3);font-weight:600;background:#fafbfc}
+  tr:last-child td{border-bottom:none}
+  code{font-family:var(--mono);font-size:12.5px;background:#f3f5f7;padding:1px 5px;border-radius:5px}
+  pre{background:#0f1419;color:#d7e0e8;font-family:var(--mono);font-size:12.5px;line-height:1.65;
+    padding:16px 18px;border-radius:12px;overflow:auto;margin:0}
+  pre .c{color:#7d8b99}.pre .p{color:#7ee787}
+  .pill{display:inline-block;font-size:11.5px;padding:2px 8px;border-radius:999px;font-weight:600}
+  .pill.done{background:var(--ok-soft);color:var(--ok)}
+  .pill.part{background:var(--warn-soft);color:var(--warn)}
+  .pill.todo{background:#eef1f5;color:var(--ink-3)}
+  .pill.p0{background:var(--danger-soft);color:var(--danger)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px dashed var(--line);font-size:13.5px}
+  .row:last-child{border-bottom:none}
+  .row .k{color:var(--ink-2)}
+  .row .v{font-weight:600}
+  ul.clean{margin:8px 0 0;padding-left:18px;color:var(--ink-2);font-size:13.5px}
+  ul.clean li{margin:5px 0}
+  footer{color:var(--ink-3);font-size:12.5px;text-align:center;margin-top:22px;line-height:1.9}
+  @media (max-width:860px){.kpis{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">Delivery Review · V1.0</div>
+    <h1>岗位人才匹配 Agent｜交付验收看板</h1>
+    <p class="sub">真实 uvicorn 进程 + 真实 MySQL 8.0.27 + 真实 HTTP ｜ 分支 <code>lz_agent</code>（未提交）｜ 2026-11-04</p>
+    <div class="badges">
+      <span class="badge ok">主链路已跑通</span>
+      <span class="badge ok">178/178 测试通过</span>
+      <span class="badge ok">P0 = 0</span>
+      <span class="badge warn">Dify / LLM / Milvus 未接通（已如实标注）</span>
+      <span class="badge warn">生产库待执行 DDL</span>
+    </div>
+  </header>
+
+  <div class="kpis">
+    <div class="kpi">
+      <div class="num">10<small> / 14</small></div>
+      <div class="lbl">需求项完全达标</div>
+      <div class="hint">4 项 PARTIAL：外部依赖或已知结构缺口</div>
+    </div>
+    <div class="kpi">
+      <div class="num">178<small> 例</small></div>
+      <div class="lbl">匹配链路测试（100%）</div>
+      <div class="hint">单元 144 + 集成 34，5.4s 跑完</div>
+    </div>
+    <div class="kpi">
+      <div class="num">22<small> / 22</small></div>
+      <div class="lbl">端到端断言</div>
+      <div class="hint">真实进程 + 真实库，非 TestClient</div>
+    </div>
+    <div class="kpi">
+      <div class="num">12<small> 个</small></div>
+      <div class="lbl">发现问题（7 个 P1 全修）</div>
+      <div class="hint">含 1 个业务事故级：离职人员误入匹配</div>
+    </div>
+  </div>
+
+  <section>
+    <h2><span class="idx">1</span>需求完成度（14 项）</h2>
+    <p class="note">判定口径：只有提供真实执行记录与证据的功能才标 DONE；外部受阻区分「代码完成」与「真实联调」。</p>
+    <table>
+      <thead><tr><th style="width:26%">需求</th><th style="width:12%">状态</th><th>证据 / 差距</th></tr></thead>
+      <tbody>
+        <tr><td>JD 智能解析</td><td><span class="pill part">PARTIAL</span></td><td>规则通道实测：本科 / 3 年 / Python+FastAPI+MySQL / Redis 优先；Dify 无密钥、契约未拿到</td></tr>
+        <tr><td>画像确认与版本</td><td><span class="pill done">DONE</span></td><td>v3 → v4 递增；旧版本号被 400 拦截；未确认禁止匹配</td></tr>
+        <tr><td>人才档案读取</td><td><span class="pill done">DONE</span></td><td>缺失字段 → UNKNOWN，不当成「不满足」；完整度 33% 如实体现</td></tr>
+        <tr><td>候选人召回</td><td><span class="pill part">PARTIAL</span></td><td>SQL 召回 + 状态过滤；Milvus 未部署 → <code>sql_fallback</code></td></tr>
+        <tr><td>四态硬条件判定</td><td><span class="pill done">DONE</span></td><td>仅 FAIL 淘汰；UNKNOWN / NEEDS_REVIEW 一律保留</td></tr>
+        <tr><td>软性维度评分</td><td><span class="pill done">DONE</span></td><td>0~100，权重归一化，UNKNOWN 降权 15%，可复算</td></tr>
+        <tr><td>综合排序</td><td><span class="pill done">DONE</span></td><td>降序 + top_k / min_score；同分稳定</td></tr>
+        <tr><td>证据构建</td><td><span class="pill done">DONE</span></td><td><code>EVID-pid-tid-seq</code>，missing 不带能力术语</td></tr>
+        <tr><td>证据校验</td><td><span class="pill done">DONE</span></td><td>五层校验，编造 / 跨人 / 矛盾 / 缺失滥用一律剔除</td></tr>
+        <tr><td>匹配解释</td><td><span class="pill part">PARTIAL</span></td><td>规则解释每条挂 evidence_id；Dify / LLM 未接通</td></tr>
+        <tr><td>结果持久化</td><td><span class="pill part">PARTIAL</span></td><td>批次 / 明细 / 统计 / 淘汰原因可回读；全淘汰批次不落库（缺批次表）</td></tr>
+        <tr><td>API 暴露</td><td><span class="pill done">DONE</span></td><td>8 个接口进 OpenAPI，401/403/404/400/422 全符合契约</td></tr>
+        <tr><td>权限 / 异常 / 日志</td><td><span class="pill done">DONE</span></td><td>trace_id 贯穿访问日志与业务日志</td></tr>
+        <tr><td>工作流编排</td><td><span class="pill done">DONE</span></td><td>LangGraph 6 节点，不直连 DB，可降级顺序执行</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2><span class="idx">2</span>真实执行记录（节选）</h2>
+    <p class="note">命令：<code>scripts/e2e_matching_check.py</code> ｜ 原始日志：<code>docs/delivery/evidence/e2e_matching_run_20261104.log</code></p>
+<pre><span class="c"># 执行匹配（真实读库 + 落库）</span>
+POST /matchings/run -> 200  耗时=1.07s  batch_id=ee0c0c6d...
+recall_mode=sql_fallback  requirement_version=4
+stats={"candidates":5,"excluded_by_hard":2,"unknown":1,"needs_review":1,"output":3}
+
+#1 张伟 99.5  完整度100%  PASS / PASS / PASS
+#2 陈晨 98.0  完整度100%  PASS / PASS / PASS
+#3 王强 24.22 完整度 33%  UNKNOWN / NEEDS_REVIEW / UNKNOWN
+
+× 李娜 FAIL  required_skills：缺少必备技能 fastapi/mysql（命中 1/3）
+× 赵敏 FAIL  min_education 大专&lt;本科；min_work_years 2&lt;3；缺 mysql（命中 2/3）
+
+<span class="c"># 回读一致性（本轮修复前这里恒为空数组）</span>
+GET /matchings/positions/1 -> 200  条数=3  淘汰名单与原因文本一致 ✔
+
+<span class="c"># 解释与证据</span>
+POST /matchings/explain -> 200  source=rule_fallback
++ 学历满足：要求「本科」，实际「本科」   ← evidence_ids=['EVID-1-1-1']
++ 工作年限满足：要求 3 年，实际 5 年     ← evidence_ids=['EVID-1-1-2']
++ 必备技能全部命中（3/3）               ← evidence_ids=['EVID-1-1-3']</pre>
+  </section>
+
+  <div class="grid2">
+    <section>
+      <h2><span class="idx">3</span>外部依赖真实状态</h2>
+      <div class="row"><span class="k">MySQL 8.0.27（真实库，25 张表）</span><span class="v" style="color:var(--ok)">已接通</span></div>
+      <div class="row"><span class="k">uvicorn + 真实 HTTP（:8010）</span><span class="v" style="color:var(--ok)">已接通</span></div>
+      <div class="row"><span class="k">LangGraph 工作流</span><span class="v" style="color:var(--ok)">真实执行</span></div>
+      <div class="row"><span class="k">Dify 工作流</span><span class="v" style="color:var(--warn)">未接通 · 规则兜底</span></div>
+      <div class="row"><span class="k">LLM（Qwen 等）</span><span class="v" style="color:var(--warn)">无密钥</span></div>
+      <div class="row"><span class="k">Milvus 向量库</span><span class="v" style="color:var(--warn)">未部署 · SQL 召回</span></div>
+      <p class="note" style="margin:12px 0 0">未接通的通道在 <code>channel</code> / <code>source</code> / <code>recall_mode</code> 中如实返回，未用 Mock 冒充。</p>
+    </section>
+
+    <section>
+      <h2><span class="idx">4</span>问题级别</h2>
+      <div class="row"><span class="k">P0（阻断）</span><span class="v" style="color:var(--ok)">0</span></div>
+      <div class="row"><span class="k">P1（业务正确性）</span><span class="v" style="color:var(--ok)">7 发现 / 7 已修</span></div>
+      <div class="row"><span class="k">P2（可用性/结构）</span><span class="v" style="color:var(--warn)">4（含 1 项待 DDL）</span></div>
+      <div class="row"><span class="k">P3（体验/性能）</span><span class="v" style="color:var(--ink-2)">3</span></div>
+      <p class="note" style="margin:12px 0 0">P1 含：<code>top_k</code> 失效、离职人员误入、缺档案误淘汰、missing 证据滥用、<code>java</code> 误命中 <code>javascript</code>、JD 噪声、淘汰原因丢失。</p>
+    </section>
+  </div>
+
+  <section>
+    <h2><span class="idx">5</span>验收分层结论（L1~L5）</h2>
+    <table>
+      <thead><tr><th style="width:22%">层级</th><th style="width:20%">结果</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>L1 单元</td><td><span class="pill done">144 / 144</span></td><td>0.55s，无 DB 无网络</td></tr>
+        <tr><td>L2 集成</td><td><span class="pill done">18 / 18</span></td><td>真实 MySQL + 真实 Service/Repository + LangGraph</td></tr>
+        <tr><td>L3 启动 + API</td><td><span class="pill done">8 个新接口全通</span></td><td>41 条 OpenAPI 路径；状态码与契约一致</td></tr>
+        <tr><td>L4 完整业务流程</td><td><span class="pill done">22 / 22 断言</span></td><td>解析 → 确认 → 召回 → 判定 → 打分 → 证据 → 解释 → 校验 → 落库 → 回读</td></tr>
+        <tr><td>L5 异常与边界</td><td><span class="pill done">11 / 11 类</span></td><td>参数、不存在、未认证、无权限、规则拦截、版本冲突、缺失、空集、外部失败、编造、脏数据</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2><span class="idx">6</span>上线前必须完成</h2>
+    <ul class="clean">
+      <li><strong>DDL 审批</strong>：执行 <code>docs/sql/2026-11-04_matching_records_trace.sql</code>（新增 5 个可空列，可回滚）。</li>
+      <li><strong>人才档案接口</strong>：<code>/api/v1/talents</code> 仍为占位（他人模块），HR 目前无法在页面维护候选人。</li>
+      <li><strong>Dify 联调</strong>：拿到 Key + 工作流 ID + 契约后灰度；在此之前演示必须说明是规则通道。</li>
+      <li><strong>批次表</strong>：新增 <code>matching_batches</code>，解决「全员淘汰批次不落库、回读 404」。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="idx">7</span>配套 HTML 文档</h2>
+    <p class="note">按使用场景选：想逐个接口交接 → 15；想知道真实返回长什么样 → 14；想点着测 → 13；想知道谁负责哪块 → 12。</p>
+    <table>
+      <thead><tr><th style="width:36%">文档</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td><a href="15_接口交接手册.html">15_接口交接手册.html</a></td><td><strong>新增</strong>：52 个接口的目的 / 入参 / 出参 / 副作用 / 坑，含数据结构字典与三条调用链路</td></tr>
+        <tr><td><a href="14_真实服务测试数据.html">14_真实服务测试数据.html</a></td><td>8010 实测请求体与响应，可直接复制到 Swagger</td></tr>
+        <tr><td><a href="13_沙箱测试指南.html">13_沙箱测试指南.html</a></td><td>8011 怎么登、怎么点、报错怎么查</td></tr>
+        <tr><td><a href="12_对接清单与文件职责.html">12_对接清单与文件职责.html</a></td><td>端口、数据接入、Dify 配合、20 个 py 文件职责</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>
+    本看板数据全部来自真实执行；文档顺序：需求矩阵 → 环境启动 → API → 用例 → 自动化/集成/端到端报告 → Bug 记录 → 验收报告。<br>
+    <code>docs/delivery/</code> · 未提交 Git（分支 <code>lz_agent</code>）· 生成于 2026-11-04
+  </footer>
+</div>
+</body>
+</html>

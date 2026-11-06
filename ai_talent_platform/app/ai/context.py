@@ -42,6 +42,7 @@ class AIContext:
     username: str | None = None
     roles: list[str] = field(default_factory=list)
     organization_id: int | None = None
+    #一次请求的追踪编号，方便查日志、排查问题
     trace_id: str = "-"
     conversation_id: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)

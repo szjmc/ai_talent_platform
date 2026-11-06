@@ -63,6 +63,9 @@ class OllamaAdapter(BaseLLM):
         options.update(self.merge_options(**kwargs))
         if options:
             payload["options"] = options
+        # 思考模型（qwen3 等）默认关闭思考：否则 num_predict 会被思考耗尽，
+        # content 返回空串导致上层 parse_json 失败。需要思考时 options["think"]=True。
+        payload["think"] = bool(self.options.get("think", False))
 
         started = time.perf_counter()
         data = await self._post("/api/chat", payload)

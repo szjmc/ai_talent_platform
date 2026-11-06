@@ -1,26 +1,48 @@
-"""
-模块：app/schemas/resume.py
-职责：简历上传与解析相关结构。
-
-标签：[RAG组] [P1]
-
-============================ 实现思路与代码要点 ============================
-需要定义的 Schema：
-1. ResumeUploadResponse   file_id、resume_id、file_name、file_size、status="uploaded"
-2. ResumeParseRequest     resume_id、force(是否重新解析)、talent_id(可空，解析后绑定)
-3. ResumeParseResult      resume_id、status(parsing/success/failed)、
-                          parsed(结构化内容：basic_info/education/work_experience/projects/skills)、
-                          accuracy、warnings: list[str]、parsed_at
-4. ResumeResponse         id、file_name、file_type、file_size、status、talent_id、created_at
-5. ResumeQuery            keyword、status、talent_id
-实现要点：
-- 上传接口用 UploadFile，校验扩展名（settings.allowed_upload_extensions）与大小；
-- 解析是耗时任务：接口立即返回 task_id（或 resume_id + status=parsing），
-  真实解析在 ai/workflows/resume_workflow.py 中异步执行，结果写回 resume 表；
-- parsed 结构必须与 models/resume.py 中 JSON 字段定义一一对应。
-=========================================================================
-"""
-
-from __future__ import annotations
-
-# TODO(负责人)：按上述设计实现本文件的 Pydantic 模型。
+# 解析状态用于轮询，结构化字段经过响应契约约束。accuracy 可以为空。
+"""简历请求/响应契约，不把内部文件路径暴露给客户端。
+标签：[RAG组] [P1]。"""
+from datetime import datetime,date
+from typing import Literal
+from pydantic import BaseModel,ConfigDict,Field
+class Experience(BaseModel):
+    company: str = Field(min_length=1,max_length=128)
+    title: str | None = Field(default=None,max_length=128)
+    start_date: date | None = None
+    end_date: date | None = None
+    description: str | None = None
+class ParsedResume(BaseModel):
+    basic_info: dict = Field(default_factory=dict)
+    education: list[dict] = Field(default_factory=list)
+    work_experience: list[Experience] = Field(default_factory=list)
+    projects: list[dict] = Field(default_factory=list)
+    skills: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+class ResumeParseRequest(BaseModel):
+    force: bool = False
+class ResumeBindRequest(BaseModel):
+    talent_id: int = Field(gt=0)
+class ResumeResponse(BaseModel):
+    model_config=ConfigDict(from_attributes=True)
+    id:int
+    file_id:int|None=None
+    talent_id:int|None=None
+    file_name:str
+    file_type:str|None=None
+    file_size:int
+    status:Literal['uploaded','parsing','success','failed']
+    parsed_at:datetime|None=None
+    created_at:datetime
+class ResumeUploadResponse(ResumeResponse):
+    duplicate:bool=False
+class ResumeParseResult(BaseModel):
+    resume_id:int
+    status:str
+    parsed:ParsedResume|None=None
+    accuracy:float|None=None
+    warnings:list[str]=Field(default_factory=list)
+    parsed_at:datetime|None=None
+    error:str|None=None
+class ResumeQuery(BaseModel):
+    keyword:str|None=Field(default=None,max_length=255)
+    status:Literal['uploaded','parsing','success','failed']|None=None
+    talent_id:int|None=Field(default=None,gt=0)

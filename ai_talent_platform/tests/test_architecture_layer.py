@@ -217,11 +217,35 @@ async def test_circuit_breaker_opens_and_resets(monkeypatch):
 
 # ==================================================================== 模型选择
 def test_select_model_and_fallback(monkeypatch):
+    # 该用例验证原生qwen默认策略，不依赖开发者正在使用哪个兼容服务。
+    monkeypatch.setattr(settings, "LLM_PROVIDER", "qwen")
+    monkeypatch.setattr(settings, "LLM_MODEL", "qwen-plus")
+    monkeypatch.setattr(settings, "DASHSCOPE_MODEL", "")
+    monkeypatch.setattr(settings, "DASHSCOPE_BASE_URL", "")
+    monkeypatch.setattr(settings, "LLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+    monkeypatch.setattr(settings, "LLM_MODEL_MAP", "")
+    monkeypatch.setattr(settings, "LLM_FALLBACK_MODELS", "")
     assert select_model() == settings.LLM_MODEL or select_model() == "qwen-plus"
     monkeypatch.setenv("LLM_MODEL_MATCHING", "custom-model")
     assert select_model("matching") == "custom-model"
     assert select_temperature("resume_parse") < select_temperature("assistant")
     assert fallback_models("qwen-max")[0] == "qwen-plus"
+
+
+@pytest.mark.parametrize("purpose", ["sql", "summary"])
+def test_vanna_model_uses_config_and_preserves_override(monkeypatch, purpose):
+    """Vanna 两种用途默认读取配置，保留已有的进程环境变量覆盖能力。"""
+    monkeypatch.setattr(settings, "LLM_PROVIDER", "openai")
+    monkeypatch.setattr(settings, "LLM_BASE_URL", "https://compatible-model.example/v1")
+    monkeypatch.setattr(settings, "LLM_MODEL", "test-provider/configured-model")
+    monkeypatch.setattr(settings, "OPENAI_MODEL", "")
+    monkeypatch.setattr(settings, "OPENAI_BASE_URL", "")
+    monkeypatch.setattr(settings, "LLM_MODEL_MAP", "")
+    monkeypatch.delenv(f"LLM_MODEL_{purpose.upper()}", raising=False)
+    monkeypatch.delenv(f"LLM_MODEL_OPENAI_{purpose.upper()}", raising=False)
+    assert select_model(purpose) == settings.LLM_MODEL
+    monkeypatch.setenv(f"LLM_MODEL_{purpose.upper()}", "test-provider/override-model")
+    assert select_model(purpose) == "test-provider/override-model"
 
 
 # ==================================================================== Token 配额
@@ -239,13 +263,60 @@ async def test_token_manager_records_and_limits():
 
 
 # ==================================================================== LLM 管理
+@pytest.mark.asyncio
+@pytest.mark.parametrize("purpose", ["sql", "summary"])
+async def test_vanna_compatible_endpoint_request(monkeypatch, purpose):
+    """离线验证配置地址、鉴权和模型贯穿管理器到 HTTP 请求，不访问在线服务。"""
+    monkeypatch.setattr(settings, "LLM_PROVIDER", "openai")
+    monkeypatch.setattr(settings, "LLM_BASE_URL", "https://compatible-model.example/v1/")
+    monkeypatch.setattr(settings, "LLM_API_KEY", "test-key-not-a-real-secret")
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "")
+    monkeypatch.setattr(settings, "OPENAI_BASE_URL", "")
+    monkeypatch.delenv(f"LLM_MODEL_{purpose.upper()}", raising=False)
+    monkeypatch.delenv(f"LLM_MODEL_OPENAI_{purpose.upper()}", raising=False)
+    monkeypatch.setattr(settings, "LLM_MODEL_MAP", f"{purpose}=test-provider/test-model")
+    requests = []
+
+    def respond(request):
+        requests.append(request)
+        assert str(request.url) == "https://compatible-model.example/v1/chat/completions"
+        assert request.headers["Authorization"] == "Bearer test-key-not-a-real-secret"
+        payload = json.loads(request.content)
+        assert payload["model"] == "test-provider/test-model"
+        return httpx.Response(200, json={
+            "model": payload["model"],
+            "choices": [{"message": {"content": "SELECT 1"}}],
+        })
+
+    def offline_client(adapter):
+        return httpx.AsyncClient(
+            transport=httpx.MockTransport(respond), headers=adapter.default_headers(),
+        )
+
+    async def skip_record(*args, **kwargs):
+        pass
+
+    monkeypatch.setattr(BaseLLM, "client", offline_client)
+    monkeypatch.setattr(llm_manager, "_record", skip_record)
+    llm_manager.clear_instances()
+    try:
+        result = await llm_manager.chat([ChatMessage.user("统计人数")], purpose=purpose)
+        assert result.content == "SELECT 1"
+        assert result.model == "test-provider/test-model"
+        assert len(requests) == 1
+        assert llm_manager.get_llm(purpose) is llm_manager.get_llm(purpose)
+    finally:
+        llm_manager.clear_instances()
+
+
 @pytest.fixture()
 def fake_provider(monkeypatch):
     """注册 fake provider 并让 LLMManager 使用它。"""
     llm_registry.add("fake", FakeLLM)
+    monkeypatch.setattr(settings, "LLM_EMBED_PROVIDER", "fake")
     monkeypatch.setattr(settings, "LLM_PROVIDER", "fake")
     monkeypatch.setattr("app.ai.core.llm_manager.select_model", lambda purpose=None: "fake-model")
-    monkeypatch.setattr("app.ai.core.llm_manager.select_embedding_model", lambda: "fake-embed")
+    monkeypatch.setattr("app.ai.core.llm_manager.select_embedding_model", lambda *args, **kwargs: "fake-embed")
     llm_manager.clear_instances()
     yield
     llm_manager.clear_instances()
@@ -546,7 +617,8 @@ async def test_openai_adapter_chat_and_embed(monkeypatch):
         await adapter.chat([ChatMessage.user("hi")])
 
 
-def test_adapters_registered_and_describe():
+def test_adapters_registered_and_describe(monkeypatch):
+    monkeypatch.setattr(settings, "LLM_EMBED_MODEL", "")
     assert {"openai", "qwen", "ollama"} <= set(llm_registry.keys())
     from app.adapters.llm.ollama_adapter import OllamaAdapter
     from app.adapters.llm.qwen_adapter import QwenAdapter

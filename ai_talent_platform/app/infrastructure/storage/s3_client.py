@@ -277,13 +277,18 @@ class S3Client:
         url = self._url(key)
         if query:
             url = f"{url}?{_canonical_query(query)}"
-        async with self._client() as client:
+        import asyncio
+        # GET/HEAD/PUT固定对象键/DELETE均可幂等重试；不重试认证和参数错误。
+        for attempt in range(3):
             try:
-                return await client.request(method, url, headers=headers, content=data)
+                async with self._client() as client:
+                    response = await client.request(method, url, headers=headers, content=data)
+                if response.status_code not in {408,429,500,502,503,504} or attempt == 2:
+                    return response
             except httpx.HTTPError as exc:
-                raise ExternalServiceError(
-                    f"对象存储连接失败（{self.endpoint}）：{exc}"
-                ) from exc
+                if attempt == 2:
+                    raise ExternalServiceError('对象存储连接失败，已重试3次') from exc
+            await asyncio.sleep(0.5 * (2 ** attempt))
 
     # ---------------------------------------------------------------- 对象操作
     async def put_object(
@@ -408,6 +413,25 @@ class S3Client:
             f"对象存储调用失败（{action} {key}，HTTP {response.status_code}）：{detail}",
             data={"status": response.status_code, "bucket": self.bucket},
         )
+
+
+    async def list_keys(self, prefix):
+        """分页列举指定前缀，供补偿任务扫描；不读取其他业务对象。"""
+        from xml.etree import ElementTree
+        keys, token = [], None
+        while True:
+            query = {'list-type':'2', 'prefix':prefix}
+            if token:
+                query['continuation-token'] = token
+            response = await self._request('GET', query=query)
+            self._raise_for_status('GET', prefix, response)
+            root = ElementTree.fromstring(response.content)
+            keys.extend(node.text for node in root.findall('.//{*}Contents/{*}Key') if node.text)
+            if root.findtext('{*}IsTruncated') != 'true':
+                return keys
+            token = root.findtext('{*}NextContinuationToken')
+            if not token:
+                raise ExternalServiceError('对象列表分页缺少 continuation token')
 
 
 __all__ = [

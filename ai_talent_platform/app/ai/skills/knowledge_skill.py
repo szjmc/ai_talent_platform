@@ -1,3 +1,4 @@
+# 技能入口复用知识检索能力，调用链须携带当前用户上下文。
 """
 模块：app/ai/skills/knowledge_skill.py
 职责：知识库检索技能（RAG 检索能力对 Agent / LLM 的唯一出口）。
@@ -101,10 +102,16 @@ class KnowledgeSearchSkill(BaseSkill):
                 hint="MILVUS_ENABLED=False，知识检索依赖向量库",
             )
 
-        retriever = _load_retriever()
-        # 权限过滤只依赖上下文：把角色/部门传给检索器，由其拼 Milvus expr
-        chunks = await self._search(retriever, question, top_k, context, category)
-        return self._shape(chunks, top_k, context)
+        from app.infrastructure.database.session import session_scope
+        from app.repositories.user_repository import UserRepository
+        from app.ai.rag.retriever import Retriever
+        require_dependency(context.user_id is not None,'认证上下文',hint='依赖未就绪：缺少登录用户')
+        async with session_scope() as db:
+            user=await UserRepository().get_by_id_or_404(db,context.user_id)
+            from app.core.permissions import has_permission
+            require_dependency(user.is_active and not user.is_deleted and (user.is_superuser or has_permission(user.role_codes,PermissionEnum.KNOWLEDGE_READ)), '知识库权限', hint='用户不可访问知识库')
+            chunks=await Retriever(db).search(question,user,top_k=top_k,category=category,mode='hybrid')
+        return self._shape(chunks,top_k,context)
 
     # ---------------------------------------------------------------- 内部实现
     async def _search(
@@ -146,7 +153,7 @@ class KnowledgeSearchSkill(BaseSkill):
             score = float(item.get("score") or 0)
             if score < self.score_threshold:
                 continue
-            key = (item.get("doc_id"), item.get("chunk_index"))
+            key = (item.get("doc_id"), item.get("chunk_id", item.get("chunk_index")))
             if key in seen:
                 continue
             seen.add(key)

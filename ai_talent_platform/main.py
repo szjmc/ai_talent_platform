@@ -31,6 +31,7 @@ from app.config.logging_config import get_logger, setup_logging  # noqa: E402
 from app.config.settings import settings  # noqa: E402
 from app.core.application import create_application  # noqa: E402
 
+
 setup_logging()
 logger = get_logger("app.main")
 

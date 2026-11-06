@@ -26,7 +26,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 
 import bcrypt
-import jwt
+from jose import jwt
 
 from app.config.settings import settings
 from app.core.exceptions import AuthError, TokenExpiredError

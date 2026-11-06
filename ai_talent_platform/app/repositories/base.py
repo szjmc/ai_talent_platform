@@ -32,7 +32,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any, ClassVar, Generic, Sequence, TypeVar
 
-from sqlalchemy import Select, and_, delete, func, inspect, or_, select, update
+from sqlalchemy import Select, and_, func, inspect, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 

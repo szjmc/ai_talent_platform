@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>20 · 与人才数据决策 Agent 的交集与输出清单</title>
+<style>
+  :root{
+    --bg:#f6f8fa; --card:#ffffff; --ink:#1f2937; --sub:#6b7280;
+    --line:#e5e7eb; --blue:#1d4ed8; --blue-bg:#eff6ff;
+    --green:#15803d; --green-bg:#f0fdf4;
+    --amber:#b45309; --amber-bg:#fffbeb;
+    --red:#b91c1c; --red-bg:#fef2f2;
+    --purple:#6d28d9; --purple-bg:#f5f3ff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:var(--bg);color:var(--ink);line-height:1.75;padding:32px 16px}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-size:26px;margin-bottom:6px}
+  .meta{color:var(--sub);font-size:13px;margin-bottom:24px}
+  h2{font-size:20px;margin:36px 0 14px;padding-left:12px;border-left:4px solid var(--blue)}
+  h3{font-size:16px;margin:20px 0 10px}
+  p{margin:8px 0;font-size:14.5px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin:14px 0}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:10px 0;background:var(--card)}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:#f3f4f6;font-weight:600;white-space:nowrap}
+  code{font-family:Consolas,monospace;font-size:12.5px;background:#f3f4f6;padding:1px 5px;border-radius:4px}
+  .tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:10px;margin-right:6px;white-space:nowrap}
+  .t-blue{background:var(--blue-bg);color:var(--blue)}
+  .t-green{background:var(--green-bg);color:var(--green)}
+  .t-amber{background:var(--amber-bg);color:var(--amber)}
+  .t-red{background:var(--red-bg);color:var(--red)}
+  .t-purple{background:var(--purple-bg);color:var(--purple)}
+  .note{font-size:13px;color:var(--sub)}
+  .flow{font-size:13.5px;background:var(--blue-bg);border-radius:8px;padding:10px 14px;margin:10px 0;font-family:Consolas,monospace}
+  ul{margin:6px 0 6px 22px}
+  li{font-size:14px;margin:4px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>20 · 与人才数据决策 Agent 的交集与输出清单</h1>
+<div class="meta">岗位人才匹配 Agent 视角 · 基于真实代码核验（app/ai/agents/talent_agent.py、app/models/talent.py、app/services/evidence_builder.py、docs/CODEX_HANDOVER.md §5.7）· 2026-11-05</div>
+
+<div class="card" style="border-left:4px solid var(--amber)">
+<h3>先说现状：代码层面的真话</h3>
+<p>"人才数据决策 Agent" = <code>app/ai/agents/talent_agent.py</code>（人才分析 Agent：读人才档案 + 简历 + 测评 + 培训记录 → LLM 生成画像 → 写 <code>talent_portraits</code> 表）。目前它是 <b>32 行 TODO 骨架，无任何实现</b>；交接文档 CODEX_HANDOVER §5.7 原文：「与人才决策 Agent（talent）的接口：<b>无</b>，匹配不依赖它的输出」。</p>
+<p>所以：现在<b>没有正在运行的接口</b>，但表结构已经把交集点设计好了——趁对方还没动手，先把契约谈死。</p>
+</div>
+
+<h2>一、四个真实交集点（表和字段已存在，可逐条核对）</h2>
+
+<table>
+<tr><th>#</th><th>交集点</th><th>方向</th><th>代码依据</th></tr>
+<tr>
+<td>1</td>
+<td><code>talents.potential_level</code>（A/B/C/D 潜力等级）</td>
+<td><b>我 ← 他</b></td>
+<td>我的 <b>quality 维打分</b>直接读它：<code>evidence_builder.py:53</code>、<code>matching_skill.py:135</code>（POTENTIAL_SCORES 映射）。现状由 seed 脚本写演示数据；他实现后若画像里产生 potential_level，<b>是否回写 talents 主表</b>必须对齐，否则我的 quality 维永远是假数据</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>talent_portraits.suggested_positions</code>（建议岗位）</td>
+<td><b>我 → 他</b></td>
+<td>他的画像字段之一是"建议岗位"（<code>talent.py:174</code>）。"建议岗位"如果没有真实匹配数据支撑就是编造——正确做法是调我的匹配接口拿事实，再写进画像</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>talent_portraits.dimensions</code>（skill/experience/quality/potential 维度分）</td>
+<td><b>互相校准</b></td>
+<td>他的维度分是 LLM 生成的；我的 dimension_scores 是<b>规则代码算的</b>。两边口径不一致时，决策会自相矛盾，需要对齐"以谁为准"</td>
+</tr>
+<tr>
+<td>4</td>
+<td>AI 产物不得当事实证据</td>
+<td><b>双向铁律</b></td>
+<td>我的证据构建器明确排除 <code>portrait_summary</code>（AI 生成）作事实证据；<code>talent_portraits</code> 整表也是"AI 可重建数据"——<b>他也同样不能拿我的解释文本（highlights/gaps）当事实</b>，只能拿 matched_skills / hard_results / decision</td>
+</tr>
+</table>
+
+<h2>二、我要输出给他什么（推荐契约）</h2>
+
+<div class="card">
+<h3>① 首选：HTTP API（禁止让他直查我的表）</h3>
+<table>
+<tr><th>接口</th><th>他传什么</th><th>拿到什么</th><th>用途</th></tr>
+<tr>
+<td><code>POST /matchings/reverse</code></td>
+<td><code>{"talent_id": x, "top_k": n, "weights": {...可选}}</code></td>
+<td>该人才适合的开放岗位排序（score + decision 四态）+ <b>淘汰岗位逐条原因</b></td>
+<td>生成画像的 <code>suggested_positions</code> 的事实依据；只读不落库</td>
+</tr>
+<tr>
+<td><code>GET /matchings/talents/{talent_id}?limit=50</code></td>
+<td>talent_id（limit 1-200）</td>
+<td>该人才在各岗位的<b>历史匹配记录</b>（MatchHistoryItem 列表）</td>
+<td>画像"建议岗位"引用历史结论；追踪人才流转</td>
+</tr>
+<tr>
+<td><code>GET /matchings?talent_id=x&amp;min_score=s</code></td>
+<td>talent_id / min_score 过滤</td>
+<td>匹配记录分页</td>
+<td>批量分析某人才被推荐情况</td>
+</tr>
+<tr>
+<td><code>POST /matchings/explain</code></td>
+<td>position_id + talent_id</td>
+<td>证据化解释（含 rejected_claims、pending_verification）</td>
+<td>画像里"优势/短板"想引用某岗位结论时的复核入口</td>
+</tr>
+</table>
+<p class="note">权限口径：他只需 <code>MATCHING_READ</code>（reverse/explain 会跑完整打分链路但属只读查询，批量高频调用需另行限流约定）。</p>
+</div>
+
+<div class="card">
+<h3>② 字段语义约定（给他的"读数说明书"，最重要的一节）</h3>
+<table>
+<tr><th>类别</th><th>字段</th><th>他可以怎么用</th></tr>
+<tr>
+<td><span class="tag t-green">事实（可作决策依据）</span></td>
+<td><code>decision</code>（四态）、<code>score</code>、<code>dimension_scores</code>、<code>matched_skills</code>、<code>hard_results</code>、<code>data_completeness</code></td>
+<td>直接写进画像 / 用于决策；这些是规则代码产出 + 五层校验过的事实</td>
+</tr>
+<tr>
+<td><span class="tag t-amber">解释（仅供参考）</span></td>
+<td><code>highlights</code> / <code>gaps</code> / <code>suggestion</code>，并看 <code>explanation_source</code></td>
+<td>只能做参考文案。<code>explanation_source=dify</code> 是 LLM 产物；<code>llm_fallback</code>（本地 Ollama）/ <code>rule_fallback</code> 是降级产物，质量递减，画像引用时应降级措辞</td>
+</tr>
+<tr>
+<td><span class="tag t-red">警示信号（必须透传）</span></td>
+<td><code>pending_verification</code>（待补全项）、<code>recall_mode=sql_fallback</code>（向量召回降级）、<code>defaulted_dimensions</code>（按默认值兜底的维度）</td>
+<td>出现这些标记说明数据不全或走了降级，决策置信度要打折，不能当正常结果展示</td>
+</tr>
+</table>
+<p class="note">对称铁律（交集点 4）：他给我回写画像时，我同样只把 <code>talents.potential_level</code>（若对齐回写）当事实证据；<code>talent_portraits</code> 里的 LLM 维度分/标签我<b>不引入</b> hard_results 与证据包——防止"AI 解释引用 AI 解释"的循环污染。</p>
+</div>
+
+<h2>三、我要反向跟他要的东西（谈判筹码，别只给不拿）</h2>
+<ul>
+<li><b>potential_level 回写对齐</b>：talent_portraits 生成 potential_level 后，是否回写 <code>talents.potential_level</code>？回写则我的 quality 维有真实来源；不回写则该维应声明为演示数据（测评 Agent 侧同样有此待确认项）。</li>
+<li><b>talents.status 维护责任</b>：在职/离职/储备状态是我的<b>召回过滤关键</b>（MATCH-008 教训：离职者曾以 97 分排第 1）。要确认状态由简历组、决策侧还是 HR 人工维护，并要求变更可及时生效。</li>
+<li><b>画像版本通知</b>：talent_portraits 是版本化的（version 每次重算 +1）。若他更新画像后希望我重新匹配，需要一个通知/触发约定（当前无任务队列，P1 缺口）。</li>
+</ul>
+
+<h2>四、一图记牢数据流</h2>
+<div class="flow">
+他（人才决策Agent，未实现）：talent_id → 读 talents/resumes/测评/培训 → LLM → talent_portraits(版本化)
+        ↑ 我输出给他（API，MATCHING_READ）
+        │  POST /matchings/reverse      ← suggested_positions 的事实依据
+        │  GET  /matchings/talents/{id} ← 历史匹配记录
+        │  POST /matchings/explain      ← 结论复核（rejected_claims 一并给他）
+        │  读数规则：decision/score/matched_skills=事实；highlights/gaps=参考(看source)；
+        │            pending_verification/sql_fallback/defaulted_dimensions=降级警示
+        ↓ 我反向要他（对齐后才有）
+        │  talents.potential_level 回写（quality 维真实来源）
+        │  talents.status 维护责任（离职过滤）
+</div>
+
+<p class="note" style="margin-top:20px">核验依据：app/ai/agents/talent_agent.py（TODO 骨架）、app/models/talent.py（TalentPortrait 表）、app/services/evidence_builder.py:53、app/ai/skills/matching_skill.py:135、docs/CODEX_HANDOVER.md §5.7。未改动任何业务代码。</p>
+
+</div>
+</body>
+</html>

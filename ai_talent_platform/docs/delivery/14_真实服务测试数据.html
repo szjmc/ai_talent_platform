@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>真实服务测试数据｜岗位人才匹配 Agent</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#fff; --ink:#1a1d21; --ink-2:#4a5158; --ink-3:#7a828a;
+    --line:#e5e8ec; --brand:#1f6feb; --brand-soft:#eaf2ff;
+    --ok:#1a7f4b; --ok-soft:#e8f6ee; --warn:#8a5a00; --warn-soft:#fff5e0;
+    --danger:#b42318; --danger-soft:#fdecea;
+    --mono:'SFMono-Regular',Consolas,'Liberation Mono',monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.72 -apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;-webkit-font-smoothing:antialiased}
+  .layout{display:grid;grid-template-columns:236px minmax(0,1fr);gap:26px;max-width:1240px;margin:0 auto;padding:28px 22px 72px}
+  aside{position:sticky;top:24px;align-self:start;max-height:calc(100vh - 48px);overflow:auto}
+  aside .toc-title{font-size:11.5px;letter-spacing:.14em;color:var(--ink-3);font-weight:700;margin:0 0 10px 6px}
+  aside a{display:block;padding:7px 9px;border-radius:9px;color:var(--ink-2);text-decoration:none;font-size:13px;line-height:1.4;margin-bottom:2px}
+  aside a:hover{background:#eef2f7;color:var(--ink)}
+  aside a.active{background:var(--brand-soft);color:var(--brand);font-weight:600}
+  main{min-width:0}
+  header.hero{background:linear-gradient(135deg,#fff 0%,#f0f5ff 100%);border:1px solid var(--line);border-radius:16px;padding:26px 28px;margin-bottom:18px}
+  .eyebrow{font-size:12px;letter-spacing:.14em;color:var(--brand);font-weight:700}
+  h1{font-size:26px;line-height:1.35;margin:8px 0 6px}
+  .sub{color:var(--ink-2);font-size:14px;margin:0}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .badge{font-size:12.5px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink-2)}
+  .badge.ok{background:var(--ok-soft);border-color:#bfe5cf;color:var(--ok);font-weight:600}
+  .badge.warn{background:var(--warn-soft);border-color:#f0dcb4;color:var(--warn);font-weight:600}
+  section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin-bottom:18px}
+  h2{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+  h2 .no{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;
+    background:var(--brand-soft);color:var(--brand);font:700 13px/1 var(--mono);flex:none}
+  h3{font-size:15.5px;margin:20px 0 8px}
+  h3:first-of-type{margin-top:12px}
+  p{margin:8px 0}
+  .lead{color:var(--ink-2);font-size:14px;margin:6px 0 14px}
+  code{font-family:var(--mono);font-size:12.6px;background:#f3f5f7;padding:2px 6px;border-radius:5px;color:#213547}
+  pre{background:#0f1419;color:#d7e0e7;border-radius:10px;padding:14px 16px;overflow:auto;margin:10px 0;font:12.6px/1.6 var(--mono)}
+  pre .k{color:#7fb3ff}
+  .copybar{display:flex;justify-content:space-between;align-items:center;background:#171d24;color:#93a1ad;
+    border-radius:10px 10px 0 0;padding:7px 12px;font-size:11.5px;letter-spacing:.04em;margin-top:12px}
+  .copybar+pre{margin-top:0;border-radius:0 0 10px 10px}
+  .btn{background:#22303c;color:#cfe0ec;border:1px solid #2e3f4d;border-radius:6px;font-size:11.5px;padding:3px 9px;cursor:pointer}
+  .btn:hover{background:#2c3d4b}
+  .btn.done{background:#1a5c3a;border-color:#256f47;color:#d8f5e6}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.4px}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#fafbfc;color:var(--ink-3);font-weight:600;font-size:12.6px;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  .pill{display:inline-block;font:700 11px/1 var(--mono);letter-spacing:.05em;padding:4px 7px;border-radius:5px;color:#fff;background:#7a828a}
+  .m-post{background:#1f6feb}.m-get{background:#1a7f4b}
+  .note{border-left:3px solid var(--brand);background:#fafbfc;border-radius:0 8px 8px 0;padding:10px 14px;color:var(--ink-2);font-size:13.4px;margin:12px 0}
+  .note.warn{border-left-color:#d9a300;background:#fffdf5}
+  .note.danger{border-left-color:var(--danger);background:#fffbfa}
+  .note b{color:var(--ink)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}
+  .card{border:1px solid var(--line);border-radius:12px;padding:13px 15px;background:#fcfcfd}
+  .card h4{margin:0 0 6px;font-size:13.6px}
+  .card p{margin:0;font-size:13px;color:var(--ink-2)}
+  .tag{display:inline-block;font-size:11.5px;padding:2px 8px;border-radius:999px;background:#eef1f5;color:var(--ink-2);margin-right:4px}
+  .tag.ok{background:var(--ok-soft);color:var(--ok)}
+  .tag.bad{background:var(--danger-soft);color:var(--danger)}
+  .tag.warn{background:var(--warn-soft);color:var(--warn)}
+  .steps{counter-reset:s;list-style:none;padding:0;margin:14px 0 0}
+  .steps li{position:relative;padding:0 0 0 34px;margin-bottom:12px;color:var(--ink-2);font-size:14px}
+  .steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:1px;width:22px;height:22px;border-radius:50%;
+    background:#eef2f7;color:var(--ink-2);font:700 12px/22px var(--mono);text-align:center}
+  .steps b{color:var(--ink)}
+  footer{color:var(--ink-3);font-size:12.5px;text-align:center;padding:10px 0 0;line-height:1.9}
+  @media (max-width:900px){.layout{grid-template-columns:1fr;padding:18px 14px 60px}aside{display:none}.grid2{grid-template-columns:1fr}}
+  @media print{body{background:#fff}aside{display:none}.layout{display:block;max-width:none;padding:0}section{break-inside:avoid;border-color:#ddd}.btn{display:none}}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside>
+  <p class="toc-title">目录</p>
+  <a href="#prep">0 · 前提与自检</a>
+  <a href="#auth">1 · 登录与身份</a>
+  <a href="#profile">2 · 岗位画像三件套</a>
+  <a href="#match">3 · 匹配五件套</a>
+  <a href="#other">4 · 已有模块</a>
+  <a href="#todo">5 · 占位模块（501）</a>
+  <a href="#errors">6 · 错误对照表</a>
+  <a href="#diff">7 · 与沙箱的差异</a>
+</aside>
+
+<main>
+<header class="hero">
+  <div class="eyebrow">REAL SERVICE · 8010 · MYSQL</div>
+  <h1>真实服务测试数据</h1>
+  <p class="sub">每个请求体可直接复制到 Swagger 里执行，响应都是 <b>2026-11-04 15:01 实测抓取</b>的，
+    不是手写示意。数值会随你后续操作变化（版本号、批次）,以实际返回为准。</p>
+  <div class="badges">
+    <span class="badge ok">http://127.0.0.1:8010</span>
+    <span class="badge">MySQL 127.0.0.1:3306/ai_talent_platform</span>
+    <span class="badge">1 个岗位 · 5 位人才 · 画像 v11</span>
+    <span class="badge warn">JWT 有效期 24h</span>
+  </div>
+</header>
+
+<section id="prep">
+  <h2><span class="no">0</span>前提与自检</h2>
+  <p class="lead">真实服务会连 MySQL，比沙箱"重"。跑之前先确认三件事：解释器对不对、库通不通、数据在不在。</p>
+
+  <h3>① 启动（必须用项目 venv）</h3>
+  <div class="copybar"><span>bash · 项目根目录</span><button class="btn" data-copy="D:/0904开班/.venv-match313/Scripts/python.exe -m uvicorn main:app --host 127.0.0.1 --port 8010">复制</button></div>
+  <pre>D:/0904开班/.venv-match313/Scripts/python.exe -m uvicorn main:app --host 127.0.0.1 --port 8010</pre>
+  <div class="note danger"><b>最容易踩的坑：</b>用 anaconda 的 <code>python main.py</code> 启动，会因缺 <code>aiomysql</code>
+    让<b>所有</b>接口 500（<code>get_db → get_engine → create_async_engine → ModuleNotFoundError</code>）。
+    判断方法：看 traceback 里 <code>site-packages</code> 路径带 <code>anaconda</code> 就是解释器错了。</div>
+
+  <h3>② 三个健康检查（都不需要登录）</h3>
+  <table>
+    <thead><tr><th>接口</th><th>看什么</th><th>实测</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill m-get">GET</span> <code>/health</code></td><td>进程活着</td><td><code>{"code":200,"message":"OK"}</code></td></tr>
+      <tr><td><span class="pill m-get">GET</span> <code>/health/ready</code></td><td>MySQL 是否连得上</td><td><code>status:"up"</code>，mysql up</td></tr>
+      <tr><td><span class="pill m-get">GET</span> <code>/api/v1/system/info</code></td><td>环境与依赖状态</td><td>见下</td></tr>
+    </tbody>
+  </table>
+  <div class="copybar"><span>GET /api/v1/system/info · 200</span></div>
+  <pre>{
+  "code": 200, "message": "OK",
+  "data": {
+    "name": "AI 数字化人才平台", "version": "1.0.0", "env": "dev", "api_prefix": "/api/v1",
+    "databases": { "mysql": "127.0.0.1:3306/ai_talent_platform",
+                   "pgsql": "disabled", "redis": "disabled", "milvus": "disabled" },
+    "connection_status": { "status": "up",
+      "mysql": { "status": "up", "message": "MySQL 连接正常", "elapsed_ms": 5.9 } }
+  }
+}</pre>
+  <div class="note"><b>这张图很关键：</b>MySQL 是唯一真实在用的存储；Redis / Milvus / PostgreSQL 都是 <code>disabled</code>。
+    所以匹配召回走的是 <code>recall_mode: "sql_fallback"</code>（数据库召回，不是向量召回）。</div>
+
+  <h3>③ 库里有什么（决定你能填哪些 ID）</h3>
+  <table>
+    <thead><tr><th>对象</th><th>可用 ID</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>岗位</td><td><b>只有 1</b></td><td>后端开发工程师，画像当前 <code>v11</code>，已确认</td></tr>
+      <tr><td>人才</td><td>1、3、5 等共 5 位</td><td>张伟(1)、王强(3)、陈晨(5)，另有李娜、赵敏</td></tr>
+      <tr><td>用户</td><td>2 = admin，3 = hr_demo</td><td>密码需向管理员确认，本文只用 admin</td></tr>
+      <tr><td>其他岗位 id</td><td>2 / 3 / 999</td><td>不存在，返回 <code>404 / 3001 岗位不存在（id=x）</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="auth">
+  <h2><span class="no">1</span>登录与身份</h2>
+  <p class="lead">真实服务用 JWT（无状态），和沙箱的"内存 token"不同：<b>服务重启不会失效</b>，但 24 小时后会。</p>
+
+  <h3>1.1 登录</h3>
+  <p><span class="pill m-post">POST</span> <code>/api/v1/auth/login</code></p>
+  <div class="copybar"><span>请求体</span><button class="btn" data-copy='{"username":"admin","password":"Admin@12345"}'>复制</button></div>
+  <pre>{ <span class="k">"username"</span>: "admin", <span class="k">"password"</span>: "Admin@12345" }</pre>
+  <div class="copybar"><span>200 OK · 响应（token 已截断）</span></div>
+  <pre>{
+  "code": 200, "message": "登录成功",
+  "data": {
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIi...",
+    "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+    "token_type": "bearer",
+    "expires_in": 86400,
+    "user": { "id": 2, "username": "admin", "real_name": "系统管理员",
+              "is_superuser": true, "roles": ["super_admin","admin"], "permissions": ["*"] }
+  }
+}</pre>
+  <p>拿到 <code>access_token</code> 后，点 Swagger 右上角 <b>Authorize</b> 粘贴（不要写 <code>Bearer </code>，Swagger 会自己加）。</p>
+
+  <h3>1.2 我是谁</h3>
+  <p><span class="pill m-get">GET</span> <code>/api/v1/auth/me</code>　→ 校验 token 是否还有效，返回当前用户与角色权限。</p>
+  <div class="copybar"><span>200 OK</span></div>
+  <pre>{
+  "code":200,"message":"success",
+  "data":{"id":2,"username":"admin","real_name":"系统管理员","is_superuser":true,
+          "roles":["super_admin","admin"],"permissions":["*"]}
+}</pre>
+
+  <h3>1.3 刷新令牌</h3>
+  <p><span class="pill m-post">POST</span> <code>/api/v1/auth/refresh</code></p>
+  <div class="copybar"><span>请求体</span><button class="btn" data-copy='{"refresh_token":"<粘贴登录返回的 refresh_token>"}'>复制</button></div>
+  <pre>{ <span class="k">"refresh_token"</span>: "&lt;粘贴登录返回的 refresh_token&gt;" }</pre>
+  <p>实测返回 <code>200 刷新成功</code>，带新的 <code>access_token</code> + 新的 <code>refresh_token</code>。</p>
+</section>
+
+<section id="profile">
+  <h2><span class="no">2</span>岗位画像三件套</h2>
+  <p class="lead">顺序是固定的：<b>解析（草稿）→ 人工修订 → 确认（落库生效）</b>。未确认的画像不能跑匹配。</p>
+
+  <h3>2.1 查当前画像</h3>
+  <p><span class="pill m-get">GET</span> <code>/api/v1/positions/1/profile</code></p>
+  <div class="copybar"><span>200 OK · 实测 v11</span></div>
+  <pre>{
+  "code": 200, "message": "OK",
+  "data": {
+    "position_id": 1, "position_title": "后端开发工程师",
+    "version": 11, "confirmed": true,
+    "profile": {
+      "job_title": "后端开发工程师",
+      "responsibilities": ["1. 负责公司核心业务系统的后端服务开发，参与需求评审与技术方案设计；", "2. 负责接口性能优化，保障系统稳定性；", "3. 参与技术文档编写与代码评审。"],
+      "required_conditions": [], "preferred_conditions": [],
+      "required_skills": ["Python", "FastAPI", "MySQL"],
+      "preferred_skills": ["Redis"],
+      "min_education": "本科", "min_work_years": 3,
+      "location": null, "salary_range": "25k-35k",
+      "missing_fields": [], "conflicts": [], "review_required": true,
+      "source": "manual", "prompt_version": "rule-v1"
+    },
+    "confirmed_by": 2, "confirmed_at": "2026-11-04T12:24:57"
+  }
+}</pre>
+  <div class="note"><b>注意结构</b>：真实画像的硬条件放在 <code>min_education</code>、<code>min_work_years</code>、
+    <code>required_skills</code> 这类<b>扁平字段</b>里，<code>required_conditions</code> 实测是空数组；
+    沙箱为方便演示用了 <code>required_conditions</code> 列表。看数据时别找错地方。</div>
+
+  <h3>2.2 JD 智能解析（不落库，只出草稿）</h3>
+  <p><span class="pill m-post">POST</span> <code>/api/v1/positions/1/jd/parse</code></p>
+  <div class="copybar"><span>请求体 · jd_text 20~20000 字</span><button class="btn" data-copy='{"jd_text":"岗位职责：负责企业级AI招聘平台的算法设计与落地，构建人岗匹配模型，优化召回与排序效果。任职要求：本科及以上学历，3年以上机器学习经验，熟悉Python与深度学习框架，具备良好的沟通与团队协作能力。"}'>复制</button></div>
+  <pre>{
+  <span class="k">"jd_text"</span>: "岗位职责：负责企业级AI招聘平台的算法设计与落地，构建人岗匹配模型，优化召回与排序效果。任职要求：本科及以上学历，3年以上机器学习经验，熟悉Python与深度学习框架，具备良好的沟通与团队协作能力。"
+}</pre>
+  <div class="copybar"><span>200 OK · 实测</span></div>
+  <pre>{
+  "code": 200, "message": "解析完成",
+  "data": {
+    "channel": "rule_fallback",
+    "profile": {
+      "job_title": "后端开发工程师",
+      "responsibilities": ["岗位职责：负责企业级AI招聘平台的算法设计与落地，构建人岗匹配模型，优化召回与排序效果。任职要求：..."],
+      "required_skills": ["AI", "机器学习", "Python", "深度学习"],
+      "preferred_skills": [],
+      "min_education": "本科", "min_work_years": 3,
+      "missing_fields": [], "conflicts": [], "review_required": true,
+      "source": "manual", "prompt_version": "rule-v1"
+    },
+    "message": "解析完成"
+  }
+}</pre>
+  <div class="note"><b><code>channel: rule_fallback</code> 是当前正常状态</b>：Dify 未接、LLM 走规则兜底。
+    这条路径不花钱、不联网，但抽取质量就是规则水平（技能能抓到，职责会整段塞进数组）。</div>
+
+  <h3>2.3 确认画像（唯一会改库的一步）</h3>
+  <p><span class="pill m-post">POST</span> <code>/api/v1/positions/1/profile/confirm</code></p>
+  <div class="copybar"><span>请求体 · expected_version 必须等于 2.1 查到的 version</span><button class="btn" data-copy='{"profile":{"job_title":"后端开发工程师","required_skills":["Python","FastAPI","MySQL"],"preferred_skills":["Redis"],"min_education":"本科","min_work_years":3,"salary_range":"25k-35k","responsibilities":["负责核心业务系统后端开发"],"required_conditions":[],"preferred_conditions":[],"location":null,"missing_fields":[],"conflicts":[],"review_required":false,"source":"manual","prompt_version":"rule-v1"},"expected_version":11,"note":"本次确认说明"}'>复制</button></div>
+  <pre>{
+  <span class="k">"profile"</span>: {
+    "job_title": "后端开发工程师",
+    "required_skills": ["Python","FastAPI","MySQL"],
+    "preferred_skills": ["Redis"],
+    "min_education": "本科",
+    "min_work_years": 3,
+    "salary_range": "25k-35k",
+    "responsibilities": ["负责核心业务系统后端开发"],
+    "required_conditions": [], "preferred_conditions": [],
+    "location": null, "missing_fields": [], "conflicts": [],
+    "review_required": false, "source": "manual", "prompt_version": "rule-v1"
+  },
+  <span class="k">"expected_version"</span>: 11,
+  <span class="k">"note"</span>: "本次确认说明"
+}</pre>
+  <div class="note warn"><b>执行后果</b>：会在 <code>job_requirements</code> 新增一条 v12 并置为生效版本，之后匹配都用 v12。
+    想反复练手没关系（库里已有 11 版），但别在演示前把它改乱。最稳的写法是把 2.1 返回的 <code>data.profile</code> 原样贴进来，只改 <code>expected_version</code>。</div>
+  <div class="copybar"><span>版本填错时 · 400（不是 409）</span></div>
+  <pre>{ "code": 1002, "message": "画像版本已变化（期望 1，当前 11），请刷新后重试", "data": null }</pre>
+</section>
+
+<section id="match">
+  <h2><span class="no">3</span>匹配五件套</h2>
+  <p class="lead">真实链路：召回 → 硬条件四态 → 维度打分 → 排序 → 证据 → 解释 → 落库。跑一次就有数据可回读。</p>
+
+  <h3>3.1 执行匹配</h3>
+  <p><span class="pill m-post">POST</span> <code>/api/v1/matchings/run</code></p>
+  <div class="copybar"><span>请求体 · 先关解释，避免调外部模型</span><button class="btn" data-copy='{"position_id":1,"strategy":"hybrid","top_k":5,"with_explanation":false}'>复制</button></div>
+  <pre>{
+  <span class="k">"position_id"</span>: 1,
+  <span class="k">"strategy"</span>: "hybrid",
+  <span class="k">"top_k"</span>: 5,
+  <span class="k">"with_explanation"</span>: false
+}</pre>
+  <div class="copybar"><span>200 OK · 实测（batch 7db43261…）</span></div>
+  <pre>{
+  "code": 200, "message": "匹配完成",
+  "data": {
+    "batch_id": "7db4326126ab475780674dfd95ae7a80",
+    "position_id": 1, "position_title": "后端开发工程师",
+    "requirement_version": 11, "recall_mode": "sql_fallback",
+    "matched_at": "2026-11-04T15:01:49",
+    "stats": { "candidates": 5, "excluded_by_hard": 2, "unknown": 1, "needs_review": 1, "output": 3 },
+    "items": [
+      { "talent_id": 1, "talent_name": "张伟", "rank": 1, "decision": "PASS", "score": 99.5,
+        "dimension_scores": { "skill": 100.0, "experience": 100.0, "education": 100.0, "quality": 95.0 },
+        "data_completeness": 1.0,
+        "matched_skills": ["fastapi","mysql","python"],
+        "hard_results": [
+          { "item": "min_education", "required": "本科", "actual": "本科", "status": "PASS",
+            "reason": "学历满足：要求「本科」，实际「本科」", "evidence_id": "EVID-1-1-1" }
+        ] }
+    ]
+  }
+}</pre>
+  <p>本次实测榜单：<b>1. 张伟 99.5 PASS</b> → <b>2. 陈晨 98.0 PASS</b> → <b>3. 王强 24.22 NEEDS_REVIEW</b>；
+    李娜、赵敏被硬条件淘汰（<code>excluded_by_hard: 2</code>）。</p>
+  <div class="note"><b>四态含义</b>：<code>PASS</code> 通过 / <code>FAIL</code> 淘汰（唯一会踢人的）/ <code>UNKNOWN</code> 档案缺信息（保留待补）
+    / <code>NEEDS_REVIEW</code> 需人工复核（保留）。所以 <code>output</code> 少于 <code>candidates</code> 是正常的。</div>
+
+  <h3>3.2 匹配记录列表（分页 + 三种过滤）</h3>
+  <p><span class="pill m-get">GET</span> <code>/api/v1/matchings?position_id=1&amp;page=1&amp;page_size=3</code></p>
+  <p>可用参数：<code>position_id</code>、<code>talent_id</code>、<code>min_score</code>、<code>page</code>、<code>page_size</code>。</p>
+  <div class="copybar"><span>200 OK · 实测</span></div>
+  <pre>{
+  "code":200,"message":"OK",
+  "data": {
+    "items": [
+      { "batch_id":"7db4326126ab475780674dfd95ae7a80","position_id":1,"position_title":"后端开发工程师",
+        "talent_id":3,"talent_name":"王强","score":24.22,"strategy":"hybrid",
+        "requirement_version":11,"matched_at":"2026-11-04T15:01:50","explanation_source":"rule_fallback" },
+      { "batch_id":"7db4326126ab475780674dfd95ae7a80", "...":"陈晨 98.0 ..." }
+    ],
+    "total": 67, "page": 1, "page_size": 3, "pages": 23
+  }
+}</pre>
+
+  <h3>3.3 按岗位看最新一批</h3>
+  <p><span class="pill m-get">GET</span> <code>/api/v1/matchings/positions/1</code>　→ 返回整批（含 <code>stats</code>、<code>items</code>、<code>excluded</code>）。</p>
+  <div class="copybar"><span>404 · 该岗位没跑过匹配时</span></div>
+  <pre>{ "code": 3001, "message": "该岗位还没有匹配记录（position_id=999）", "data": null }</pre>
+
+  <h3>3.4 按人才回溯</h3>
+  <p><span class="pill m-get">GET</span> <code>/api/v1/matchings/talents/1</code>　→ 返回 <b>数组</b>（不是分页对象），按时间倒序。</p>
+  <div class="copybar"><span>200 OK · 实测（截断）</span></div>
+  <pre>{
+  "code":200,"message":"OK",
+  "data":[
+    { "batch_id":"7db4326126ab475780674dfd95ae7a80","position_id":1,"position_title":"后端开发工程师",
+      "talent_id":1,"talent_name":"张伟","score":99.5,"strategy":"hybrid",
+      "requirement_version":11,"matched_at":"2026-11-04T15:01:50","explanation_source":"rule_fallback" },
+    { "batch_id":"5bcff79e9db349bfa4d8f34a89a30bfb", "...":"更早一次" }
+  ]
+}</pre>
+
+  <h3>3.5 生成/读取解释（含证据校验）</h3>
+  <p><span class="pill m-post">POST</span> <code>/api/v1/matchings/explain</code></p>
+  <div class="copybar"><span>请求体</span><button class="btn" data-copy='{"position_id":1,"talent_id":1}'>复制</button></div>
+  <pre>{ <span class="k">"position_id"</span>: 1, <span class="k">"talent_id"</span>: 1 }</pre>
+  <div class="copybar"><span>200 OK · 实测</span></div>
+  <pre>{
+  "code":200,"message":"OK",
+  "data": {
+    "summary": "本次判定共 3 项硬性条件：满足 3 项、不满足 0 项、档案缺失 0 项、需人工复核 0 项；档案完整度 100%。（综合分 99.50）",
+    "highlights": [
+      { "text":"min_education：学历满足：要求「本科」，实际「本科」","evidence_ids":["EVID-1-1-1"],"claim_type":"fact" },
+      { "text":"min_work_years：工作年限满足：要求 3 年，实际 5 年","evidence_ids":["EVID-1-1-2"],"claim_type":"fact" },
+      { "text":"required_skills：必备技能全部命中（3/3）","evidence_ids":["EVID-1-1-3"],"claim_type":"fact" }
+    ],
+    "gaps": [], "risks": [], "interview_suggestions": [], "pending_verification": [], "rejected_claims": [],
+    "source": "rule_fallback", "prompt_version": "rule-v1"
+  }
+}</pre>
+  <div class="note"><b>看 <code>rejected_claims</code></b>：解释层会校验每条断言是否有证据 ID，
+    没有证据的会被丢进这里而不是正文——这就是"不许模型瞎编"的落地方式。</div>
+</section>
+
+<section id="other">
+  <h2><span class="no">4</span>已有模块（可测，但不属于本任务链路）</h2>
+  <p class="lead">这几个是别人已完成的基础模块，联调时可能需要，顺手列出来。</p>
+  <table>
+    <thead><tr><th>接口</th><th>用途</th><th>实测</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill m-get">GET</span> <code>/api/v1/users?page=1&amp;page_size=5</code></td><td>用户列表（含角色）</td><td>200，含 <code>hr_demo</code></td></tr>
+      <tr><td><span class="pill m-get">GET</span> <code>/api/v1/organizations/tree</code></td><td>组织架构树</td><td>200，研发部（RD）</td></tr>
+      <tr><td><span class="pill m-get">GET</span> <code>/api/v1/system/skills</code></td><td>AI 技能清单</td><td>200，含 <code>candidate_list</code> 等</td></tr>
+      <tr><td><span class="pill m-get">POST</span> <code>/api/v1/auth/logout</code></td><td>退出登录</td><td>需 token</td></tr>
+    </tbody>
+  </table>
+  <p>用户 / 组织 / 角色是完整 CRUD（增删改查齐全），但<b>与本任务的匹配链路无关</b>，这里不展开。</p>
+</section>
+
+<section id="todo">
+  <h2><span class="no">5</span>占位模块：8 个 501</h2>
+  <p class="lead">这些接口在 OpenAPI 里能看到，但调用会返回 <code>501</code> + 模块名 + 对接提示。看到 501 不是故障，是"还没做"。</p>
+  <table>
+    <thead><tr><th>接口</th><th>返回</th></tr></thead>
+    <tbody>
+      <tr><td><code>/api/v1/talents</code></td><td>501 人才档案模块尚未实现</td></tr>
+      <tr><td><code>/api/v1/resumes</code></td><td>501 简历管理模块尚未实现</td></tr>
+      <tr><td><code>/api/v1/agents</code></td><td>501 AI 智能体模块尚未实现</td></tr>
+      <tr><td><code>/api/v1/analytics</code></td><td>501 数据分析模块尚未实现</td></tr>
+      <tr><td><code>/api/v1/assessments</code></td><td>501 人才测评模块尚未实现</td></tr>
+      <tr><td><code>/api/v1/knowledge</code></td><td>501 知识库模块尚未实现</td></tr>
+      <tr><td><code>/api/v1/files</code></td><td>501 文件管理模块尚未实现</td></tr>
+      <tr><td><code>/api/v1/trainings</code></td><td>501 培训管理模块尚未实现</td></tr>
+    </tbody>
+  </table>
+  <div class="copybar"><span>501 · 典型响应</span></div>
+  <pre>{
+  "code": 501, "message": "人才档案模块尚未实现，请对接负责人",
+  "data": { "module": "人才档案",
+            "hint": "人才档案 CRUD、画像查询、语义检索、档案合并（见 routers/talent_router.py）" }
+}</pre>
+  <div class="note danger"><b>这意味着：</b>HR 目前无法在系统里新建/编辑候选人（没有 <code>/talents</code> 写接口），
+    人才数据只能直接进库。这是闭环的 P0 缺口，演示时要提前说明。</div>
+</section>
+
+<section id="errors">
+  <h2><span class="no">6</span>错误对照表（真实服务实测）</h2>
+  <table>
+    <thead><tr><th>HTTP</th><th>业务码</th><th>提示</th><th>原因 / 怎么改</th></tr></thead>
+    <tbody>
+      <tr><td>401</td><td>2001</td><td>请先登录</td><td>没带 Authorization 头 → 点 Authorize 填 token</td></tr>
+      <tr><td>401</td><td>2001</td><td>登录凭证无效，请重新登录</td><td>token 乱填 / 被改过 → 重新登录</td></tr>
+      <tr><td>401</td><td>2002</td><td>登录已过期，请重新登录</td><td>超过 24h → 重新登录或用 refresh_token 换新</td></tr>
+      <tr><td>401</td><td>2003</td><td>用户名或密码错误</td><td>登录接口专用，检查账号密码</td></tr>
+      <tr><td>403</td><td>2004</td><td>权限不足，无法访问该资源</td><td>角色缺权限（如 viewer 改画像）→ 换 admin</td></tr>
+      <tr><td>404</td><td>3001</td><td>岗位不存在（id=999）</td><td>库里只有 id=1</td></tr>
+      <tr><td>404</td><td>3001</td><td>该岗位还没有匹配记录（position_id=999）</td><td>先跑一次 <code>/matchings/run</code></td></tr>
+      <tr><td>400</td><td>1002</td><td>画像版本已变化（期望 1，当前 11），请刷新后重试</td><td><code>expected_version</code> 与当前不一致 → 重新查 profile</td></tr>
+      <tr><td>400</td><td>1002</td><td>该岗位尚未确认岗位画像，不能执行正式匹配</td><td>先去 confirm，再跑匹配</td></tr>
+      <tr><td>422</td><td>1001</td><td>请求参数不合法 / Pydantic detail</td><td>字段缺失、类型错、<code>jd_text</code> 不足 20 字</td></tr>
+      <tr><td>500</td><td>—</td><td>Internal Server Error</td><td><b>先看是不是解释器错了</b>（aiomysql 缺失），再看 traceback</td></tr>
+      <tr><td>501</td><td>501</td><td>xx 模块尚未实现，请对接负责人</td><td>占位接口，正常现象</td></tr>
+    </tbody>
+  </table>
+  <div class="note"><b>一句话记法</b>：<code>2001/2002/2003</code> 是"你是谁"的问题，<code>2004</code> 是"你能干什么"，
+    <code>3001</code> 是"东西不存在"，<code>1002</code> 是"状态不对"，<code>422</code> 是"传参不对"。</div>
+</section>
+
+<section id="diff">
+  <h2><span class="no">7</span>和沙箱的差异（别混着记）</h2>
+  <table>
+    <thead><tr><th>维度</th><th>真实服务 8010</th><th>沙箱 8011</th></tr></thead>
+    <tbody>
+      <tr><td>数据存储</td><td>MySQL，改了就真改</td><td>内存 + JSON，重启复位</td></tr>
+      <tr><td>token</td><td>JWT，24h，重启不失效</td><td>内存 map，重启全部失效</td></tr>
+      <tr><td>候选人</td><td>张伟 99.5 / 陈晨 98.0 / 王强 24.22 …</td><td>林一 96.8 / 周珂 87.4 / 吴敏 68.2 …</td></tr>
+      <tr><td>召回</td><td><code>sql_fallback</code>（Milvus 未启用）</td><td>固定 5 人</td></tr>
+      <tr><td>未实现接口</td><td>501 + 模块名 + hint</td><td>404 + <code>3001 接口不存在</code></td></tr>
+      <tr><td>画像硬条件位置</td><td>扁平字段（<code>min_education</code> 等）</td><td><code>required_conditions</code> 列表</td></tr>
+      <tr><td>用途</td><td>验收、演示、真实数据核对</td><td>练手、前端联调、压测</td></tr>
+    </tbody>
+  </table>
+  <div class="note warn"><b>建议的用法</b>：先用沙箱把前端和流程跑熟（改坏了也无所谓），
+    再到真实服务上验证一遍"真实数据能不能出正确四态 + 证据"。两边响应结构一致，但数据口径不同。</div>
+</section>
+
+<footer>
+  数据采集时间：2026-11-04 15:01（真实服务运行中，MySQL 已连接）。<br>
+  本文件由实测响应整理，非脚本生成；数值随操作变化，请以当场返回为准。<br>
+  配套文档：<code>13_沙箱测试指南.html</code>（沙箱版）、<code>03_API接口说明.md</code>（字段定义）。
+</footer>
+</main>
+</div>
+<script>
+document.querySelectorAll('.btn').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var text = btn.getAttribute('data-copy') || '';
+    var done = function () { var o = btn.textContent; btn.textContent = '已复制'; btn.classList.add('done');
+      setTimeout(function () { btn.textContent = o; btn.classList.remove('done'); }, 1200); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text, done); });
+    } else { fallback(text, done); }
+  });
+});
+function fallback(text, done) {
+  var ta = document.createElement('textarea'); ta.value = text;
+  ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); } catch (e) { alert('复制失败，请手动选中'); }
+  document.body.removeChild(ta);
+}
+var links = document.querySelectorAll('aside a');
+var secs = document.querySelectorAll('section[id]');
+function sync() {
+  var y = window.scrollY + 120, cur = null;
+  secs.forEach(function (s) { if (s.offsetTop <= y) cur = s.id; });
+  links.forEach(function (a) { a.classList.toggle('active', a.getAttribute('href') === '#' + cur); });
+}
+window.addEventListener('scroll', sync); sync();
+</script>
+</body>
+</html>

@@ -1,3 +1,4 @@
+# 此处是 RAG 编排模块，实际 HTTP 入口和权限依赖以知识库与问答 Router 的注册为准。
 """
 模块：app/ai/rag/rag_pipeline.py
 职责：RAG 完整流程编排（索引 + 问答）。

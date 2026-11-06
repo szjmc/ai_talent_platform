@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>沙箱测试指南｜岗位人才匹配 Agent</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#fff; --ink:#1a1d21; --ink-2:#4a5158; --ink-3:#7a828a;
+    --line:#e5e8ec; --brand:#1f6feb; --brand-soft:#eaf2ff;
+    --ok:#1a7f4b; --ok-soft:#e8f6ee; --warn:#8a5a00; --warn-soft:#fff5e0;
+    --danger:#b42318; --danger-soft:#fdecea;
+    --mono:'SFMono-Regular',Consolas,'Liberation Mono',monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.72 -apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;-webkit-font-smoothing:antialiased}
+  .layout{display:grid;grid-template-columns:232px minmax(0,1fr);gap:26px;max-width:1240px;margin:0 auto;padding:28px 22px 72px}
+  aside{position:sticky;top:24px;align-self:start;max-height:calc(100vh - 48px);overflow:auto}
+  aside .toc-title{font-size:11.5px;letter-spacing:.14em;color:var(--ink-3);font-weight:700;margin:0 0 10px 6px}
+  aside a{display:block;padding:7px 9px;border-radius:9px;color:var(--ink-2);text-decoration:none;font-size:13px;line-height:1.4;margin-bottom:2px}
+  aside a:hover{background:#eef2f7;color:var(--ink)}
+  aside a.active{background:var(--brand-soft);color:var(--brand);font-weight:600}
+  main{min-width:0}
+  header.hero{background:linear-gradient(135deg,#fff 0%,#f0f5ff 100%);border:1px solid var(--line);
+    border-radius:16px;padding:26px 28px;margin-bottom:18px}
+  .eyebrow{font-size:12px;letter-spacing:.14em;color:var(--brand);font-weight:700}
+  h1{font-size:26px;line-height:1.35;margin:8px 0 6px}
+  .sub{color:var(--ink-2);font-size:14px;margin:0}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .badge{font-size:12.5px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink-2)}
+  .badge.ok{background:var(--ok-soft);border-color:#bfe5cf;color:var(--ok);font-weight:600}
+  .badge.warn{background:var(--warn-soft);border-color:#f0dcb4;color:var(--warn);font-weight:600}
+  section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin-bottom:18px}
+  h2{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+  h2 .no{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;
+    background:var(--brand-soft);color:var(--brand);font:700 13px/1 var(--mono);flex:none}
+  h3{font-size:15.5px;margin:22px 0 8px}
+  h3:first-of-type{margin-top:14px}
+  p{margin:8px 0}
+  .lead{color:var(--ink-2);font-size:14px;margin:6px 0 14px}
+  .steps{counter-reset:s;list-style:none;padding:0;margin:14px 0 0}
+  .steps li{position:relative;padding:0 0 0 34px;margin-bottom:14px;color:var(--ink-2);font-size:14px}
+  .steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:1px;width:22px;height:22px;
+    border-radius:50%;background:#eef2f7;color:var(--ink-2);font:700 12px/22px var(--mono);text-align:center}
+  .steps b{color:var(--ink)}
+  code{font-family:var(--mono);font-size:12.6px;background:#f3f5f7;padding:2px 6px;border-radius:5px;color:#213547}
+  pre{background:#0f1419;color:#d7e0e7;border-radius:10px;padding:14px 16px;overflow:auto;margin:10px 0;
+    font:12.8px/1.62 var(--mono)}
+  pre .k{color:#7fb3ff}
+  .copybar{display:flex;justify-content:space-between;align-items:center;background:#171d24;color:#93a1ad;
+    border-radius:10px 10px 0 0;padding:7px 12px;font-size:11.5px;letter-spacing:.04em;margin-top:12px}
+  .copybar+pre{margin-top:0;border-radius:0 0 10px 10px}
+  .btn{background:#22303c;color:#cfe0ec;border:1px solid #2e3f4d;border-radius:6px;font-size:11.5px;padding:3px 9px;cursor:pointer}
+  .btn:hover{background:#2c3d4b}
+  .btn.done{background:#1a5c3a;border-color:#256f47;color:#d8f5e6}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.4px}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#fafbfc;color:var(--ink-3);font-weight:600;font-size:12.6px;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  td code{background:#f3f5f7;white-space:nowrap}
+  .pill{display:inline-block;font:700 11px/1 var(--mono);letter-spacing:.05em;padding:4px 7px;border-radius:5px;color:#fff;background:#7a828a}
+  .m-post{background:#1f6feb}.m-get{background:#1a7f4b}
+  .note{border-left:3px solid var(--brand);background:#fafbfc;border-radius:0 8px 8px 0;padding:10px 14px;
+    color:var(--ink-2);font-size:13.4px;margin:12px 0}
+  .note.warn{border-left-color:#d9a300;background:#fffdf5}
+  .note.danger{border-left-color:var(--danger);background:#fffbfa}
+  .note b{color:var(--ink)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}
+  .card{border:1px solid var(--line);border-radius:12px;padding:13px 15px;background:#fcfcfd}
+  .card h4{margin:0 0 6px;font-size:13.6px}
+  .card p{margin:0;font-size:13px;color:var(--ink-2)}
+  .tag{display:inline-block;font-size:11.5px;padding:2px 8px;border-radius:999px;background:#eef1f5;color:var(--ink-2);margin-right:4px}
+  .tag.ok{background:var(--ok-soft);color:var(--ok)}
+  .tag.bad{background:var(--danger-soft);color:var(--danger)}
+  .tag.warn{background:var(--warn-soft);color:var(--warn)}
+  footer{color:var(--ink-3);font-size:12.5px;text-align:center;padding:10px 0 0;line-height:1.9}
+  @media (max-width:900px){
+    .layout{grid-template-columns:1fr;padding:18px 14px 60px}
+    aside{display:none}
+    .grid2{grid-template-columns:1fr}
+  }
+  @media print{
+    body{background:#fff}
+    aside{display:none}
+    .layout{display:block;max-width:none;padding:0}
+    section{break-inside:avoid;border-color:#ddd}
+    .btn{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+<aside>
+  <p class="toc-title">目录</p>
+  <a href="#start">0 · 30 秒自检</a>
+  <a href="#auth">1 · 登录拿 token</a>
+  <a href="#authorize">2 · Swagger Authorize</a>
+  <a href="#flow">3 · 七步跑通全链路</a>
+  <a href="#errors">4 · 报错对照表</a>
+  <a href="#accounts">5 · 账号与权限</a>
+  <a href="#limits">6 · 沙箱边界</a>
+  <a href="#script">7 · 一键 curl 脚本</a>
+</aside>
+
+<main>
+<header class="hero">
+  <div class="eyebrow">SANDBOX · MOCK API · 8011</div>
+  <h1>沙箱测试指南</h1>
+  <p class="sub">这份只讲一件事：<b>怎么把沙箱的 11 个接口按正确顺序点通</b>。所有示例响应都是从运行中的 8011 真实采集的，
+    不是示意。</p>
+  <div class="badges">
+    <span class="badge ok">Sandbox http://127.0.0.1:8011</span>
+    <span class="badge">Swagger /docs</span>
+    <span class="badge">真实服务 8010（对比用）</span>
+    <span class="badge warn">token 内存态 · 重启即失效</span>
+  </div>
+</header>
+
+<section id="start">
+  <h2><span class="no">0</span>先做 30 秒自检</h2>
+  <p class="lead">测试全失败时，八成不是接口坏了，而是「服务没起」或「没带 token」。先确认这两件事。</p>
+
+  <h3>① 服务在不在</h3>
+  <div class="copybar"><span>浏览器直接打开</span></div>
+  <pre>http://127.0.0.1:8011/health</pre>
+  <p>返回 <code>{"code":200,"message":"OK",...}</code> 就是在跑。如果返回 <code>502</code> 或连接被拒，说明进程没起。</p>
+
+  <h3>② 没起就启动（在项目根目录执行）</h3>
+  <div class="copybar"><span>bash</span><button class="btn" data-copy="D:/0904开班/.venv-match313/Scripts/python.exe -m uvicorn sandbox.mock_api:app --host 127.0.0.1 --port 8011">复制</button></div>
+  <pre>D:/0904开班/.venv-match313/Scripts/python.exe -m uvicorn sandbox.mock_api:app --host 127.0.0.1 --port 8011</pre>
+  <div class="note warn"><b>注意：</b>沙箱和真实服务要分别在<b>项目根目录</b>启动（那里才有 <code>app/</code> 和 <code>sandbox/</code>）。
+    token 存在进程内存里，<b>重启一次，之前拿到的 token 全部作废</b>，必须重新登录。</div>
+</section>
+
+<section id="auth">
+  <h2><span class="no">1</span>登录拿 token</h2>
+  <p class="lead">除 <code>/</code>、<code>/health</code>、<code>/api/v1/auth/login</code> 外，<b>每个接口都必须带 token</b>。这是最容易漏的一步。</p>
+
+  <p><span class="pill m-post">POST</span> <code>/api/v1/auth/login</code></p>
+  <div class="copybar"><span>请求体 application/json</span><button class="btn" data-copy='{"username":"admin","password":"Admin@12345"}'>复制</button></div>
+  <pre>{
+  <span class="k">"username"</span>: "admin",
+  <span class="k">"password"</span>: "Admin@12345"
+}</pre>
+
+  <p>响应（真实，每次登录 token 都不同）：</p>
+  <div class="copybar"><span>200 OK</span></div>
+  <pre>{
+  "code": 200,
+  "message": "登录成功",
+  "data": {
+    "access_token": "mock.admin.06708f60c0d7",   <span class="k">// ← 复制这一串</span>
+    "refresh_token": "mock-refresh.admin.c7bef755",
+    "token_type": "bearer",
+    "expires_in": 86400,
+    "user": { "id": 1, "username": "admin", "real_name": "沙箱管理员",
+              "is_superuser": true, "roles": ["super_admin"], "permissions": ["*"] }
+  }
+}</pre>
+  <div class="note"><b>要复制的是 <code>data.access_token</code></b>，不是 <code>refresh_token</code>，也不是 <code>token_type</code>。
+    它长得像 <code>mock.admin.06708f60c0d7</code>，本身<b>不带</b> <code>Bearer</code> 前缀。</div>
+</section>
+
+<section id="authorize">
+  <h2><span class="no">2</span>在 Swagger 里填一次 Authorize</h2>
+  <p class="lead">Swagger 顶部有 <b>Authorize</b> 按钮（🔒 图标），填一次，后面所有接口自动带上请求头，不用每个接口重复填。</p>
+
+  <ol class="steps">
+    <li>打开 <b>http://127.0.0.1:8011/docs</b>。如果之前开过，<b>按 Ctrl+F5 强制刷新</b>，否则会继续用旧的接口描述。</li>
+    <li>点右上角 <b>Authorize</b>，弹窗里只有一个 <code>Value</code> 输入框。</li>
+    <li>粘贴<b>纯 token</b>，例如 <code>mock.admin.06708f60c0d7</code>。<b>不要</b>自己写 <code>Bearer </code>（Swagger 会自动加；多写了沙箱也会帮你剥掉，但真实服务不一定）。</li>
+    <li>点 <b>Authorize</b> → <b>Close</b>。按钮变成带锁的实心状态就成功了。</li>
+    <li>之后每个接口直接 <b>Try it out</b> → 填参数 → <b>Execute</b>，参数面板里不会再有 <code>authorization</code> 这一栏。</li>
+  </ol>
+
+  <div class="note danger"><b>为什么以前会全失败：</b>沙箱早期版本用的是普通 Header 参数，Swagger 没有 Authorize 按钮，
+    只能手填 <code>authorization</code>，少写一个 <code>Bearer </code> 加空格就是 <code>401 / 2001「请先登录」</code>——
+    看起来像接口全挂，其实只是这一个头的问题。现已改为与真实服务一致的 HTTPBearer。</div>
+</section>
+
+<section id="flow">
+  <h2><span class="no">3</span>七步跑通全链路</h2>
+  <p class="lead">顺序不能乱：画像没确认就跑匹配会报「未确认画像」。下面每步的请求体都可以直接复制。</p>
+
+  <table>
+    <thead><tr><th>#</th><th>接口</th><th>作用</th><th>权限</th></tr></thead>
+    <tbody>
+      <tr><td>3.1</td><td><span class="pill m-post">POST</span> <code>/api/v1/positions/1/jd/parse</code></td><td>JD 原文 → 结构化画像</td><td>position:manage</td></tr>
+      <tr><td>3.2</td><td><span class="pill m-get">GET</span> <code>/api/v1/positions/1/profile</code></td><td>查当前画像与版本号</td><td>position:read</td></tr>
+      <tr><td>3.3</td><td><span class="pill m-post">POST</span> <code>/api/v1/positions/1/profile/confirm</code></td><td>确认画像（带版本锁）</td><td>position:manage</td></tr>
+      <tr><td>3.4</td><td><span class="pill m-post">POST</span> <code>/api/v1/matchings/run</code></td><td>跑一次匹配，产出四态</td><td>matching:run</td></tr>
+      <tr><td>3.5</td><td><span class="pill m-get">GET</span> <code>/api/v1/matchings</code></td><td>分页回读匹配记录</td><td>matching:read</td></tr>
+      <tr><td>3.6</td><td><span class="pill m-get">GET</span> <code>/api/v1/matchings/positions/1</code></td><td>按岗位看最近一批</td><td>matching:read</td></tr>
+      <tr><td>3.7</td><td><span class="pill m-post">POST</span> <code>/api/v1/matchings/explain</code></td><td>取/生成匹配解释</td><td>matching:read</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3.1 JD 解析</h3>
+  <p><span class="pill m-post">POST</span> <code>/api/v1/positions/1/jd/parse</code></p>
+  <div class="copybar"><span>请求体 · jd_text 最少 20 字</span><button class="btn" data-copy='{"jd_text":"岗位职责：负责企业级AI招聘平台的算法设计与落地，构建人岗匹配模型。任职要求：本科及以上学历，3年以上机器学习经验，熟悉Python与深度学习框架。"}'>复制</button></div>
+  <pre>{
+  <span class="k">"jd_text"</span>: "岗位职责：负责企业级AI招聘平台的算法设计与落地，构建人岗匹配模型。任职要求：本科及以上学历，3年以上机器学习经验，熟悉Python与深度学习框架。"
+}</pre>
+  <div class="copybar"><span>200 OK · 关键字段</span></div>
+  <pre>{
+  "code": 200,
+  "message": "解析完成（预置画像兜底：ParamError）",
+  "data": {
+    "channel": "rule_fallback",
+    "profile": {
+      "job_title": "后端开发工程师",
+      "responsibilities": ["负责公司核心业务系统的后端服务开发，参与需求评审与技术方案设计", "..."],
+      "required_conditions": [
+        { "text": "本科及以上学历", "normalized": "本科",
+          "source_span": "本科及以上学历，计算机相关专业", "confidence": 0.9 },
+        { "text": "3 年以上后端开发经验", "normalized": "3",
+          "source_span": "3 年以上后端开发经验", "confidence": 0.9 }
+      ]
+    }
+  }
+}</pre>
+  <div class="note"><b>看到「预置画像兜底」是正常的。</b>沙箱优先跑真实规则解析器，解析不出结构化条件时用预置画像兜底，
+    这样你任何 JD 都能拿到一份合法结构，方便前端继续往下测。</div>
+
+  <h3>3.2 查画像与版本号</h3>
+  <p><span class="pill m-get">GET</span> <code>/api/v1/positions/1/profile</code>　—— 返回 <code>data.version</code>、<code>data.confirmed</code>、<code>data.profile</code>。</p>
+  <div class="copybar"><span>200 OK · 关键字段</span></div>
+  <pre>{
+  "code": 200, "message": "OK",
+  "data": {
+    "position_id": 1,
+    "position_title": "后端开发工程师",
+    "version": 2,
+    "confirmed": true,
+    "profile": { "job_title": "...", "responsibilities": ["..."], "required_conditions": ["..."] }
+  }
+}</pre>
+
+  <h3>3.3 确认画像（注意版本锁）</h3>
+  <p><span class="pill m-post">POST</span> <code>/api/v1/positions/1/profile/confirm</code></p>
+  <div class="copybar"><span>请求体 · expected_version 必须等于 3.2 查到的 version</span><button class="btn" data-copy='{"profile":{"job_title":"后端开发工程师","responsibilities":["负责公司核心业务系统的后端服务开发"],"required_conditions":[{"text":"本科及以上学历","normalized":"本科","source_span":"本科及以上学历","confidence":0.9}]},"expected_version":2,"note":"沙箱确认"}'>复制</button></div>
+  <pre>{
+  <span class="k">"profile"</span>: { "job_title": "后端开发工程师", "responsibilities": ["..."], "required_conditions": ["..."] },
+  <span class="k">"expected_version"</span>: 2,
+  <span class="k">"note"</span>: "沙箱确认"
+}</pre>
+  <p>成功：<code>200</code>，<code>message</code> 形如「岗位画像 v3 已确认」，版本号 +1。最省事的做法是<b>把 3.2 返回的整个 <code>data.profile</code> 原样贴进 <code>profile</code></b>。</p>
+  <div class="copybar"><span>400 Bad Request · 版本填错时</span></div>
+  <pre>{ "code": 1002, "message": "画像版本已变化（期望 1，当前 2），请刷新后重试", "data": null }</pre>
+  <div class="note warn"><b>400 / 1002 不是 bug，是乐观锁在保护你</b>：防止两个人同时确认时后提交的覆盖前一个。
+    处理办法：重新调 3.2 拿最新 <code>version</code>，再用它作为 <code>expected_version</code> 提交。</div>
+
+  <h3>3.4 跑匹配</h3>
+  <p><span class="pill m-post">POST</span> <code>/api/v1/matchings/run</code></p>
+  <div class="copybar"><span>请求体</span><button class="btn" data-copy='{"position_id":1,"strategy":"hybrid","top_k":5,"with_explanation":false}'>复制</button></div>
+  <pre>{
+  <span class="k">"position_id"</span>: 1,
+  <span class="k">"strategy"</span>: "hybrid",        // hard 只硬过滤 / soft 只打分 / hybrid 先硬后软
+  <span class="k">"top_k"</span>: 5,
+  <span class="k">"with_explanation"</span>: false   // 先关掉：不调外部模型，不产生费用与等待
+}</pre>
+  <div class="copybar"><span>200 OK · 真实统计（沙箱预置 5 位候选人）</span></div>
+  <pre>"stats": {
+  "candidates": 5,          <span class="k">// 召回 5 位</span>
+  "excluded_by_hard": 1,    <span class="k">// 仅 FAIL 淘汰 1 位</span>
+  "unknown": 2,             <span class="k">// 档案缺信息，保留，不淘汰</span>
+  "needs_review": 1,        <span class="k">// 需人工复核，保留</span>
+  "output": 4               <span class="k">// 最终进入榜单的人</span>
+}</pre>
+  <p>榜单结果（按排名）：<b>林一 96.8 PASS</b> → <b>周珂 87.4 PASS</b> → <b>吴敏 68.2 UNKNOWN</b> → <b>郑昊 44.5 NEEDS_REVIEW</b>；
+    孙楠因硬条件 FAIL 被淘汰并出现在 <code>excluded</code> 里。</p>
+  <div class="copybar"><span>单条 item 的关键字段</span></div>
+  <pre>{
+  "talent_id": 1, "talent_name": "林一", "rank": 1, "decision": "PASS", "score": 96.8,
+  "dimension_scores": { "skill": 100.0, "experience": 100.0, "education": 100.0, "quality": 88.0 },
+  "defaulted_dimensions": [], "data_completeness": 1.0,
+  "matched_skills": ["python", "fastapi", "mysql", "redis"],
+  "hard_results": [
+    { "item": "min_education", "required": "本科", "actual": "本科", "status": "PASS",
+      "reason": "学历满足：要求「本科」，实际「本科」", "evidence_id": "EVID-1-1-1" }
+  ],
+  "explanation_source": null
+}</pre>
+  <div class="note"><b>重点看三样</b>：<code>decision</code> 是不是四态之一（PASS / FAIL / UNKNOWN / NEEDS_REVIEW）、
+    每条判定有没有 <code>evidence_id</code>（<code>EVID-{岗位}-{人才}-{序号}</code>）、<code>excluded</code> 里淘汰原因是否写明硬条件。</div>
+
+  <h3>3.5 分页回读</h3>
+  <p><span class="pill m-get">GET</span> <code>/api/v1/matchings?position_id=1&amp;page=1&amp;page_size=5</code></p>
+  <p>支持的过滤参数：<code>position_id</code>、<code>talent_id</code>、<code>min_score</code>、<code>page</code>、<code>page_size</code>。
+    不传 <code>position_id</code> 就是全库最近记录。</p>
+  <div class="copybar"><span>200 OK</span></div>
+  <pre>{
+  "code": 200, "message": "OK",
+  "data": {
+    "items": [
+      { "batch_id": "b7dd6ca269f744cd8bfe9e06acb1c157", "position_id": 1,
+        "position_title": "后端开发工程师", "talent_id": 1, "talent_name": "林一",
+        "score": 96.8, "strategy": "hybrid", "requirement_version": 2,
+        "matched_at": "2026-11-04T14:46:09", "explanation_source": null }
+    ],
+    "total": 10, "page": 1, "page_size": 5, "pages": 2
+  }
+}</pre>
+
+  <h3>3.6 按岗位取最近批次</h3>
+  <p><span class="pill m-get">GET</span> <code>/api/v1/matchings/positions/1</code></p>
+  <div class="copybar"><span>404 · 该岗位还没跑过匹配时</span></div>
+  <pre>{ "code": 3001, "message": "该岗位还没有匹配记录（position_id=1）", "data": null }</pre>
+
+  <h3>3.7 解释</h3>
+  <p><span class="pill m-post">POST</span> <code>/api/v1/matchings/explain</code></p>
+  <div class="copybar"><span>请求体</span><button class="btn" data-copy='{"position_id":1,"talent_id":1}'>复制</button></div>
+  <pre>{ <span class="k">"position_id"</span>: 1, <span class="k">"talent_id"</span>: 1 }</pre>
+  <div class="copybar"><span>200 OK</span></div>
+  <pre>{
+  "code": 200, "message": "OK",
+  "data": {
+    "summary": "本次判定共 3 项硬性条件：满足 3 项、不满足 0 项、档案缺失 0 项、需人工复核 0 项；档案完整度 100%。（综合分 96.80）",
+    "highlights": [
+      { "text": "min_education：学历满足：要求「本科」，实际「本科」", "evidence_ids": ["EVID-1-1-1"], "claim_type": "fact" },
+      { "text": "required_skills：必备技能全部命中（3/3）", "evidence_ids": ["EVID-1-1-3"], "claim_type": "fact" }
+    ],
+    "gaps": [], "risks": [], "interview_suggestions": ["..."]
+  }
+}</pre>
+</section>
+
+<section id="errors">
+  <h2><span class="no">4</span>报错对照表</h2>
+  <p class="lead">沙箱同时用 HTTP 状态码和业务 <code>code</code>。判断问题时以业务 <code>code</code> 为准，HTTP 码只是分类。</p>
+
+  <table>
+    <thead><tr><th>HTTP</th><th>业务 code</th><th>提示</th><th>真实原因</th><th>怎么改</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>401</td><td>2001</td><td>请先登录</td>
+        <td>请求里<b>根本没有</b> Authorization 头（没点 Authorize / 面板被重置）</td>
+        <td>重新点 Authorize 填 token</td>
+      </tr>
+      <tr>
+        <td>401</td><td>2001</td><td>登录凭证无效，请重新登录（mock 服务重启后需重新登录）</td>
+        <td>头带了，但 token 不在内存里：<b>服务重启过</b>、或复制错了（带了 Bearer、复制成 refresh_token）</td>
+        <td>重新登录，复制 <code>data.access_token</code></td>
+      </tr>
+      <tr>
+        <td>403</td><td>2004</td><td>权限不足，无法访问该资源</td>
+        <td>用小于所需权限的账号（如 viewer 去改画像）</td>
+        <td>换 admin / hr 账号</td>
+      </tr>
+      <tr>
+        <td>404</td><td>3001</td><td>接口不存在（mock 仅实现了匹配链路）：GET /xxx</td>
+        <td>这个接口沙箱没实现（如岗位 CRUD、人才列表、用户管理）</td>
+        <td>换沙箱已实现的 11 个接口，或去真实服务 8010 测</td>
+      </tr>
+      <tr>
+        <td>404</td><td>3001</td><td>该岗位还没有匹配记录（position_id=1）</td>
+        <td>还没跑过 3.4</td>
+        <td>先跑一次匹配</td>
+      </tr>
+      <tr>
+        <td>400</td><td>1002</td><td>画像版本已变化（期望 1，当前 2），请刷新后重试</td>
+        <td><code>expected_version</code> 与库中当前版本不一致</td>
+        <td>GET profile 拿最新 version 再提交</td>
+      </tr>
+      <tr>
+        <td>422</td><td>—</td><td>detail: [{ "type": "string_too_short", "loc": ["body","jd_text"] }]</td>
+        <td>请求体字段缺失/类型不对，<b>请求根本没进业务</b></td>
+        <td>看 <code>loc</code> 指到哪个字段；<code>jd_text</code> 至少 20 字</td>
+      </tr>
+      <tr>
+        <td>405</td><td>—</td><td>Method Not Allowed</td>
+        <td>方法用错（如对 <code>/matchings</code> 发了 POST）</td>
+        <td>跑匹配是 <code>/matchings/run</code></td>
+      </tr>
+      <tr>
+        <td>502</td><td>—</td><td>—</td>
+        <td>本机代理拦截了 127.0.0.1，或服务没起</td>
+        <td>加 <code>--noproxy '*'</code>；浏览器访问则检查进程</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="note"><b>一句话区分 401 的两种文案：</b>「未提供」= 头没发出去（客户端问题）；「无效/过期」= 头发了但 token 不对（登录或重启问题）。</div>
+</section>
+
+<section id="accounts">
+  <h2><span class="no">5</span>账号与权限</h2>
+  <table>
+    <thead><tr><th>账号</th><th>密码</th><th>权限</th><th>能干什么</th></tr></thead>
+    <tbody>
+      <tr><td><code>admin</code></td><td><code>Admin@12345</code></td><td><span class="tag ok">*</span>全部</td><td>全部接口，含解析、确认、跑匹配</td></tr>
+      <tr><td><code>hr</code></td><td><code>Hr@123456</code></td><td><span class="tag">position:read</span><span class="tag">position:manage</span><span class="tag">matching:read</span><span class="tag">matching:run</span></td><td>业务全流程（推荐用它模拟 HR 视角）</td></tr>
+      <tr><td><code>viewer</code></td><td><code>Viewer@123</code></td><td><span class="tag">position:read</span><span class="tag">matching:read</span></td><td>只能看，动任何写操作都会 403</td></tr>
+    </tbody>
+  </table>
+  <div class="note"><b>建议测一遍 403：</b>用 viewer 登录，再去调 <code>/jd/parse</code>，会稳定返回 <code>403 / 2004 权限不足，无法访问该资源</code>。
+    前端拿这个验证「按钮置灰 + 错误提示」逻辑正合适。</div>
+</section>
+
+<section id="limits">
+  <h2><span class="no">6</span>沙箱的边界（别当成真后端）</h2>
+  <div class="grid2">
+    <div class="card">
+      <h4>实现了什么</h4>
+      <p>11 个接口：<code>/</code>、<code>/health</code>、登录、JD 解析、查画像、确认画像、跑匹配、匹配列表、按岗位查、按人才查、解释。</p>
+    </div>
+    <div class="card">
+      <h4>没实现什么</h4>
+      <p>岗位 CRUD、人才档案读写、用户/角色管理、组织架构、文件上传。访问统一返回 <code>404 / 3001</code>，不是坏了。</p>
+    </div>
+    <div class="card">
+      <h4>数据从哪来</h4>
+      <p>全部来自 <code>sandbox/mock_data.json</code>：1 个岗位、5 位候选人（覆盖四态）、2 版画像、若干解释。改 JSON 重启即生效。</p>
+    </div>
+    <div class="card">
+      <h4>和真实服务的差异</h4>
+      <p>沙箱不连 MySQL、不调 Dify/LLM、不做向量召回，<b>分数与四态判定只用于演示结构</b>，算法结论以 8010 为准。</p>
+    </div>
+  </div>
+  <div class="note danger"><b>怎么删掉沙箱：</b>停掉 8011 进程，然后删 <code>sandbox/</code> 整个目录即可。
+    主程序对沙箱<b>零依赖</b>（单向依赖 <code>sandbox → app</code>），且 <code>sandbox/</code> 已在 <code>.gitignore</code> 里，
+    合代码时不需要任何额外处理。</div>
+</section>
+
+<section id="script">
+  <h2><span class="no">7</span>一键跑完（不想点 Swagger 就用这个）</h2>
+  <p class="lead">同目录下的 <code>run_sandbox_flow.py</code> 会按七步顺序真实请求沙箱，逐步打印状态码与关键字段，最适合「先确认链路通不通」。</p>
+
+  <h3>执行</h3>
+  <div class="copybar"><span>bash · 在项目根目录执行</span><button class="btn" data-copy='python sandbox/run_sandbox_flow.py'>复制</button></div>
+  <pre>python sandbox/run_sandbox_flow.py</pre>
+  <p>换账号或换端口：</p>
+  <div class="copybar"><span>bash</span><button class="btn" data-copy='python sandbox/run_sandbox_flow.py --user hr --password Hr@123456'>复制</button></div>
+  <pre>python sandbox/run_sandbox_flow.py --user hr --password Hr@123456</pre>
+
+  <h3>真实输出（8/8 通过）</h3>
+  <div class="copybar"><span>stdout</span></div>
+  <pre>✅ 1 登录         HTTP 200  登录成功 token=mock.admin.09b88c7d022f
+✅ 2 JD解析       HTTP 200  解析完成（预置画像兜底：ParamError） 硬条件 4 条
+✅ 3 查画像       HTTP 200  OK version=v3
+✅ 4 确认画像     HTTP 200  岗位画像 v4 已确认
+✅ 5 跑匹配       HTTP 200  匹配完成 {"candidates": 5, "excluded_by_hard": 1, "unknown": 2, "needs_review": 1, "output": 4}
+   榜单：1.林一 96.8 PASS / 2.周珂 87.4 PASS / 3.吴敏 68.2 UNKNOWN / 4.郑昊 44.5 NEEDS_REVIEW
+✅ 6 列表回读     HTTP 200  OK total=20
+✅ 7 按岗位查     HTTP 200  OK
+✅ 8 解释         HTTP 200  OK
+
+结果：8/8 步通过</pre>
+
+  <div class="note warn"><b>为什么不直接给 curl 版：</b>Windows 的 Git Bash 调用 curl 时会把中文参数按 GBK 转码，
+    <code>jd_text</code> 传过去会变成乱码导致 <code>400 There was an error parsing the body</code>。
+    脚本内部统一用 UTF-8 编码请求体，能避开这个坑。</div>
+</section>
+
+<footer>
+  沙箱仅用于熟悉接口与前端联调，不代表真实算法结果；真实服务在 8010。<br>
+  本文件为手写维护的测试指引，接口示例数据请见同目录 <code>接口示例.html</code>（由脚本真实采集生成）。
+</footer>
+</main>
+</div>
+<script>
+document.querySelectorAll('.btn').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var text = btn.getAttribute('data-copy') || '';
+    var done = function () {
+      var old = btn.textContent;
+      btn.textContent = '已复制'; btn.classList.add('done');
+      setTimeout(function () { btn.textContent = old; btn.classList.remove('done'); }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text, done); });
+    } else { fallback(text, done); }
+  });
+});
+function fallback(text, done) {
+  var ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); } catch (e) { alert('复制失败，请手动选中'); }
+  document.body.removeChild(ta);
+}
+var links = document.querySelectorAll('aside a');
+var secs = document.querySelectorAll('section[id]');
+function sync() {
+  var y = window.scrollY + 120, cur = null;
+  secs.forEach(function (s) { if (s.offsetTop <= y) cur = s.id; });
+  links.forEach(function (a) { a.classList.toggle('active', a.getAttribute('href') === '#' + cur); });
+}
+window.addEventListener('scroll', sync); sync();
+</script>
+</body>
+</html>

@@ -11,17 +11,38 @@
 3. 常用基类：
      ORMModel     读模型基类（from_attributes）
      BaseSchema   写模型基类（禁止额外字段，保证入参严格）
-4. 响应与分页结构不在此重复定义（历史上的 PageData / PageQuerySchema / SuccessResponse
-   已删除）：分页统一 core/pagination.PageParams + core/response.PageResult，
-   Swagger 响应包装统一 core/response.ApiResponse，避免多套契约漂移。
+4. 响应与分页结构统一在 core/response 定义（PageResult / ApiResponse）；
+   本文件的 SuccessResponse 是 ApiResponse 的兼容别名（历史上独立定义过一份、
+   合并后多个路由仍按此名称引用），二者是同一个类，不会产生契约漂移；
+   COMMON_ERROR_RESPONSES 供各 router 的 responses= 参数统一声明错误响应。
 """
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.core.response import ApiResponse
+
+# ------------------------------------------------------------------ 兼容层
+# 各业务组路由（talent/dify/analytics 等）以 SuccessResponse[...] 声明响应模型。
+# 它与 ApiResponse 是同一个类，仅保留历史导入名，勿在此之外再定义新的响应结构。
+SuccessResponse = ApiResponse
+
+# 各 router 的 APIRouter(responses=...) 统一声明：让 Swagger 展示所有接口
+# 可能返回的错误码。错误体结构见 core/exception_handlers（统一 ApiResponse 包装）。
+COMMON_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
+    400: {"description": "业务错误（code=1xxx）"},
+    401: {"description": "未认证（code=2xxx）"},
+    403: {"description": "权限不足（code=2004）"},
+    404: {"description": "资源不存在（code=3001）"},
+    422: {"description": "参数校验失败"},
+    500: {"description": "系统错误（code=5000）"},
+}
 
 
 class ORMModel(BaseModel):
@@ -93,3 +114,17 @@ COMMON_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     422: {"description": "参数校验失败"},
     500: {"description": "系统错误（code=5000）"},
 }
+
+
+# ====================================================================== 合并兼容层
+# 说明：合并 origin/develop 时恢复。develop 侧 dd42def 删除了 SuccessResponse 但未迁移完
+#      引用它的 router（analytics/dify/talent/system 等十余处仍在 import），
+#      该提交在 develop 上本身无法通过 import；此处按 lz_agent 原定义恢复，
+#      待全仓库统一迁移 core.response.ApiResponse 后再移除。
+class SuccessResponse(BaseModel, Generic[T]):
+    """Swagger 响应模型：统一结构 + 泛型 data。"""
+
+    code: int = 200
+    message: str = "success"
+    data: T | None = None
+    trace_id: str = "-"

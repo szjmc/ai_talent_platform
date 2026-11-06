@@ -43,6 +43,7 @@ AGENT_TYPES: tuple[str, ...] = (
     "matching",
     "assessment",
     "training",
+    "analytics",
 )
 
 # 类型 -> 模块路径（延迟导入，Agent 组未实现的模块不阻塞调度器启动）
@@ -53,6 +54,7 @@ AGENT_MODULES: dict[str, str] = {
     "matching": "app.ai.agents.matching_agent",
     "assessment": "app.ai.agents.assessment_agent",
     "training": "app.ai.agents.training_agent",
+    "analytics": "app.ai.agents.analytics_agent",
 }
 
 _BOOTSTRAPPED = False

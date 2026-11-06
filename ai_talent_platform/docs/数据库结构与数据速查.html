@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>数据库结构与数据速查 · 培训模块</title>
+<style>
+:root{
+  --bg:#F7F7F5; --card:#FFFFFF; --ink:#1F1F1E; --ink2:#5C5C58; --ink3:#8E8E88;
+  --line:#E4E4DE; --line2:#D3D3CB; --accent:#185FA5; --accent-bg:#E6F1FB;
+  --teal:#0F6E56; --warn:#854F0B; --null:#A8A8A0;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#1A1A19; --card:#232322; --ink:#EDEDE8; --ink2:#B4B4AD; --ink3:#8A8A84;
+    --line:#33332F; --line2:#42423C; --accent:#85B7EB; --accent-bg:#1B2C3D;
+    --teal:#5DCAA5; --warn:#EF9F27; --null:#6B6B64;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  font-size:14px;line-height:1.65;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+.wrap{max-width:1120px;margin:0 auto;padding:40px 28px 80px}
+
+header.top{border-bottom:1px solid var(--line);padding-bottom:22px;margin-bottom:28px}
+header.top h1{margin:0 0 6px;font-size:22px;font-weight:500;letter-spacing:-.01em}
+.meta-line{color:var(--ink2);font-size:13px;display:flex;gap:18px;flex-wrap:wrap}
+.meta-line b{font-weight:500;color:var(--ink)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-bottom:22px}
+
+.toc{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:26px}
+.toc a{display:inline-flex;align-items:center;gap:7px;padding:7px 13px;border-radius:8px;
+  border:1px solid var(--line2);color:var(--ink2);text-decoration:none;font-size:13px;background:var(--card)}
+.toc a:hover{border-color:var(--accent);color:var(--accent)}
+.toc a .n{color:var(--ink3);font-size:11.5px;font-family:ui-monospace,monospace}
+
+.table-block{background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:22px;margin-bottom:24px;scroll-margin-top:20px}
+.tb-head{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;
+  padding-bottom:16px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.tb-head h2{margin:0 0 7px;font-size:17px;font-weight:500}
+.tname{color:var(--accent);background:var(--accent-bg);padding:2px 7px;border-radius:5px;margin-left:6px}
+.desc{margin:0;color:var(--ink2);font-size:13.5px;max-width:640px}
+.tb-stats{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0}
+.stat{font-size:12.5px;color:var(--ink2);background:var(--bg);border:1px solid var(--line);
+  padding:3px 9px;border-radius:6px}
+.stat b{font-weight:500;color:var(--ink)}
+.role{font-size:12.5px;color:var(--teal);border:1px solid currentColor;padding:3px 9px;border-radius:6px}
+
+.io{display:flex;gap:26px;flex-wrap:wrap;margin-bottom:6px;font-size:12.5px;color:var(--ink2)}
+.io-k{display:inline-block;min-width:34px;color:var(--ink3);margin-right:8px}
+
+h3{font-size:13.5px;font-weight:500;margin:22px 0 10px;color:var(--ink)}
+h3 .sub{color:var(--ink3);font-weight:400;font-size:12px;margin-left:6px}
+
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table.grid{border-collapse:collapse;width:100%;font-size:12.5px}
+table.grid th{text-align:left;padding:9px 12px;background:var(--bg);color:var(--ink2);
+  font-weight:500;border-bottom:1px solid var(--line2);white-space:nowrap;
+  position:sticky;top:0;z-index:1}
+table.grid td{padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top;
+  max-width:420px;word-break:break-word}
+table.grid tr:last-child td{border-bottom:none}
+table.grid tr.base{opacity:.62}
+table.grid .ctr{text-align:center}
+.type{color:var(--ink2);white-space:nowrap}
+.badge{font-size:10.5px;padding:1px 5px;border-radius:4px;font-family:ui-monospace,monospace}
+.badge.pk{background:var(--accent-bg);color:var(--accent)}
+.badge.fk{background:var(--bg);color:var(--ink3);border:1px solid var(--line2)}
+
+.data-wrap{max-height:460px;overflow:auto}
+table.data td{white-space:nowrap;max-width:340px}
+table.data td.cl-json{white-space:normal;font-family:ui-monospace,monospace;font-size:11.5px;
+  color:var(--ink2);min-width:220px}
+.cl-num{font-family:ui-monospace,monospace;text-align:right}
+.cl-null{color:var(--null)}
+.null{color:var(--null);font-style:normal}
+
+details{margin-top:20px;border:1px solid var(--line);border-radius:8px;padding:0 14px}
+summary{cursor:pointer;padding:11px 0;font-size:12.5px;color:var(--ink2);user-select:none}
+summary:hover{color:var(--accent)}
+details pre{margin:0 0 14px;padding:14px;background:var(--bg);border-radius:6px;
+  overflow-x:auto;font-size:12px;line-height:1.6;color:var(--ink)}
+
+.tips{font-size:13px;color:var(--ink2)}
+.tips li{margin:5px 0}
+.tips code{background:var(--bg);border:1px solid var(--line);padding:1px 5px;border-radius:4px;
+  font-family:ui-monospace,monospace;font-size:12px}
+footer{color:var(--ink3);font-size:12px;text-align:center;margin-top:36px;padding-top:20px;
+  border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>数据库结构与数据速查</h1>
+  <div class="meta-line">
+    <span>MySQL <b>8.0.27</b></span>
+    <span><b>127.0.0.1:3306</b></span>
+    <span>库 <b>ai_talent_platform</b></span>
+    <span><b>5</b> 张表 / <b>78</b> 行</span>
+    <span>生成于 2026-11-04 14:24</span>
+  </div>
+</header>
+
+<div class="card">
+  <h3 style="margin-top:0">关联网页</h3>
+  
+<svg viewBox="0 0 680 200" width="100%" role="img" aria-label="五张表的关联关系">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6"
+      orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5"
+        stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <g>
+    <rect x="40" y="30" width="150" height="46" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+    <text x="115" y="47" text-anchor="middle" font-size="13" font-weight="500" fill="#0C447C" font-family="system-ui,sans-serif" dominant-baseline="central">position_requirements</text>
+    <text x="115" y="63" text-anchor="middle" font-size="11" fill="#185FA5" font-family="system-ui,sans-serif" dominant-baseline="central">3 行 · 标准</text>
+  </g>
+
+  <path d="M190 53 L232 53" stroke="#888780" stroke-width="1.5" fill="none" marker-end="url(#a)"/>
+
+  <g>
+    <rect x="235" y="26" width="150" height="54" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text x="310" y="46" text-anchor="middle" font-size="13" font-weight="500" fill="#04342C" font-family="system-ui,sans-serif" dominant-baseline="central">training_plans</text>
+    <text x="310" y="64" text-anchor="middle" font-size="11" fill="#0F6E56" font-family="system-ui,sans-serif" dominant-baseline="central">4 行 · 主体</text>
+  </g>
+
+  <path d="M385 53 L427 53" stroke="#888780" stroke-width="1.5" fill="none" marker-end="url(#a)"/>
+
+  <g>
+    <rect x="430" y="26" width="150" height="54" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text x="505" y="46" text-anchor="middle" font-size="13" font-weight="500" fill="#412402" font-family="system-ui,sans-serif" dominant-baseline="central">plan_courses</text>
+    <text x="505" y="64" text-anchor="middle" font-size="11" fill="#854F0B" font-family="system-ui,sans-serif" dominant-baseline="central">13 行 · 明细</text>
+  </g>
+
+  <path d="M505 80 L505 118" stroke="#888780" stroke-width="1.5" fill="none" marker-end="url(#a)"/>
+
+  <g>
+    <rect x="430" y="120" width="150" height="54" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text x="505" y="140" text-anchor="middle" font-size="13" font-weight="500" fill="#2C2C2A" font-family="system-ui,sans-serif" dominant-baseline="central">courses</text>
+    <text x="505" y="158" text-anchor="middle" font-size="11" fill="#5F5E5A" font-family="system-ui,sans-serif" dominant-baseline="central">19 行 · 教材</text>
+  </g>
+
+  <path d="M310 80 L310 118" stroke="#888780" stroke-width="1.5" fill="none" marker-end="url(#a)"/>
+
+  <g>
+    <rect x="235" y="120" width="150" height="54" rx="8" fill="#FBEAF0" stroke="#993556" stroke-width="0.5"/>
+    <text x="310" y="140" text-anchor="middle" font-size="13" font-weight="500" fill="#4B1528" font-family="system-ui,sans-serif" dominant-baseline="central">learning_records</text>
+    <text x="310" y="158" text-anchor="middle" font-size="11" fill="#993556" font-family="system-ui,sans-serif" dominant-baseline="central">39 行 · 过程</text>
+  </g>
+
+  <path d="M385 147 L427 147" stroke="#888780" stroke-width="1.5" fill="none" marker-end="url(#a)"/>
+</svg>
+
+</div>
+
+<nav class="toc"><a href="#t-position_requirements"><span class="n">3</span>岗位能力模型</a><a href="#t-courses"><span class="n">19</span>课程库</a><a href="#t-training_plans"><span class="n">4</span>培训计划</a><a href="#t-plan_courses"><span class="n">13</span>计划课程明细</a><a href="#t-learning_records"><span class="n">39</span>学习记录</a></nav>
+
+
+<section class="table-block" id="t-position_requirements">
+  <div class="tb-head">
+    <div>
+      <h2>岗位能力模型 <span class="mono tname">position_requirements</span></h2>
+      <p class="desc">每个岗位一套能力维度要求分 + 权重。计划生成时先读这张表，拿到 target 和 weight，才能算差距和排序。</p>
+    </div>
+    <div class="tb-stats">
+      <span class="stat"><b>3</b> 行</span>
+      <span class="stat"><b>12</b> 列</span>
+      <span class="role">标准来源</span>
+    </div>
+  </div>
+
+  <div class="io">
+    <div><span class="io-k">写入</span><span class="mono">seed_position_requirements.py（--bind 可绑岗位）</span></div>
+    <div><span class="io-k">读取</span><span class="mono">TrainingService._resolve_requirement_model()</span></div>
+  </div>
+
+  <h3>列定义</h3>
+  <div class="scroll">
+    <table class="grid">
+      <thead><tr><th>字段</th><th>类型</th><th class="ctr">键 / 可空</th><th>默认</th><th>含义</th></tr></thead>
+      <tbody><tr><td class='mono'>position_id</td><td class='mono type'>bigint</td><td class='ctr'><span class="badge fk">IDX</span></td><td class='mono'><span class="null">—</span></td><td>岗位 ID，关联 positions.id</td></tr><tr class="base"><td class='mono'>version</td><td class='mono type'>int</td><td class='ctr'>NO</td><td class='mono'>1</td><td>模型版本，改权重时递增</td></tr><tr><td class='mono'>dimensions</td><td class='mono type'>json</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>JSON：各维度要求分 {维度: {required: 分}}</td></tr><tr><td class='mono'>weights</td><td class='mono type'>json</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>JSON：各维度权重，合计必须为 1.0</td></tr><tr><td class='mono'>source</td><td class='mono type'>varchar(20)</td><td class='ctr'>NO</td><td class='mono'>manual</td><td>来源，manual = 人工配置</td></tr><tr class="base"><td class='mono'>id</td><td class='mono type'>bigint</td><td class='ctr'><span class="badge pk">PK</span></td><td class='mono'><span class="null">—</span></td><td>主键</td></tr><tr class="base"><td class='mono'>created_at</td><td class='mono type'>datetime</td><td class='ctr'>NO</td><td class='mono'>CURRENT_TIMESTAMP</td><td>创建时间</td></tr><tr class="base"><td class='mono'>updated_at</td><td class='mono type'>datetime</td><td class='ctr'>NO</td><td class='mono'>CURRENT_TIMESTAMP</td><td>更新时间</td></tr><tr class="base"><td class='mono'>is_deleted</td><td class='mono type'>tinyint(1)</td><td class='ctr'><span class="badge fk">IDX</span></td><td class='mono'>0</td><td>软删除标记</td></tr><tr class="base"><td class='mono'>deleted_at</td><td class='mono type'>datetime</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>删除时间</td></tr><tr class="base"><td class='mono'>created_by</td><td class='mono type'>bigint</td><td class='ctr'><span class="badge fk">IDX</span></td><td class='mono'><span class="null">—</span></td><td>创建人 ID</td></tr><tr class="base"><td class='mono'>updated_by</td><td class='mono type'>bigint</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>更新人 ID</td></tr></tbody>
+    </table>
+  </div>
+
+  <h3>现有数据 <span class="sub">3 行</span></h3>
+  <div class="scroll data-wrap">
+    <table class="grid data">
+      <thead><tr><th class='mono'>position_id</th><th class='mono'>version</th><th class='mono'>dimensions</th><th class='mono'>weights</th><th class='mono'>source</th><th class='mono'>id</th><th class='mono'>created_at</th><th class='mono'>updated_at</th><th class='mono'>is_deleted</th><th class='mono'>deleted_at</th><th class='mono'>created_by</th><th class='mono'>updated_by</th></tr></thead>
+      <tbody><tr><td class='cl-num'>1</td><td class='cl-num'>1</td><td class='cl-json'>{&quot;团队协作&quot;: {&quot;required&quot;: 75}, &quot;数据分析&quot;: {&quot;required&quot;: 88}, &quot;沟通表达&quot;: {&quot;required&quot;: 78}, &quot;需求分析&quot;: {&quot;required&quot;: 78}, &quot;项目管理&quot;: {&quot;required&quot;: 72}, &quot;SQL与数据库&quot;: {&quot;required&quot;: 85}}</td><td class='cl-json'>{&quot;团队协作&quot;: 0.05, &quot;数据分析&quot;: 0.3, &quot;沟通表达&quot;: 0.15, &quot;需求分析&quot;: 0.15, &quot;项目管理&quot;: 0.1, &quot;SQL与数据库&quot;: 0.25}</td><td class=''>manual</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:10:19</td><td class=''>2026-11-03 22:10:19</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-num'>2</td><td class='cl-num'>1</td><td class='cl-json'>{&quot;产品设计&quot;: {&quot;required&quot;: 82}, &quot;数据分析&quot;: {&quot;required&quot;: 80}, &quot;沟通表达&quot;: {&quot;required&quot;: 78}, &quot;用户研究&quot;: {&quot;required&quot;: 78}, &quot;需求分析&quot;: {&quot;required&quot;: 85}, &quot;项目管理&quot;: {&quot;required&quot;: 75}}</td><td class='cl-json'>{&quot;产品设计&quot;: 0.25, &quot;数据分析&quot;: 0.15, &quot;沟通表达&quot;: 0.08, &quot;用户研究&quot;: 0.15, &quot;需求分析&quot;: 0.25, &quot;项目管理&quot;: 0.12}</td><td class=''>manual</td><td class='cl-num'>2</td><td class=''>2026-11-03 22:10:19</td><td class=''>2026-11-03 22:10:19</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-num'>3</td><td class='cl-num'>1</td><td class='cl-json'>{&quot;团队协作&quot;: {&quot;required&quot;: 80}, &quot;数据分析&quot;: {&quot;required&quot;: 75}, &quot;沟通表达&quot;: {&quot;required&quot;: 72}, &quot;项目管理&quot;: {&quot;required&quot;: 75}, &quot;SQL与数据库&quot;: {&quot;required&quot;: 90}}</td><td class='cl-json'>{&quot;团队协作&quot;: 0.2, &quot;数据分析&quot;: 0.15, &quot;沟通表达&quot;: 0.15, &quot;项目管理&quot;: 0.2, &quot;SQL与数据库&quot;: 0.3}</td><td class=''>manual</td><td class='cl-num'>3</td><td class=''>2026-11-03 22:10:19</td><td class=''>2026-11-03 22:10:19</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr></tbody>
+    </table>
+  </div>
+
+  <details>
+    <summary>建表语句 DDL</summary>
+    <pre class="mono">CREATE TABLE `position_requirements` (
+  `position_id` bigint NOT NULL COMMENT &#x27;岗位 ID（FK -&gt; positions.id，CASCADE）&#x27;,
+  `version` int NOT NULL DEFAULT &#x27;1&#x27; COMMENT &#x27;版本号（同岗位递增）&#x27;,
+  `dimensions` json DEFAULT NULL COMMENT &#x27;维度定义：技能/经验/学历/素质&#x27;,
+  `weights` json DEFAULT NULL COMMENT &#x27;维度权重（合计 1.0）&#x27;,
+  `source` varchar(20) COLLATE utf8mb4_general_ci NOT NULL DEFAULT &#x27;manual&#x27; COMMENT &#x27;来源：manual/ai_parse&#x27;,
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT &#x27;主键 ID（BIGINT，主键索引由 PK 提供）&#x27;,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT &#x27;创建时间&#x27;,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT &#x27;更新时间&#x27;,
+  `is_deleted` tinyint(1) NOT NULL DEFAULT &#x27;0&#x27; COMMENT &#x27;是否已删除（逻辑删除）&#x27;,
+  `deleted_at` datetime DEFAULT NULL COMMENT &#x27;删除时间&#x27;,
+  `created_by` bigint DEFAULT NULL COMMENT &#x27;创建人用户 ID&#x27;,
+  `updated_by` bigint DEFAULT NULL COMMENT &#x27;最后修改人用户 ID&#x27;,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_position_requirements_position_version` (`position_id`,`version`),
+  KEY `ix_position_requirements_created_by` (`created_by`),
+  KEY `ix_position_requirements_is_deleted` (`is_deleted`),
+  KEY `ix_position_requirements_position_id` (`position_id`),
+  CONSTRAINT `fk_position_requirements_position_id_positions` FOREIGN KEY (`position_id`) REFERENCES `positions` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT=&#x27;岗位能力模型表（多版本）&#x27;</pre>
+  </details>
+</section>
+<section class="table-block" id="t-courses">
+  <div class="tb-head">
+    <div>
+      <h2>课程库 <span class="mono tname">courses</span></h2>
+      <p class="desc">所有可推荐课程的目录。匹配靠 category 与 skill_tags 对能力维度，没有匹配课程时该能力项会被标记为「无课可推」。</p>
+    </div>
+    <div class="tb-stats">
+      <span class="stat"><b>19</b> 行</span>
+      <span class="stat"><b>17</b> 列</span>
+      <span class="role">教材来源</span>
+    </div>
+  </div>
+
+  <div class="io">
+    <div><span class="io-k">写入</span><span class="mono">seed_training_courses.py / POST /trainings/courses</span></div>
+    <div><span class="io-k">读取</span><span class="mono">TrainingService._build_skeleton() → match_courses()</span></div>
+  </div>
+
+  <h3>列定义</h3>
+  <div class="scroll">
+    <table class="grid">
+      <thead><tr><th>字段</th><th>类型</th><th class="ctr">键 / 可空</th><th>默认</th><th>含义</th></tr></thead>
+      <tbody><tr><td class='mono'>title</td><td class='mono type'>varchar(128)</td><td class='ctr'><span class="badge fk">IDX</span></td><td class='mono'><span class="null">—</span></td><td>课程名称</td></tr><tr><td class='mono'>category</td><td class='mono type'>varchar(32)</td><td class='ctr'><span class="badge fk">IDX</span></td><td class='mono'><span class="null">—</span></td><td>所属能力维度，课程匹配的第一关键字</td></tr><tr><td class='mono'>level</td><td class='mono type'>varchar(20)</td><td class='ctr'><span class="badge fk">IDX</span></td><td class='mono'><span class="null">—</span></td><td>难度 L1–L4，需 ≥ 学员当前等级</td></tr><tr><td class='mono'>duration_hours</td><td class='mono type'>decimal(6,2)</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>课时数，参与总时长估算</td></tr><tr><td class='mono'>resource_url</td><td class='mono type'>varchar(512)</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>学习链接，可为空</td></tr><tr><td class='mono'>cover</td><td class='mono type'>varchar(255)</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>封面图地址，可为空</td></tr><tr><td class='mono'>description</td><td class='mono type'>text</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>课程简介</td></tr><tr><td class='mono'>skill_tags</td><td class='mono type'>json</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>JSON 技能标签，用于精准匹配</td></tr><tr><td class='mono'>is_active</td><td class='mono type'>tinyint(1)</td><td class='ctr'>NO</td><td class='mono'>1</td><td>1 上架 / 0 下架，下架不参与推荐</td></tr><tr class="base"><td class='mono'>id</td><td class='mono type'>bigint</td><td class='ctr'><span class="badge pk">PK</span></td><td class='mono'><span class="null">—</span></td><td>主键</td></tr><tr class="base"><td class='mono'>version</td><td class='mono type'>int</td><td class='ctr'>NO</td><td class='mono'>1</td><td>乐观锁版本号</td></tr><tr class="base"><td class='mono'>created_at</td><td class='mono type'>datetime</td><td class='ctr'>NO</td><td class='mono'>CURRENT_TIMESTAMP</td><td>创建时间</td></tr><tr class="base"><td class='mono'>updated_at</td><td class='mono type'>datetime</td><td class='ctr'>NO</td><td class='mono'>CURRENT_TIMESTAMP</td><td>更新时间</td></tr><tr class="base"><td class='mono'>is_deleted</td><td class='mono type'>tinyint(1)</td><td class='ctr'><span class="badge fk">IDX</span></td><td class='mono'>0</td><td>软删除标记</td></tr><tr class="base"><td class='mono'>deleted_at</td><td class='mono type'>datetime</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>删除时间</td></tr><tr class="base"><td class='mono'>created_by</td><td class='mono type'>bigint</td><td class='ctr'><span class="badge fk">IDX</span></td><td class='mono'><span class="null">—</span></td><td>创建人 ID</td></tr><tr class="base"><td class='mono'>updated_by</td><td class='mono type'>bigint</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>更新人 ID</td></tr></tbody>
+    </table>
+  </div>
+
+  <h3>现有数据 <span class="sub">19 行</span></h3>
+  <div class="scroll data-wrap">
+    <table class="grid data">
+      <thead><tr><th class='mono'>title</th><th class='mono'>category</th><th class='mono'>level</th><th class='mono'>duration_hours</th><th class='mono'>resource_url</th><th class='mono'>cover</th><th class='mono'>description</th><th class='mono'>skill_tags</th><th class='mono'>is_active</th><th class='mono'>id</th><th class='mono'>version</th><th class='mono'>created_at</th><th class='mono'>updated_at</th><th class='mono'>is_deleted</th><th class='mono'>deleted_at</th><th class='mono'>created_by</th><th class='mono'>updated_by</th></tr></thead>
+      <tbody><tr><td class=''>Excel 进阶与数据透视</td><td class=''>数据分析</td><td class=''>L1</td><td class='cl-num'>4.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>透视表、函数组合与基础图表，适合零基础起步。</td><td class='cl-json'>[&quot;数据分析&quot;, &quot;Excel&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>4</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>PRD 写作与需求评审</td><td class=''>产品设计</td><td class=''>L3</td><td class='cl-num'>6.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>一份研发愿意照着做的 PRD 该有什么、不该有什么。</td><td class='cl-json'>[&quot;产品设计&quot;, &quot;PRD&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>15</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>SQL 入门到熟练</td><td class=''>SQL与数据库</td><td class=''>L1</td><td class='cl-num'>8.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>单表查询、聚合、多表关联与子查询，配套练习库。</td><td class='cl-json'>[&quot;SQL与数据库&quot;, &quot;SQL&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>7</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>SQL 查询优化与索引原理</td><td class=''>SQL与数据库</td><td class=''>L2</td><td class='cl-num'>6.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>执行计划解读、索引设计、慢查询改写。</td><td class='cl-json'>[&quot;SQL与数据库&quot;, &quot;SQL&quot;, &quot;性能优化&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>8</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>业务数据分析方法与归因</td><td class=''>数据分析</td><td class=''>L3</td><td class='cl-num'>8.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>漏斗 / 留存 / AB 实验，以及指标下跌的三层归因法。</td><td class='cl-json'>[&quot;数据分析&quot;, &quot;归因&quot;, &quot;AB测试&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>6</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>业务数据看板与可视化</td><td class=''>数据分析</td><td class=''>L2</td><td class='cl-num'>8.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>指标体系搭建、看板设计与异常波动的读图方法。</td><td class='cl-json'>[&quot;数据分析&quot;, &quot;可视化&quot;, &quot;指标体系&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>5</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>产品原型与交互设计基础</td><td class=''>产品设计</td><td class=''>L2</td><td class='cl-num'>8.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>从流程图到高保真原型，交互四原则与可用性自检。</td><td class='cl-json'>[&quot;产品设计&quot;, &quot;原型&quot;, &quot;交互&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>14</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>协作机制与团队冲突化解</td><td class=''>团队协作</td><td class=''>L2</td><td class='cl-num'>6.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>RACI 分工、接口人机制与冲突升级路径。</td><td class='cl-json'>[&quot;团队协作&quot;, &quot;RACI&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>19</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>团队协作与高效会议</td><td class=''>团队协作</td><td class=''>L1</td><td class='cl-num'>4.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>会议前置材料、议题收敛与行动项闭环。</td><td class='cl-json'>[&quot;团队协作&quot;, &quot;会议管理&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>18</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>敏捷与 Scrum 实战</td><td class=''>项目管理</td><td class=''>L3</td><td class='cl-num'>4.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>迭代节奏、故事点估算、站会与回顾会怎么开才不流于形式。</td><td class='cl-json'>[&quot;项目管理&quot;, &quot;敏捷&quot;, &quot;Scrum&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>10</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>数据建模与数仓分层基础</td><td class=''>SQL与数据库</td><td class=''>L3</td><td class='cl-num'>8.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>维度建模、ODS/DWD/DWS 分层与指标口径治理。</td><td class='cl-json'>[&quot;SQL与数据库&quot;, &quot;数据建模&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>9</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>用户画像与需求洞察</td><td class=''>用户研究</td><td class=''>L3</td><td class='cl-num'>8.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>从行为数据与访谈记录里提炼可落地的用户画像。</td><td class='cl-json'>[&quot;用户研究&quot;, &quot;用户画像&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>17</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>用户访谈与调研方法</td><td class=''>用户研究</td><td class=''>L2</td><td class='cl-num'>6.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>访谈提纲设计、避免诱导性提问、样本与结论边界。</td><td class='cl-json'>[&quot;用户研究&quot;, &quot;用户访谈&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>16</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>结构化表达与向上汇报</td><td class=''>沟通表达</td><td class=''>L2</td><td class='cl-num'>4.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>结论先行、MECE 拆解，把复杂事讲成三句话。</td><td class='cl-json'>[&quot;沟通表达&quot;, &quot;汇报&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>12</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>跨部门沟通与冲突处理</td><td class=''>沟通表达</td><td class=''>L3</td><td class='cl-num'>6.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>利益对齐、非暴力沟通与僵局破解的实操话术。</td><td class='cl-json'>[&quot;沟通表达&quot;, &quot;跨部门协作&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>13</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>需求优先级与 MVP 设计</td><td class=''>需求分析</td><td class=''>L3</td><td class='cl-num'>8.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>KANO / 价值-成本矩阵，把一堆需求砍到能上线的范围。</td><td class='cl-json'>[&quot;需求分析&quot;, &quot;优先级&quot;, &quot;MVP&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>2</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>需求分析与用户故事拆解</td><td class=''>需求分析</td><td class=''>L2</td><td class='cl-num'>6.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>从业务目标拆到可用研发的用户故事，含验收标准写法。</td><td class='cl-json'>[&quot;需求分析&quot;, &quot;用户故事&quot;, &quot;PRD&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>1</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>项目风险与干系人管理</td><td class=''>项目管理</td><td class=''>L4</td><td class='cl-num'>6.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>风险登记册、关键路径与跨部门干系人对齐策略。</td><td class='cl-json'>[&quot;项目管理&quot;, &quot;风险管理&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>11</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>高阶需求架构与变更治理</td><td class=''>需求分析</td><td class=''>L4</td><td class='cl-num'>8.00</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class=''>多产品线需求分层、变更影响面评估与评审机制。</td><td class='cl-json'>[&quot;需求分析&quot;, &quot;需求治理&quot;]</td><td class='cl-num'>1</td><td class='cl-num'>3</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:30:35</td><td class=''>2026-11-03 21:30:35</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr></tbody>
+    </table>
+  </div>
+
+  <details>
+    <summary>建表语句 DDL</summary>
+    <pre class="mono">CREATE TABLE `courses` (
+  `title` varchar(128) COLLATE utf8mb4_general_ci NOT NULL COMMENT &#x27;课程名称&#x27;,
+  `category` varchar(32) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT &#x27;分类&#x27;,
+  `level` varchar(20) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT &#x27;适用层级&#x27;,
+  `duration_hours` decimal(6,2) DEFAULT NULL COMMENT &#x27;学时&#x27;,
+  `resource_url` varchar(512) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT &#x27;资源地址&#x27;,
+  `cover` varchar(255) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT &#x27;封面&#x27;,
+  `description` text COLLATE utf8mb4_general_ci COMMENT &#x27;简介&#x27;,
+  `skill_tags` json DEFAULT NULL COMMENT &#x27;对应技能标签&#x27;,
+  `is_active` tinyint(1) NOT NULL DEFAULT &#x27;1&#x27; COMMENT &#x27;是否上架&#x27;,
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT &#x27;主键 ID（BIGINT，主键索引由 PK 提供）&#x27;,
+  `version` int NOT NULL DEFAULT &#x27;1&#x27; COMMENT &#x27;乐观锁版本号，每次更新 +1&#x27;,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT &#x27;创建时间&#x27;,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT &#x27;更新时间&#x27;,
+  `is_deleted` tinyint(1) NOT NULL DEFAULT &#x27;0&#x27; COMMENT &#x27;是否已删除（逻辑删除）&#x27;,
+  `deleted_at` datetime DEFAULT NULL COMMENT &#x27;删除时间&#x27;,
+  `created_by` bigint DEFAULT NULL COMMENT &#x27;创建人用户 ID&#x27;,
+  `updated_by` bigint DEFAULT NULL COMMENT &#x27;最后修改人用户 ID&#x27;,
+  PRIMARY KEY (`id`),
+  KEY `ix_courses_level` (`level`),
+  KEY `ix_courses_category` (`category`),
+  KEY `ix_courses_created_by` (`created_by`),
+  KEY `ix_courses_is_deleted` (`is_deleted`),
+  KEY `ix_courses_title` (`title`)
+) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT=&#x27;课程表&#x27;</pre>
+  </details>
+</section>
+<section class="table-block" id="t-training_plans">
+  <div class="tb-head">
+    <div>
+      <h2>培训计划 <span class="mono tname">training_plans</span></h2>
+      <p class="desc">一次生成的培养计划。created_by_ai=1 说明有 LLM 参与写总结，=0 说明是纯规则兜底产出。</p>
+    </div>
+    <div class="tb-stats">
+      <span class="stat"><b>4</b> 行</span>
+      <span class="stat"><b>16</b> 列</span>
+      <span class="role">主体</span>
+    </div>
+  </div>
+
+  <div class="io">
+    <div><span class="io-k">写入</span><span class="mono">POST /trainings/plans/generate</span></div>
+    <div><span class="io-k">读取</span><span class="mono">/plans/{id}、/plans、/lag-scan</span></div>
+  </div>
+
+  <h3>列定义</h3>
+  <div class="scroll">
+    <table class="grid">
+      <thead><tr><th>字段</th><th>类型</th><th class="ctr">键 / 可空</th><th>默认</th><th>含义</th></tr></thead>
+      <tbody><tr><td class='mono'>name</td><td class='mono type'>varchar(128)</td><td class='ctr'>NO</td><td class='mono'><span class="null">—</span></td><td>计划名称，自动拼接「姓名·能力项提升计划」</td></tr><tr><td class='mono'>talent_id</td><td class='mono type'>bigint</td><td class='ctr'><span class="badge fk">IDX</span></td><td class='mono'><span class="null">—</span></td><td>关联 talents.id</td></tr><tr><td class='mono'>goal</td><td class='mono type'>varchar(512)</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>目标描述</td></tr><tr><td class='mono'>start_date</td><td class='mono type'>date</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>开始日期</td></tr><tr><td class='mono'>end_date</td><td class='mono type'>date</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>结束日期，由总课时 ÷ 每周可投入小时推算</td></tr><tr><td class='mono'>status</td><td class='mono type'>varchar(20)</td><td class='ctr'>NO</td><td class='mono'>draft</td><td>not_started / ongoing / finished</td></tr><tr><td class='mono'>created_by_ai</td><td class='mono type'>tinyint(1)</td><td class='ctr'>NO</td><td class='mono'>0</td><td>1 = LLM 参与生成，0 = 纯规则兜底</td></tr><tr><td class='mono'>source_assessment_id</td><td class='mono type'>bigint</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>来源测评 ID，可空</td></tr><tr class="base"><td class='mono'>id</td><td class='mono type'>bigint</td><td class='ctr'><span class="badge pk">PK</span></td><td class='mono'><span class="null">—</span></td><td>主键</td></tr><tr class="base"><td class='mono'>version</td><td class='mono type'>int</td><td class='ctr'>NO</td><td class='mono'>1</td><td>乐观锁版本号</td></tr><tr class="base"><td class='mono'>created_at</td><td class='mono type'>datetime</td><td class='ctr'>NO</td><td class='mono'>CURRENT_TIMESTAMP</td><td>创建时间</td></tr><tr class="base"><td class='mono'>updated_at</td><td class='mono type'>datetime</td><td class='ctr'>NO</td><td class='mono'>CURRENT_TIMESTAMP</td><td>更新时间</td></tr><tr class="base"><td class='mono'>is_deleted</td><td class='mono type'>tinyint(1)</td><td class='ctr'><span class="badge fk">IDX</span></td><td class='mono'>0</td><td>软删除标记</td></tr><tr class="base"><td class='mono'>deleted_at</td><td class='mono type'>datetime</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>删除时间</td></tr><tr class="base"><td class='mono'>created_by</td><td class='mono type'>bigint</td><td class='ctr'><span class="badge fk">IDX</span></td><td class='mono'><span class="null">—</span></td><td>创建人 ID</td></tr><tr class="base"><td class='mono'>updated_by</td><td class='mono type'>bigint</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>更新人 ID</td></tr></tbody>
+    </table>
+  </div>
+
+  <h3>现有数据 <span class="sub">4 行</span></h3>
+  <div class="scroll data-wrap">
+    <table class="grid data">
+      <thead><tr><th class='mono'>name</th><th class='mono'>talent_id</th><th class='mono'>goal</th><th class='mono'>start_date</th><th class='mono'>end_date</th><th class='mono'>status</th><th class='mono'>created_by_ai</th><th class='mono'>source_assessment_id</th><th class='mono'>id</th><th class='mono'>version</th><th class='mono'>created_at</th><th class='mono'>updated_at</th><th class='mono'>is_deleted</th><th class='mono'>deleted_at</th><th class='mono'>created_by</th><th class='mono'>updated_by</th></tr></thead>
+      <tbody><tr><td class=''>人才2·数据分析等3项能力提升计划</td><td class='cl-num'>2</td><td class=''>4 周内补齐 3 项能力短板</td><td class=''>2026-11-03</td><td class=''>2026-11-30</td><td class=''>ongoing</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>11</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:17:17</td><td class=''>2026-11-03 22:17:17</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>1</td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>人才2·数据分析等3项能力提升计划</td><td class='cl-num'>2</td><td class=''>4 周内补齐 3 项能力短板</td><td class=''>2026-11-04</td><td class=''>2026-12-01</td><td class=''>ongoing</td><td class='cl-num'>1</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>13</td><td class='cl-num'>1</td><td class=''>2026-11-04 12:03:37</td><td class=''>2026-11-04 12:03:37</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>1</td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>张伟·数据分析等3项能力提升计划</td><td class='cl-num'>2</td><td class=''>4 周内补齐 3 项能力短板</td><td class=''>2026-11-04</td><td class=''>2026-12-01</td><td class=''>ongoing</td><td class='cl-num'>1</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>12</td><td class='cl-num'>1</td><td class=''>2026-11-04 12:02:34</td><td class=''>2026-11-04 12:02:34</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class=''>张伟·需求分析等4项能力提升计划</td><td class='cl-num'>2</td><td class=''>4 周内补齐 4 项能力短板</td><td class=''>2026-10-17</td><td class=''>2026-11-14</td><td class=''>finished</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>10</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:16:07</td><td class=''>2026-11-03 22:16:07</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr></tbody>
+    </table>
+  </div>
+
+  <details>
+    <summary>建表语句 DDL</summary>
+    <pre class="mono">CREATE TABLE `training_plans` (
+  `name` varchar(128) COLLATE utf8mb4_general_ci NOT NULL COMMENT &#x27;计划名称&#x27;,
+  `talent_id` bigint NOT NULL COMMENT &#x27;人才 ID（FK -&gt; talents.id，CASCADE）&#x27;,
+  `goal` varchar(512) COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT &#x27;培养目标&#x27;,
+  `start_date` date DEFAULT NULL COMMENT &#x27;开始日期&#x27;,
+  `end_date` date DEFAULT NULL COMMENT &#x27;结束日期&#x27;,
+  `status` varchar(20) COLLATE utf8mb4_general_ci NOT NULL DEFAULT &#x27;draft&#x27; COMMENT &#x27;状态：draft/ongoing/finished/cancelled&#x27;,
+  `created_by_ai` tinyint(1) NOT NULL DEFAULT &#x27;0&#x27; COMMENT &#x27;是否 AI 生成&#x27;,
+  `source_assessment_id` bigint DEFAULT NULL COMMENT &#x27;能力缺口来源测评 ID（逻辑外键 -&gt; assessments.id）&#x27;,
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT &#x27;主键 ID（BIGINT，主键索引由 PK 提供）&#x27;,
+  `version` int NOT NULL DEFAULT &#x27;1&#x27; COMMENT &#x27;乐观锁版本号，每次更新 +1&#x27;,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT &#x27;创建时间&#x27;,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT &#x27;更新时间&#x27;,
+  `is_deleted` tinyint(1) NOT NULL DEFAULT &#x27;0&#x27; COMMENT &#x27;是否已删除（逻辑删除）&#x27;,
+  `deleted_at` datetime DEFAULT NULL COMMENT &#x27;删除时间&#x27;,
+  `created_by` bigint DEFAULT NULL COMMENT &#x27;创建人用户 ID&#x27;,
+  `updated_by` bigint DEFAULT NULL COMMENT &#x27;最后修改人用户 ID&#x27;,
+  PRIMARY KEY (`id`),
+  KEY `ix_training_plans_is_deleted` (`is_deleted`),
+  KEY `ix_training_plans_created_by` (`created_by`),
+  KEY `ix_training_plans_talent_id_status` (`talent_id`,`status`),
+  CONSTRAINT `fk_training_plans_talent_id_talents` FOREIGN KEY (`talent_id`) REFERENCES `talents` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT=&#x27;培训计划表&#x27;</pre>
+  </details>
+</section>
+<section class="table-block" id="t-plan_courses">
+  <div class="tb-head">
+    <div>
+      <h2>计划课程明细 <span class="mono tname">plan_courses</span></h2>
+      <p class="desc">计划里具体排了哪些课、按什么顺序学。一个计划对多门课。</p>
+    </div>
+    <div class="tb-stats">
+      <span class="stat"><b>13</b> 行</span>
+      <span class="stat"><b>6</b> 列</span>
+      <span class="role">关联表</span>
+    </div>
+  </div>
+
+  <div class="io">
+    <div><span class="io-k">写入</span><span class="mono">TrainingService.create_plan()</span></div>
+    <div><span class="io-k">读取</span><span class="mono">get_plan() 拼装课程列表</span></div>
+  </div>
+
+  <h3>列定义</h3>
+  <div class="scroll">
+    <table class="grid">
+      <thead><tr><th>字段</th><th>类型</th><th class="ctr">键 / 可空</th><th>默认</th><th>含义</th></tr></thead>
+      <tbody><tr><td class='mono'>plan_id</td><td class='mono type'>bigint</td><td class='ctr'><span class="badge pk">PK</span></td><td class='mono'><span class="null">—</span></td><td>关联 training_plans.id</td></tr><tr><td class='mono'>course_id</td><td class='mono type'>bigint</td><td class='ctr'><span class="badge pk">PK</span></td><td class='mono'><span class="null">—</span></td><td>关联 courses.id</td></tr><tr><td class='mono'>sort</td><td class='mono type'>int</td><td class='ctr'>NO</td><td class='mono'>0</td><td>学习顺序，从 1 开始</td></tr><tr><td class='mono'>require_pass</td><td class='mono type'>tinyint(1)</td><td class='ctr'>NO</td><td class='mono'>0</td><td>1 = 必须通过才能算完成</td></tr><tr class="base"><td class='mono'>created_at</td><td class='mono type'>datetime</td><td class='ctr'>NO</td><td class='mono'>CURRENT_TIMESTAMP</td><td>创建时间</td></tr><tr class="base"><td class='mono'>updated_at</td><td class='mono type'>datetime</td><td class='ctr'>NO</td><td class='mono'>CURRENT_TIMESTAMP</td><td>更新时间</td></tr></tbody>
+    </table>
+  </div>
+
+  <h3>现有数据 <span class="sub">13 行</span></h3>
+  <div class="scroll data-wrap">
+    <table class="grid data">
+      <thead><tr><th class='mono'>plan_id</th><th class='mono'>course_id</th><th class='mono'>sort</th><th class='mono'>require_pass</th><th class='mono'>created_at</th><th class='mono'>updated_at</th></tr></thead>
+      <tbody><tr><td class='cl-num'>10</td><td class='cl-num'>2</td><td class='cl-num'>1</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:16:07</td><td class=''>2026-11-03 22:16:07</td></tr><tr><td class='cl-num'>10</td><td class='cl-num'>5</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:16:07</td><td class=''>2026-11-03 22:16:07</td></tr><tr><td class='cl-num'>10</td><td class='cl-num'>7</td><td class='cl-num'>3</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:16:07</td><td class=''>2026-11-03 22:16:07</td></tr><tr><td class='cl-num'>10</td><td class='cl-num'>10</td><td class='cl-num'>4</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:16:07</td><td class=''>2026-11-03 22:16:07</td></tr><tr><td class='cl-num'>11</td><td class='cl-num'>1</td><td class='cl-num'>3</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:17:17</td><td class=''>2026-11-03 22:17:17</td></tr><tr><td class='cl-num'>11</td><td class='cl-num'>4</td><td class='cl-num'>1</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:17:17</td><td class=''>2026-11-03 22:17:17</td></tr><tr><td class='cl-num'>11</td><td class='cl-num'>9</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:17:17</td><td class=''>2026-11-03 22:17:17</td></tr><tr><td class='cl-num'>12</td><td class='cl-num'>1</td><td class='cl-num'>3</td><td class='cl-num'>1</td><td class=''>2026-11-04 12:02:34</td><td class=''>2026-11-04 12:02:34</td></tr><tr><td class='cl-num'>12</td><td class='cl-num'>4</td><td class='cl-num'>1</td><td class='cl-num'>0</td><td class=''>2026-11-04 12:02:34</td><td class=''>2026-11-04 12:02:34</td></tr><tr><td class='cl-num'>12</td><td class='cl-num'>9</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class=''>2026-11-04 12:02:34</td><td class=''>2026-11-04 12:02:34</td></tr><tr><td class='cl-num'>13</td><td class='cl-num'>1</td><td class='cl-num'>3</td><td class='cl-num'>1</td><td class=''>2026-11-04 12:03:37</td><td class=''>2026-11-04 12:03:37</td></tr><tr><td class='cl-num'>13</td><td class='cl-num'>4</td><td class='cl-num'>1</td><td class='cl-num'>0</td><td class=''>2026-11-04 12:03:37</td><td class=''>2026-11-04 12:03:37</td></tr><tr><td class='cl-num'>13</td><td class='cl-num'>9</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class=''>2026-11-04 12:03:37</td><td class=''>2026-11-04 12:03:37</td></tr></tbody>
+    </table>
+  </div>
+
+  <details>
+    <summary>建表语句 DDL</summary>
+    <pre class="mono">CREATE TABLE `plan_courses` (
+  `plan_id` bigint NOT NULL COMMENT &#x27;计划 ID（FK -&gt; training_plans.id，CASCADE）&#x27;,
+  `course_id` bigint NOT NULL COMMENT &#x27;课程 ID（FK -&gt; courses.id，CASCADE）&#x27;,
+  `sort` int NOT NULL DEFAULT &#x27;0&#x27; COMMENT &#x27;学习顺序&#x27;,
+  `require_pass` tinyint(1) NOT NULL DEFAULT &#x27;0&#x27; COMMENT &#x27;是否必须通过考核&#x27;,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT &#x27;创建时间&#x27;,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT &#x27;更新时间&#x27;,
+  PRIMARY KEY (`plan_id`,`course_id`),
+  UNIQUE KEY `uq_plan_courses_plan_course` (`plan_id`,`course_id`),
+  KEY `ix_plan_courses_course_id` (`course_id`),
+  CONSTRAINT `fk_plan_courses_course_id_courses` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_plan_courses_plan_id_training_plans` FOREIGN KEY (`plan_id`) REFERENCES `training_plans` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT=&#x27;培训计划-课程关联表&#x27;</pre>
+  </details>
+</section>
+<section class="table-block" id="t-learning_records">
+  <div class="tb-head">
+    <div>
+      <h2>学习记录 <span class="mono tname">learning_records</span></h2>
+      <p class="desc">每个学员每门课一条。提交成绩写这里，通过率的分母和分子都靠它。plan_id 可为空——允许先有学习行为、后归入计划。</p>
+    </div>
+    <div class="tb-stats">
+      <span class="stat"><b>39</b> 行</span>
+      <span class="stat"><b>18</b> 列</span>
+      <span class="role">过程数据</span>
+    </div>
+  </div>
+
+  <div class="io">
+    <div><span class="io-k">写入</span><span class="mono">POST /trainings/plans/{id}/score、/records</span></div>
+    <div><span class="io-k">读取</span><span class="mono">/stats/pass-rate、/plans/{id}/progress、lag-scan</span></div>
+  </div>
+
+  <h3>列定义</h3>
+  <div class="scroll">
+    <table class="grid">
+      <thead><tr><th>字段</th><th>类型</th><th class="ctr">键 / 可空</th><th>默认</th><th>含义</th></tr></thead>
+      <tbody><tr><td class='mono'>plan_id</td><td class='mono type'>bigint</td><td class='ctr'><span class="badge fk">IDX</span></td><td class='mono'><span class="null">—</span></td><td>关联 training_plans.id，可为空</td></tr><tr><td class='mono'>course_id</td><td class='mono type'>bigint</td><td class='ctr'><span class="badge fk">IDX</span></td><td class='mono'><span class="null">—</span></td><td>关联 courses.id</td></tr><tr><td class='mono'>talent_id</td><td class='mono type'>bigint</td><td class='ctr'><span class="badge fk">IDX</span></td><td class='mono'><span class="null">—</span></td><td>关联 talents.id</td></tr><tr><td class='mono'>progress</td><td class='mono type'>int</td><td class='ctr'>NO</td><td class='mono'>0</td><td>学习进度 0–100</td></tr><tr><td class='mono'>study_minutes</td><td class='mono type'>int</td><td class='ctr'>NO</td><td class='mono'>0</td><td>累计学习分钟数</td></tr><tr><td class='mono'>last_study_at</td><td class='mono type'>datetime</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>最后学习时间，滞后扫描按它判断</td></tr><tr><td class='mono'>status</td><td class='mono type'>varchar(20)</td><td class='ctr'>NO</td><td class='mono'>not_started</td><td>not_started / learning / finished</td></tr><tr><td class='mono'>score</td><td class='mono type'>decimal(5,2)</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>考试分数，未考为空</td></tr><tr><td class='mono'>passed</td><td class='mono type'>tinyint(1)</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>1 通过 / 0 未过，通过率的分子</td></tr><tr><td class='mono'>suspicious</td><td class='mono type'>tinyint(1)</td><td class='ctr'>NO</td><td class='mono'>0</td><td>1 = 疑似刷课，不计入有效统计</td></tr><tr class="base"><td class='mono'>id</td><td class='mono type'>bigint</td><td class='ctr'><span class="badge pk">PK</span></td><td class='mono'><span class="null">—</span></td><td>主键</td></tr><tr class="base"><td class='mono'>version</td><td class='mono type'>int</td><td class='ctr'>NO</td><td class='mono'>1</td><td>乐观锁版本号</td></tr><tr class="base"><td class='mono'>created_at</td><td class='mono type'>datetime</td><td class='ctr'>NO</td><td class='mono'>CURRENT_TIMESTAMP</td><td>创建时间</td></tr><tr class="base"><td class='mono'>updated_at</td><td class='mono type'>datetime</td><td class='ctr'>NO</td><td class='mono'>CURRENT_TIMESTAMP</td><td>更新时间</td></tr><tr class="base"><td class='mono'>is_deleted</td><td class='mono type'>tinyint(1)</td><td class='ctr'><span class="badge fk">IDX</span></td><td class='mono'>0</td><td>软删除标记</td></tr><tr class="base"><td class='mono'>deleted_at</td><td class='mono type'>datetime</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>删除时间</td></tr><tr class="base"><td class='mono'>created_by</td><td class='mono type'>bigint</td><td class='ctr'><span class="badge fk">IDX</span></td><td class='mono'><span class="null">—</span></td><td>创建人 ID</td></tr><tr class="base"><td class='mono'>updated_by</td><td class='mono type'>bigint</td><td class='ctr'><span class="null">YES</span></td><td class='mono'><span class="null">—</span></td><td>更新人 ID</td></tr></tbody>
+    </table>
+  </div>
+
+  <h3>现有数据 <span class="sub">39 行</span></h3>
+  <div class="scroll data-wrap">
+    <table class="grid data">
+      <thead><tr><th class='mono'>plan_id</th><th class='mono'>course_id</th><th class='mono'>talent_id</th><th class='mono'>progress</th><th class='mono'>study_minutes</th><th class='mono'>last_study_at</th><th class='mono'>status</th><th class='mono'>score</th><th class='mono'>passed</th><th class='mono'>suspicious</th><th class='mono'>id</th><th class='mono'>version</th><th class='mono'>created_at</th><th class='mono'>updated_at</th><th class='mono'>is_deleted</th><th class='mono'>deleted_at</th><th class='mono'>created_by</th><th class='mono'>updated_by</th></tr></thead>
+      <tbody><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>3</td><td class='cl-num'>2</td><td class='cl-num'>50</td><td class='cl-num'>240</td><td class=''>2026-11-03 21:31:28</td><td class=''>learning</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>5</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:31:28</td><td class=''>2026-11-03 21:31:28</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>6</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 21:31:28</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>6</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:31:28</td><td class=''>2026-11-03 21:31:28</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>8</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 21:31:28</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>7</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:31:28</td><td class=''>2026-11-03 21:31:28</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>11</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 21:31:28</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>8</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:31:28</td><td class=''>2026-11-03 21:31:28</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>3</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 21:33:25</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>9</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:33:25</td><td class=''>2026-11-03 21:33:25</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>6</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 21:33:25</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>10</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:33:25</td><td class=''>2026-11-03 21:33:25</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>8</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 21:33:25</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>11</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:33:25</td><td class=''>2026-11-03 21:33:25</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>3</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 21:33:50</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>12</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:33:50</td><td class=''>2026-11-03 21:33:50</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>6</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 21:33:50</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>13</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:33:50</td><td class=''>2026-11-03 21:33:50</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>8</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 21:33:50</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>14</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:33:50</td><td class=''>2026-11-03 21:33:50</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>3</td><td class='cl-num'>2</td><td class='cl-num'>50</td><td class='cl-num'>240</td><td class=''>2026-11-03 21:38:04</td><td class=''>learning</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>15</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:38:04</td><td class=''>2026-11-03 21:38:04</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>6</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 21:38:04</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>16</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:38:04</td><td class=''>2026-11-03 21:38:04</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>8</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 21:38:04</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>17</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:38:04</td><td class=''>2026-11-03 21:38:04</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>11</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 21:38:04</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>18</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:38:04</td><td class=''>2026-11-03 21:38:04</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>3</td><td class='cl-num'>2</td><td class='cl-num'>50</td><td class='cl-num'>240</td><td class=''>2026-11-03 21:44:43</td><td class=''>learning</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>19</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:44:43</td><td class=''>2026-11-03 21:44:43</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>6</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 21:44:43</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>20</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:44:43</td><td class=''>2026-11-03 21:44:43</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>8</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 21:44:43</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>21</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:44:43</td><td class=''>2026-11-03 21:44:43</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>11</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 21:44:43</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>22</td><td class='cl-num'>1</td><td class=''>2026-11-03 21:44:43</td><td class=''>2026-11-03 21:44:43</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>3</td><td class='cl-num'>2</td><td class='cl-num'>50</td><td class='cl-num'>240</td><td class=''>2026-11-03 22:10:27</td><td class=''>learning</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>23</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:10:27</td><td class=''>2026-11-03 22:10:27</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>6</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:10:27</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>24</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:10:27</td><td class=''>2026-11-03 22:10:27</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>8</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:10:27</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>25</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:10:27</td><td class=''>2026-11-03 22:10:27</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>11</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:10:27</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>26</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:10:27</td><td class=''>2026-11-03 22:10:27</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>3</td><td class='cl-num'>2</td><td class='cl-num'>100</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:15:06</td><td class=''>completed</td><td class='cl-num'>88.00</td><td class='cl-num'>1</td><td class='cl-num'>0</td><td class='cl-num'>27</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:15:06</td><td class=''>2026-11-03 22:15:06</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>6</td><td class='cl-num'>2</td><td class='cl-num'>100</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:15:06</td><td class=''>completed</td><td class='cl-num'>88.00</td><td class='cl-num'>1</td><td class='cl-num'>0</td><td class='cl-num'>28</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:15:06</td><td class=''>2026-11-03 22:15:06</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>8</td><td class='cl-num'>2</td><td class='cl-num'>100</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:15:06</td><td class=''>completed</td><td class='cl-num'>88.00</td><td class='cl-num'>1</td><td class='cl-num'>0</td><td class='cl-num'>29</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:15:06</td><td class=''>2026-11-03 22:15:06</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>11</td><td class='cl-num'>2</td><td class='cl-num'>100</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:15:06</td><td class=''>completed</td><td class='cl-num'>88.00</td><td class='cl-num'>1</td><td class='cl-num'>0</td><td class='cl-num'>30</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:15:06</td><td class=''>2026-11-03 22:15:06</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-num'>10</td><td class='cl-num'>2</td><td class='cl-num'>2</td><td class='cl-num'>100</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:16:07</td><td class=''>completed</td><td class='cl-num'>88.00</td><td class='cl-num'>1</td><td class='cl-num'>0</td><td class='cl-num'>31</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:16:07</td><td class=''>2026-11-03 22:16:07</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-num'>10</td><td class='cl-num'>5</td><td class='cl-num'>2</td><td class='cl-num'>100</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:16:07</td><td class=''>completed</td><td class='cl-num'>88.00</td><td class='cl-num'>1</td><td class='cl-num'>0</td><td class='cl-num'>32</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:16:07</td><td class=''>2026-11-03 22:16:07</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-num'>10</td><td class='cl-num'>7</td><td class='cl-num'>2</td><td class='cl-num'>100</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:16:07</td><td class=''>completed</td><td class='cl-num'>88.00</td><td class='cl-num'>1</td><td class='cl-num'>0</td><td class='cl-num'>33</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:16:07</td><td class=''>2026-11-03 22:16:07</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-num'>10</td><td class='cl-num'>10</td><td class='cl-num'>2</td><td class='cl-num'>100</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:16:07</td><td class=''>completed</td><td class='cl-num'>88.00</td><td class='cl-num'>1</td><td class='cl-num'>0</td><td class='cl-num'>34</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:16:07</td><td class=''>2026-11-03 22:16:07</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-num'>11</td><td class='cl-num'>4</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:17:17</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>35</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:17:17</td><td class=''>2026-11-03 22:17:17</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-num'>11</td><td class='cl-num'>9</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:17:17</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>36</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:17:17</td><td class=''>2026-11-03 22:17:17</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-num'>11</td><td class='cl-num'>1</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-03 22:17:17</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>37</td><td class='cl-num'>1</td><td class=''>2026-11-03 22:17:17</td><td class=''>2026-11-03 22:17:17</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-num'>12</td><td class='cl-num'>4</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-04 12:02:34</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>38</td><td class='cl-num'>1</td><td class=''>2026-11-04 12:02:34</td><td class=''>2026-11-04 12:02:34</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-num'>12</td><td class='cl-num'>9</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-04 12:02:34</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>39</td><td class='cl-num'>1</td><td class=''>2026-11-04 12:02:34</td><td class=''>2026-11-04 12:02:34</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-num'>12</td><td class='cl-num'>1</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-04 12:02:34</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>40</td><td class='cl-num'>1</td><td class=''>2026-11-04 12:02:34</td><td class=''>2026-11-04 12:02:34</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-num'>13</td><td class='cl-num'>4</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-04 12:03:37</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>41</td><td class='cl-num'>1</td><td class=''>2026-11-04 12:03:37</td><td class=''>2026-11-04 12:03:37</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-num'>13</td><td class='cl-num'>9</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-04 12:03:37</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>42</td><td class='cl-num'>1</td><td class=''>2026-11-04 12:03:37</td><td class=''>2026-11-04 12:03:37</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr><tr><td class='cl-num'>13</td><td class='cl-num'>1</td><td class='cl-num'>2</td><td class='cl-num'>0</td><td class='cl-num'>0</td><td class=''>2026-11-04 12:03:37</td><td class=''>not_started</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-num'>0</td><td class='cl-num'>43</td><td class='cl-num'>1</td><td class=''>2026-11-04 12:03:37</td><td class=''>2026-11-04 12:03:37</td><td class='cl-num'>0</td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td><td class='cl-null'><span class="null">NULL</span></td></tr></tbody>
+    </table>
+  </div>
+
+  <details>
+    <summary>建表语句 DDL</summary>
+    <pre class="mono">CREATE TABLE `learning_records` (
+  `plan_id` bigint DEFAULT NULL COMMENT &#x27;计划 ID（FK -&gt; training_plans.id，SET NULL）&#x27;,
+  `course_id` bigint DEFAULT NULL COMMENT &#x27;课程 ID（FK -&gt; courses.id，SET NULL）&#x27;,
+  `talent_id` bigint NOT NULL COMMENT &#x27;人才 ID（FK -&gt; talents.id，CASCADE）&#x27;,
+  `progress` int NOT NULL DEFAULT &#x27;0&#x27; COMMENT &#x27;进度 0-100（单调递增）&#x27;,
+  `study_minutes` int NOT NULL DEFAULT &#x27;0&#x27; COMMENT &#x27;累计学习分钟&#x27;,
+  `last_study_at` datetime DEFAULT NULL COMMENT &#x27;最近学习时间&#x27;,
+  `status` varchar(20) COLLATE utf8mb4_general_ci NOT NULL DEFAULT &#x27;not_started&#x27; COMMENT &#x27;状态：not_started/learning/completed&#x27;,
+  `score` decimal(5,2) DEFAULT NULL COMMENT &#x27;考核分数&#x27;,
+  `passed` tinyint(1) DEFAULT NULL COMMENT &#x27;是否通过&#x27;,
+  `suspicious` tinyint(1) NOT NULL DEFAULT &#x27;0&#x27; COMMENT &#x27;反作弊标记（学时与进度比例异常）&#x27;,
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT &#x27;主键 ID（BIGINT，主键索引由 PK 提供）&#x27;,
+  `version` int NOT NULL DEFAULT &#x27;1&#x27; COMMENT &#x27;乐观锁版本号，每次更新 +1&#x27;,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT &#x27;创建时间&#x27;,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT &#x27;更新时间&#x27;,
+  `is_deleted` tinyint(1) NOT NULL DEFAULT &#x27;0&#x27; COMMENT &#x27;是否已删除（逻辑删除）&#x27;,
+  `deleted_at` datetime DEFAULT NULL COMMENT &#x27;删除时间&#x27;,
+  `created_by` bigint DEFAULT NULL COMMENT &#x27;创建人用户 ID&#x27;,
+  `updated_by` bigint DEFAULT NULL COMMENT &#x27;最后修改人用户 ID&#x27;,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_learning_records_plan_course_talent` (`plan_id`,`course_id`,`talent_id`),
+  KEY `fk_learning_records_course_id_courses` (`course_id`),
+  KEY `ix_learning_records_talent_id_status` (`talent_id`,`status`),
+  KEY `ix_learning_records_is_deleted` (`is_deleted`),
+  KEY `ix_learning_records_created_by` (`created_by`),
+  CONSTRAINT `fk_learning_records_course_id_courses` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_learning_records_plan_id_training_plans` FOREIGN KEY (`plan_id`) REFERENCES `training_plans` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_learning_records_talent_id_talents` FOREIGN KEY (`talent_id`) REFERENCES `talents` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=47 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT=&#x27;学习记录表&#x27;</pre>
+  </details>
+</section>
+
+<div class="card">
+  <h3 style="margin-top:0">几个容易踩的点</h3>
+  <ul class="tips">
+    <li><code>position_requirements.weights</code> 各维度权重<b>必须合计 1.0</b>，
+        seed 脚本会校验；手工改库绕过校验会导致优先级排序错乱。</li>
+    <li><code>learning_records.plan_id</code> 允许为空，表示「先有学习行为、后归入计划」。
+        统计通过率时不要用 plan_id 做内连接，否则这部分数据会被漏掉。</li>
+    <li>这 5 张表都有 <code>is_deleted</code> 软删除字段，查询一律带
+        <code>is_deleted = 0</code>，物理删除不要用。</li>
+    <li>培训事件不落库，走 <code>event_bus</code> 内存总线，重启即丢。
+        需要留痕要另外落表。</li>
+  </ul>
+</div>
+
+<footer>本页由 scripts/export_db_doc.py 生成，可随时重跑以核对结构是否漂移</footer>
+</div>
+</body>
+</html>

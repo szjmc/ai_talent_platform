@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>19 · 入库数据与 Agent 对接输出清单（岗位人才匹配 Agent）</title>
+<style>
+  :root{
+    --bg:#f6f8fa; --card:#ffffff; --ink:#1f2937; --sub:#6b7280;
+    --line:#e5e7eb; --blue:#1d4ed8; --blue-bg:#eff6ff;
+    --green:#15803d; --green-bg:#f0fdf4;
+    --amber:#b45309; --amber-bg:#fffbeb;
+    --red:#b91c1c; --red-bg:#fef2f2;
+    --purple:#6d28d9; --purple-bg:#f5f3ff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:var(--bg);color:var(--ink);line-height:1.75;padding:32px 16px}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-size:26px;margin-bottom:6px}
+  .meta{color:var(--sub);font-size:13px;margin-bottom:24px}
+  h2{font-size:20px;margin:36px 0 14px;padding-left:12px;border-left:4px solid var(--blue)}
+  h3{font-size:16px;margin:20px 0 10px}
+  p{margin:8px 0;font-size:14.5px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin:14px 0}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin:10px 0;background:var(--card)}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:#f3f4f6;font-weight:600;white-space:nowrap}
+  code{font-family:Consolas,monospace;font-size:12.5px;background:#f3f4f6;padding:1px 5px;border-radius:4px}
+  .tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:10px;margin-right:6px;white-space:nowrap}
+  .t-blue{background:var(--blue-bg);color:var(--blue)}
+  .t-green{background:var(--green-bg);color:var(--green)}
+  .t-amber{background:var(--amber-bg);color:var(--amber)}
+  .t-red{background:var(--red-bg);color:var(--red)}
+  .t-purple{background:var(--purple-bg);color:var(--purple)}
+  .note{font-size:13px;color:var(--sub)}
+  .flow{font-size:13.5px;background:var(--blue-bg);border-radius:8px;padding:10px 14px;margin:10px 0;font-family:Consolas,monospace}
+  ul{margin:6px 0 6px 22px}
+  li{font-size:14px;margin:4px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>19 · 入库数据与 Agent 对接输出清单</h1>
+<div class="meta">岗位人才匹配 Agent（ai-digital-talent-platform）· 基于当前真实代码核验（app/models / app/routers / docs/delivery/18）· 2026-11-05</div>
+
+<h2>一、我要入库的数据（我方写入，共 3 张 MySQL 表 + Milvus）</h2>
+
+<div class="card">
+<h3>① MySQL：matching_batches（跑批快照表）<span class="tag t-blue">每次正式跑批写 1 行</span></h3>
+<p>文件：<code>app/models/matching.py → MatchingBatch</code></p>
+<table>
+<tr><th>字段</th><th>存什么</th><th>为什么入库</th></tr>
+<tr><td><code>batch_id</code></td><td>uuid hex，跑批唯一 ID</td><td>下游查询、重放、审计的主键入口</td></tr>
+<tr><td><code>position_id</code> / <code>matched_at</code></td><td>岗位 ID + 匹配时间</td><td>支撑"岗位最新结果"查询与储备预警扫描</td></tr>
+<tr><td><code>response</code></td><td>完整响应 JSON（含零产出批次）</td><td>快照可回放；<b>零产出也落库</b>，不伪造明细</td></tr>
+<tr><td><code>request_scope</code></td><td>本次输入范围（候选范围、weights 等请求参数）</td><td>重放历史批次时知道当时的口径</td></tr>
+</table>
+</div>
+
+<div class="card">
+<h3>② MySQL：matching_records（人岗匹配明细表）<span class="tag t-blue">每个候选人 1 行</span></h3>
+<p>文件：<code>app/models/matching.py → MatchingRecord</code> · 唯一键 <code>(batch_id, position_id, talent_id)</code></p>
+<table>
+<tr><th>字段组</th><th>字段</th><th>说明</th></tr>
+<tr><td>身份与结果</td><td><code>batch_id / position_id / talent_id / score / rank逻辑</code></td><td>综合分 0-100（Numeric(5,2)）</td></tr>
+<tr><td>四维打分</td><td><code>dimension_scores</code>（JSON）</td><td>skill / experience / education / quality 四维分</td></tr>
+<tr><td>解释文本</td><td><code>highlights / gaps / suggestion / strategy / model_name</code></td><td>优势、短板、建议、策略（hard/soft/hybrid）、所用模型</td></tr>
+<tr><td><b>可追溯字段</b><br><span class="tag t-amber">MATCH-009 新增</span></td><td><code>requirement_version / recall_mode / hard_results / explanation / stats</code></td><td>画像版本、召回方式（vector / sql_fallback 如实记录）、四态判定明细、校验后的解释、跑批统计——支撑"证据可追溯、解释可复核"</td></tr>
+<tr><td>操作留痕</td><td><code>matched_by / matched_at</code></td><td>触发用户、时间（分区键）</td></tr>
+</table>
+<p class="note">注意：岗位/人才用<b>逻辑外键</b>不建物理外键——匹配记录量大、可重建，由 Service 校验存在性。</p>
+</div>
+
+<div class="card">
+<h3>③ MySQL：reserve_warnings（储备预警表）<span class="tag t-blue">扫描时写入，幂等 + 自动闭环</span></h3>
+<p>文件：<code>app/models/reserve_warning.py</code> · SQL 脚本：<code>docs/sql/2026-11-04_reserve_warnings.sql</code></p>
+<table>
+<tr><th>预警类型</th><th>触发条件</th><th>默认级别</th></tr>
+<tr><td><code>position_no_output</code></td><td>岗位最新批次 output = 0（无可用候选人）</td><td>high</td></tr>
+<tr><td><code>position_reserve_shortage</code></td><td>最新批次 PASS 人数低于阈值</td><td>medium</td></tr>
+<tr><td><code>position_long_vacant</code></td><td>开放岗位超过 N 天从未跑批</td><td>medium</td></tr>
+</table>
+<p>关键设计：同 <code>(warning_type, position_id)</code> 只留一条未解决记录（幂等）；扫描时自动把已不再成立的预警标记 <code>resolved</code>（数据闭环）；逻辑外键，源数据删除后预警仍可追溯。</p>
+</div>
+
+<div class="card">
+<h3>④ Milvus 向量库<span class="tag t-purple">间接入库，用于向量召回</span></h3>
+<p>链路：<code>岗位画像文本 → embedding（bge-m3, dim=1024）→ Milvus collection</code>，跑批时若向量可用则 <code>recall_mode=vector</code> 召回；Milvus 不可用降级 SQL 召回并如实记录 <code>recall_mode=sql_fallback</code>。相关文件：<code>app/adapters/vector_store/milvus_adapter.py</code>、<code>app/ai/rag/embedding_service.py</code>。</p>
+</div>
+
+<div class="card" style="border-left:4px solid var(--red)">
+<h3>⑤ 明确<b>不</b>落库的接口（只读试算）</h3>
+<ul>
+<li><code>POST /matchings/reverse</code> 双向匹配（人才找岗位）——只读，不落库</li>
+<li><code>POST /matchings/explain</code> 匹配解释——只读重算 + 校验，不落库</li>
+</ul>
+<p class="note">理由：试算代价高但属于探索性查询，不产生正式批次；正式结果以 <code>POST /matchings/run</code> 的 batch_id 为准。</p>
+</div>
+
+<h2>二、我依赖谁入库（上游写入、我只读消费）——跟对方要对的"入库清单"</h2>
+<table>
+<tr><th>上游</th><th>他们要入库的数据</th><th>我拿它做什么</th></tr>
+<tr><td><b>简历解析组</b></td><td><code>talents</code>（技能标签、学历、工作年限、离职状态 status）、<code>resumes</code> 原文与结构化结果</td><td>四态判定的 <b>actual 实际值</b>、证据 <code>source_table/source_value</code> 的来源；<b>离职人才过滤依赖 talents.status</b>（MATCH-008 教训：不过滤会把离职者排第 1）</td></tr>
+<tr><td><b>岗位画像组</b></td><td><code>positions</code>、岗位画像（JobProfileParsed：学历/年限/技能要求等）及 <code>requirement_version</code></td><td>四态判定的 <b>required 要求值</b>；版本号落库到 matching_records 支撑追溯</td></tr>
+<tr><td><b>文件/知识库组</b></td><td><code>files</code>、知识库向量（Milvus）</td><td>JD 原文来源、RAG 解释素材</td></tr>
+</table>
+
+<h2>三、我要输出给其他 Agent 的东西</h2>
+
+<div class="card">
+<h3>① 给 Dify 组：两个工作流的输入 / 输出契约<span class="tag t-green">详见 18_Dify组对接需求文档.html</span></h3>
+<p><b>我 → Dify（我给它的输入）：</b></p>
+<table>
+<tr><th>工作流</th><th>输入变量</th><th>内容</th></tr>
+<tr><td><b>jd_parse</b> 岗位画像解析</td><td><code>jd_text</code></td><td>JD 自然语言原文；要求只做语义提取不做判定，字段宁全勿缺</td></tr>
+<tr><td><b>match_explain</b> 匹配解释</td><td><code>evidence_pack</code></td><td>完整证据包 JSON：岗位 × 人才 × 四态判定 × 四维分 × 结构化证据清单（evidence_id / claim / source_table / source_value）</td></tr>
+</table>
+<p><b>Dify → 我（我要它输出的，也是"我给其他 agent 输出啥"的反向答案）：</b></p>
+<ul>
+<li>jd_parse：<code>JobProfileParsed</code> 结构化 JSON（纯 JSON、无 Markdown 围栏）</li>
+<li>match_explain：<code>MatchExplanation</code> JSON —— summary / highlights / gaps / risks / interview_suggestions / pending_verification；<b>每条结论的 evidence_ids 必须逐字存在于入参 evidences</b>，否则五层校验剔除并记入 rejected_claims</li>
+</ul>
+<p><b>我对 Dify 输出的处理</b>：白名单过滤 + 五层证据校验 → 校验通过落库到 matching_records.explanation；Dify 失败 → <code>llm_fallback</code>（本地 Ollama）→ <code>rule_fallback</code>（规则），<code>source</code> 字段如实标注降级链。</p>
+</div>
+
+<div class="card">
+<h3>② 给前端 / 编排对话 Agent：HTTP API（/matchings 前缀）<span class="tag t-blue">这是我的"正式输出产品"</span></h3>
+<table>
+<tr><th>接口</th><th>方法</th><th>输出给对方什么</th></tr>
+<tr><td><code>/matchings/run</code></td><td>POST</td><td><b>MatchRunResponse</b>：batch_id + stats（候选/淘汰/待补全/输出数）+ 候选人列表（talent_id、rank、decision 四态、score、dimension_scores、matched_skills、hard_results、explanation_source）</td></tr>
+<tr><td><code>/matchings/reverse</code></td><td>POST</td><td>双向匹配结果：人才适合的开放岗位排序 + 淘汰岗位逐条原因（只读不落库）</td></tr>
+<tr><td><code>/matchings/explain</code></td><td>POST</td><td>MatchExplanation（含证据校验与 rejected_claims），被硬条件淘汰者也可调用（回答"为什么没出现"）</td></tr>
+<tr><td><code>/matchings/batches/{batch_id}</code></td><td>GET</td><td>按批次回放完整快照（含零结果）</td></tr>
+<tr><td><code>/matchings/positions/{id}</code></td><td>GET</td><td>岗位最新匹配结果（从库还原，不重算）</td></tr>
+<tr><td><code>/matchings/talents/{id}</code></td><td>GET</td><td>该人才在各岗位的历史匹配记录</td></tr>
+<tr><td><code>/matchings</code></td><td>GET</td><td>匹配记录分页，支持 position_id / talent_id / min_score 过滤</td></tr>
+<tr><td><code>/matchings/warnings/scan</code></td><td>POST</td><td>触发预警扫描，返回闭环计数</td></tr>
+<tr><td><code>/matchings/warnings</code> + <code>/{id}/resolve</code></td><td>GET/POST</td><td>预警分页查询 / 人工解决预警</td></tr>
+</table>
+<p class="note">编排层要点：把 <code>explanation.source</code>（dify / llm_fallback / rule_fallback）透传给对话用户，别把降级结果伪装成 Dify 产出；所有接口统一 SuccessResponse 包裹 + MATCHING_READ / MATCHING_RUN 权限。</p>
+</div>
+
+<div class="card">
+<h3>③ 给储备预警 / 看板侧：派生数据<span class="tag t-amber">基于落库数据二次加工</span></h3>
+<ul>
+<li>matching_batches + matching_records → 岗位储备健康度（零产出、PASS 人数、空缺天数）</li>
+<li>reserve_warnings → 预警看板（分页、按类型/岗位/解决状态过滤）</li>
+</ul>
+</div>
+
+<h2>四、一图记牢数据流</h2>
+<div class="flow">
+上游入库（别人写）：简历解析 → talents/resumes　岗位组 → positions/画像(version)　文件组 → files/Milvus
+        ↓ 我只读
+我跑批：召回(vector→sql_fallback) → 四态判定 → 四维打分 → 证据构建(726行) → Dify解释(校验/降级)
+        ↓ 我写入（我入库的全部）
+MySQL：matching_batches(快照) + matching_records(明细+追溯5字段) + reserve_warnings(预警)
+Milvus：岗位画像向量(召回用)
+        ↓ 我输出（我给别人的）
+Dify组：jd_text / evidence_pack（要回 JSON）
+前端/编排Agent：/matchings/* 全套 API（batch_id 可回放，source 如实标注）
+</div>
+
+<p class="note" style="margin-top:20px">核验依据：app/models/matching.py、app/models/reserve_warning.py、app/routers/matching_router.py、app/schemas/matching.py、docs/delivery/18_Dify组对接需求文档.html。未改动任何业务代码。</p>
+
+</div>
+</body>
+</html>

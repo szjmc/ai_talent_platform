@@ -47,6 +47,7 @@ os.environ.update(
 
 from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine  # noqa: E402
+from sqlalchemy.pool import NullPool  # noqa: E402
 
 from app.config.settings import settings  # noqa: E402
 from app.core.application import create_application  # noqa: E402
@@ -60,9 +61,12 @@ TEST_DATABASE_URL = settings.DATABASE_URL
 app = create_application()
 
 # 测试引擎
+# 注意：必须用 NullPool。pytest-asyncio 每个用例一个事件循环，QueuePool 会跨用例复用连接，
+# 而复用的连接绑定在上一个已关闭的循环上，pre_ping 时向已销毁的 transport 写入，
+# Windows 下报 `AttributeError: 'NoneType' object has no attribute 'send'`。
 engine = create_async_engine(
     TEST_DATABASE_URL,
-    pool_pre_ping=True,
+    poolclass=NullPool,
     connect_args={"charset": settings.DB_CHARSET, "autocommit": False},
 )
 TestingSessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
@@ -119,7 +123,16 @@ def mysql_ready() -> Generator[None, None, None]:
             await db.commit()
 
     try:
-        asyncio.run(_setup())
+        # 连接/建库全程加硬超时：本机或 CI 无 MySQL 时必须快速 skip，
+        # 不能让 aiomysql 的连接探测无限挂起（Windows 上尤其明显）。
+        asyncio.run(asyncio.wait_for(_setup(), timeout=15))
+    except (TimeoutError, asyncio.TimeoutError) as exc:  # noqa: F841
+        pytest.skip(
+            "MySQL 连接超时（15s），跳过集成测试。\n"
+            f"  连接目标：{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}\n"
+            "  请先启动 MySQL 并确认 .env 中 DB_* 配置（测试库可用 TEST_DB_NAME 覆盖）。",
+            allow_module_level=True,
+        )
     except Exception as exc:  # noqa: BLE001
         pytest.skip(
             "MySQL 测试库不可用，跳过集成测试。\n"

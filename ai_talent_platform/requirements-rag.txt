@@ -1,0 +1,11 @@
+# 文档解析与本地 OCR 增量依赖。
+# 说明：这些依赖已全部并入根 requirements.txt（部署只用那一份）；本文件仅作组内记录，
+#      两处冲突时以 requirements.txt 为准（Pillow 曾被写成 13.0.0，与主清单 12.2.0 互斥）。
+pdfplumber==0.11.10
+python-docx==1.2.0
+openpyxl==3.1.5
+Pillow==12.2.0
+pypdfium2>=5,<6
+rapidocr-onnxruntime==1.2.3
+jieba==0.42.1
+rank-bm25==0.2.2

@@ -35,9 +35,18 @@ DEFAULT_RETRY_ON: tuple[type[BaseException], ...] = (
 )
 
 
+def is_permanent_http_error(exc: BaseException) -> bool:
+    """识别携带HTTP状态的不可恢复请求错误，不改变无状态异常的既有处理。"""
+    data = getattr(exc, "data", None)
+    status = data.get("status") if isinstance(data, dict) else None
+    return isinstance(status, int) and 400 <= status < 500 and status not in {408, 409, 429}
+
+
 def is_retryable(exc: BaseException, retry_on: Iterable[type[BaseException]]) -> bool:
     """判断异常是否可重试：业务异常（参数/权限/规则）一律不重试。"""
     if isinstance(exc, BusinessException) and not isinstance(exc, (ExternalServiceError, AIError)):
+        return False
+    if is_permanent_http_error(exc):
         return False
     return isinstance(exc, tuple(retry_on))
 
@@ -181,4 +190,5 @@ __all__ = [
     "SimpleCircuitBreaker",
     "ai_retry",
     "is_retryable",
+    "is_permanent_http_error",
 ]

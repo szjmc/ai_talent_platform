@@ -1,0 +1,272 @@
+{
+  "run": "e7c87aa8ae62437191cdf6b5e6b7377c",
+  "dataset": "开发者编写的合成验收样例，不代表真实业务准确率。每题仅一个预期相关文档。",
+  "queries": 8,
+  "documents": 4,
+  "metrics": [
+    {
+      "mode": "semantic",
+      "rerank": false,
+      "hit_at_1": 1.0,
+      "hit_at_3": 1.0,
+      "mrr_at_3": 1.0,
+      "mean_ms": 812.33,
+      "p95_ms": 1311.7
+    },
+    {
+      "mode": "keyword",
+      "rerank": false,
+      "hit_at_1": 1.0,
+      "hit_at_3": 1.0,
+      "mrr_at_3": 1.0,
+      "mean_ms": 120.48,
+      "p95_ms": 124.63
+    },
+    {
+      "mode": "hybrid",
+      "rerank": false,
+      "hit_at_1": 1.0,
+      "hit_at_3": 1.0,
+      "mrr_at_3": 1.0,
+      "mean_ms": 894.89,
+      "p95_ms": 1369.82
+    },
+    {
+      "mode": "hybrid",
+      "rerank": true,
+      "hit_at_1": 1.0,
+      "hit_at_3": 1.0,
+      "mrr_at_3": 1.0,
+      "mean_ms": 1216.49,
+      "p95_ms": 1587.44
+    }
+  ],
+  "details": [
+    {
+      "mode": "semantic",
+      "rerank": false,
+      "question": "后端工程师需要掌握什么技术？",
+      "rank": 1,
+      "latency_ms": 906.88
+    },
+    {
+      "mode": "semantic",
+      "rerank": false,
+      "question": "Python开发岗位要求几年工作经验？",
+      "rank": 1,
+      "latency_ms": 616.85
+    },
+    {
+      "mode": "semantic",
+      "rerank": false,
+      "question": "培训结束以后怎么申请报销？",
+      "rank": 1,
+      "latency_ms": 721.49
+    },
+    {
+      "mode": "semantic",
+      "rerank": false,
+      "question": "培训报销最高能报多少钱？",
+      "rank": 1,
+      "latency_ms": 727.19
+    },
+    {
+      "mode": "semantic",
+      "rerank": false,
+      "question": "工作两年可以休几天年假？",
+      "rank": 1,
+      "latency_ms": 1311.7
+    },
+    {
+      "mode": "semantic",
+      "rerank": false,
+      "question": "休假申请要提前多久提交？",
+      "rank": 1,
+      "latency_ms": 578.6
+    },
+    {
+      "mode": "semantic",
+      "rerank": false,
+      "question": "谁有权限查看人才简历？",
+      "rank": 1,
+      "latency_ms": 798.26
+    },
+    {
+      "mode": "semantic",
+      "rerank": false,
+      "question": "多久需要修改一次账号密码？",
+      "rank": 1,
+      "latency_ms": 837.64
+    },
+    {
+      "mode": "keyword",
+      "rerank": false,
+      "question": "后端工程师需要掌握什么技术？",
+      "rank": 1,
+      "latency_ms": 119.95
+    },
+    {
+      "mode": "keyword",
+      "rerank": false,
+      "question": "Python开发岗位要求几年工作经验？",
+      "rank": 1,
+      "latency_ms": 122.45
+    },
+    {
+      "mode": "keyword",
+      "rerank": false,
+      "question": "培训结束以后怎么申请报销？",
+      "rank": 1,
+      "latency_ms": 118.29
+    },
+    {
+      "mode": "keyword",
+      "rerank": false,
+      "question": "培训报销最高能报多少钱？",
+      "rank": 1,
+      "latency_ms": 122.22
+    },
+    {
+      "mode": "keyword",
+      "rerank": false,
+      "question": "工作两年可以休几天年假？",
+      "rank": 1,
+      "latency_ms": 118.45
+    },
+    {
+      "mode": "keyword",
+      "rerank": false,
+      "question": "休假申请要提前多久提交？",
+      "rank": 1,
+      "latency_ms": 122.9
+    },
+    {
+      "mode": "keyword",
+      "rerank": false,
+      "question": "谁有权限查看人才简历？",
+      "rank": 1,
+      "latency_ms": 114.96
+    },
+    {
+      "mode": "keyword",
+      "rerank": false,
+      "question": "多久需要修改一次账号密码？",
+      "rank": 1,
+      "latency_ms": 124.63
+    },
+    {
+      "mode": "hybrid",
+      "rerank": false,
+      "question": "后端工程师需要掌握什么技术？",
+      "rank": 1,
+      "latency_ms": 895.42
+    },
+    {
+      "mode": "hybrid",
+      "rerank": false,
+      "question": "Python开发岗位要求几年工作经验？",
+      "rank": 1,
+      "latency_ms": 998.1
+    },
+    {
+      "mode": "hybrid",
+      "rerank": false,
+      "question": "培训结束以后怎么申请报销？",
+      "rank": 1,
+      "latency_ms": 1369.82
+    },
+    {
+      "mode": "hybrid",
+      "rerank": false,
+      "question": "培训报销最高能报多少钱？",
+      "rank": 1,
+      "latency_ms": 763.97
+    },
+    {
+      "mode": "hybrid",
+      "rerank": false,
+      "question": "工作两年可以休几天年假？",
+      "rank": 1,
+      "latency_ms": 650.3
+    },
+    {
+      "mode": "hybrid",
+      "rerank": false,
+      "question": "休假申请要提前多久提交？",
+      "rank": 1,
+      "latency_ms": 850.88
+    },
+    {
+      "mode": "hybrid",
+      "rerank": false,
+      "question": "谁有权限查看人才简历？",
+      "rank": 1,
+      "latency_ms": 814.79
+    },
+    {
+      "mode": "hybrid",
+      "rerank": false,
+      "question": "多久需要修改一次账号密码？",
+      "rank": 1,
+      "latency_ms": 815.83
+    },
+    {
+      "mode": "hybrid",
+      "rerank": true,
+      "question": "后端工程师需要掌握什么技术？",
+      "rank": 1,
+      "latency_ms": 1157.74
+    },
+    {
+      "mode": "hybrid",
+      "rerank": true,
+      "question": "Python开发岗位要求几年工作经验？",
+      "rank": 1,
+      "latency_ms": 907.71
+    },
+    {
+      "mode": "hybrid",
+      "rerank": true,
+      "question": "培训结束以后怎么申请报销？",
+      "rank": 1,
+      "latency_ms": 1247.22
+    },
+    {
+      "mode": "hybrid",
+      "rerank": true,
+      "question": "培训报销最高能报多少钱？",
+      "rank": 1,
+      "latency_ms": 1100.98
+    },
+    {
+      "mode": "hybrid",
+      "rerank": true,
+      "question": "工作两年可以休几天年假？",
+      "rank": 1,
+      "latency_ms": 1309.27
+    },
+    {
+      "mode": "hybrid",
+      "rerank": true,
+      "question": "休假申请要提前多久提交？",
+      "rank": 1,
+      "latency_ms": 1276.39
+    },
+    {
+      "mode": "hybrid",
+      "rerank": true,
+      "question": "谁有权限查看人才简历？",
+      "rank": 1,
+      "latency_ms": 1145.14
+    },
+    {
+      "mode": "hybrid",
+      "rerank": true,
+      "question": "多久需要修改一次账号密码？",
+      "rank": 1,
+      "latency_ms": 1587.44
+    }
+  ],
+  "limits": "8题合成开发集，每种策略各执行一遍，含首次缓存开销；非独立业务验收集，不代表95%准确率或并发SLA。",
+  "test_data_cleaned": true
+}

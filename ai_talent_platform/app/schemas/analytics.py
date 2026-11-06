@@ -1,54 +1,156 @@
 """
 模块：app/schemas/analytics.py
-职责：数据分析 / NL2SQL 相关请求 / 响应结构。
+职责：分析问数 / 报告相关的请求与响应结构定义。
 
-标签：[Vanna组] [P1]（NL2SQLResponse / 图表配置结构，被 analytics_router 依赖）
+标签：[Vanna组] [P1]（NL2SQLRequest / NL2SQLResponse / ChartConfig / 报告结构）
 
-Schema 清单：
-1. DashboardOverview     total_talents、active_positions、match_rate、training_completion、
-                         assessment_avg_score、monthly_trend: list[{month, value}]
-2. NL2SQLRequest         question、conversation_id(可空)、max_rows
-3. NL2SQLResponse        question、sql(Vanna 生成，需脱敏展示)、
-                         columns: list[str]、rows: list[list]、chart: dict(类型/配置)、
-                         insight: str(AI 解读)、elapsed_ms
-4. ChartConfig           type(bar/line/pie/radar/heatmap)、x_field、y_field、title
-5. ReportRequest         report_type(monthly/quarterly/yearly/custom)、date_range、format(pdf/docx)
-6. DistributionResponse / TrendResponse / ReportTask（看板与报告任务配套结构）
+============================ 实现思路与代码要点 ============================
+1. 请求模型继承 BaseSchema：拒绝未知字段、自动去首尾空白，防止前端多传 sql/roles；
+2. 响应模型继承 ORMModel：可直接从 ORM 对象或 dict 构造；
+3. 图表用 ChartConfig 描述「画什么」，不包含任何可执行代码：
+     bar / line  -> x_field + 多个 series（series[i].data 为 [{name, value}]）
+     pie         -> 单个 series，data 为 [{name, value}]
+     radar       -> indicators（维度与量程）+ 单个 series
+     heatmap     -> x_labels / y_labels + values（[x下标, y下标, 数值] 三元组）
+4. 图表外观（主题/尺寸/配色）放在 ChartOptions，由请求传入、响应回显，前端负责渲染；
+5. 报告支持 query_id 复用结果，或 question 重新查询；两种模式互斥。
 
-实现要点：
+其他约束（跨组约定）：
 - SQL 必须经 adapters/nl2sql/sql_validator.py 校验（只允许 SELECT、禁止系统表、强制 limit）；
 - 数据权限：生成 SQL 后追加角色数据范围条件（行级权限）；
 - 大查询走 PgSQL（分析库），不要打到 MySQL 主库。
 """
-
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field, model_validator
+
+from app.schemas.common import BaseSchema, ORMModel
+
+# 响应里出现的图表类型（auto 只存在于请求，响应一定是确定类型）
+ChartType = Literal["bar", "line", "pie", "radar", "heatmap"]
+ChartTypeRequest = Literal["auto", "bar", "line", "pie", "radar", "heatmap"]
 
 
-class _StrictModel(BaseModel):
-    """拒绝未知字段（防参数漂移）。"""
+class ChartOptions(BaseSchema):
+    """图表外观选项。
 
-    model_config = ConfigDict(extra="forbid")
+    后端只负责把选项透传到 ChartConfig，真正生效的是前端 ECharts 或报告渲染器。
+    「样式自定义 / 尺寸调整 / 主题切换」三个需求点都落在这里，不新增接口。
+    """
+
+    theme: Literal["light", "dark"] = Field("light", description="主题：浅色 / 深色")
+    width: int = Field(800, ge=320, le=2000, description="图表宽度（px）")
+    height: int = Field(450, ge=240, le=1200, description="图表高度（px）")
+    palette: list[str] = Field(default_factory=list, description="配色列表（十六进制色值）")
+    show_legend: bool = Field(True, description="是否显示图例")
 
 
-# ------------------------------------------------------------------ 图表
-class ChartConfig(BaseModel):
-    """统一图表配置（前端按 type 用 ECharts 渲染）。"""
+class NL2SQLRequest(BaseSchema):
+    """问数请求：只接收业务参数，不允许额外传入 sql、roles、user_scope。
 
-    type: Literal["bar", "line", "pie", "radar", "heatmap"] = Field(
-        "bar", description="图表类型（时间->line、枚举->bar、占比->pie）"
+    身份和数据范围由后端登录上下文提供，不信任请求体。
+    chart_type 默认 auto：不传时按数据形态推断，行为与 MVP 完全一致。
+    """
+
+    question: str = Field(..., min_length=1, max_length=500, description="自然语言问题")
+    max_rows: int = Field(200, ge=1, le=1000, description="返回行数上限，另受服务端硬上限约束")
+    with_insight: bool = Field(True, description="是否生成数据解读")
+    chart_type: ChartTypeRequest = Field(
+        "auto", description="图表类型；auto 表示由后端按数据自动推断"
     )
-    x_field: str = Field("", description="X 轴 / 类目字段名")
-    y_field: str = Field("", description="Y 轴 / 数值字段名")
-    title: str = Field("", description="图表标题（默认取问题或字段名）")
-    series: list[str] = Field(default_factory=list, description="多系列字段（折线/柱状可多列）")
+    chart_options: ChartOptions | None = Field(None, description="图表外观选项（可选）")
 
 
-# ------------------------------------------------------------------ 概览
+class ChartConfig(ORMModel):
+    """声明式图表配置：描述「画什么」，由前端映射到 ECharts，不含绘图脚本。"""
+
+    type: ChartType
+    title: str
+    x_field: str | None = Field(None, description="分类/时间列名")
+    y_field: str | None = Field(None, description="数值列名（多系列时为空）")
+    value_field: str | None = Field(None, description="热力图的数值列名")
+    series: list[dict[str, Any]] = Field(default_factory=list, description="数据系列")
+    indicators: list[dict[str, Any]] | None = Field(None, description="雷达图维度与量程")
+    x_labels: list[str] | None = Field(None, description="横轴标签")
+    y_labels: list[str] | None = Field(None, description="纵轴标签（热力图）")
+    values: list[list[Any]] | None = Field(None, description="热力图三元组 [x, y, value]")
+    style: dict[str, Any] | None = Field(None, description="样式（配色、图例等）")
+    size: dict[str, int] | None = Field(None, description="尺寸（width / height）")
+    theme: str | None = Field(None, description="主题 light / dark")
+
+
+class InsightDetail(ORMModel):
+    """结构化解读：把原来的一段纯文本拆成五块，前端可分块展示。"""
+
+    summary: str = Field("", description="总体结论")
+    anomalies: list[str] = Field(default_factory=list, description="异常点")
+    causes: list[str] = Field(default_factory=list, description="可能成因（待验证假设）")
+    risks: list[str] = Field(default_factory=list, description="潜在风险")
+    suggestions: list[str] = Field(default_factory=list, description="优化建议")
+
+
+class NL2SQLResponse(ORMModel):
+    """API / Adapter / Skill 共用的结果结构。
+
+    columns 与 rows 按列序一一对应；sql 是执行前已校验/过滤/限行的语句。
+    chart 可为空；insight 为兼容旧前端的纯文本，insight_detail 为结构化解读。
+    cached 在当前 MVP 中固定为 False；warnings 表示查询成功但附加步骤受限。
+    """
+
+    question: str
+    sql: str
+    columns: list[str]
+    rows: list[list[Any]]
+    chart: ChartConfig | None = None
+    insight: str | None = None
+    insight_detail: InsightDetail | None = None
+    elapsed_ms: int = 0
+    cached: bool = False
+    warnings: list[str] = Field(default_factory=list)
+    query_id: str | None = Field(None, description="已保存结果快照ID；不可用时为空")
+    expires_at: datetime | None = Field(None, description="快照过期时间；读取/导出不续期")
+
+
+class ReportRequest(BaseSchema):
+    """query_id复用页面结果；question保留旧的重新问数入口，两者只能选一个。"""
+
+    question: str | None = Field(None, min_length=1, max_length=500, description="重新问数的问题")
+    query_id: str | None = Field(None, pattern=r"^[0-9a-f]{32}$", description="复用问数返回的快照ID")
+    format: Literal["pdf", "docx"] = Field("pdf", description="报告格式")
+    title: str | None = Field(None, max_length=100, description="报告标题；为空时用问题截断")
+    max_rows: int = Field(200, ge=1, le=1000, description="报告内数据行数上限")
+    include_chart: bool = Field(True, description="是否在报告中嵌入图表图片")
+    chart_type: ChartTypeRequest = Field("auto", description="图表类型，auto 为自动推断")
+
+    @model_validator(mode="after")
+    def validate_source(self) -> ReportRequest:
+        """快照模式禁止重写行数/图表类型，避免声称复用却改变原结果。"""
+        if (self.question is None) == (self.query_id is None):
+            raise ValueError("question与query_id必须且只能提供一个")
+        if self.query_id is not None and self.model_fields_set & {"max_rows", "chart_type"}:
+            raise ValueError("query_id模式不接受max_rows或chart_type，请重新问数以改变结果")
+        return self
+
+
+class ReportItem(ORMModel):
+    """报告元数据：生成接口与列表接口共用。"""
+
+    report_id: str = Field(..., description="报告 ID（32 位十六进制）")
+    title: str
+    format: str
+    size: int = Field(0, description="文件大小（字节）")
+    created_at: datetime
+    url: str = Field("", description="下载地址（相对路径）")
+
+
+# ====================================================================== 概览与分布/趋势
+# 说明：合并 origin/develop 时补齐。develop 侧 ac239d7 提交误将未解决冲突的文件入库，
+#      以下 6 个模型从其作者本地版本中提取，供 tests/test_analytics_channel 工作流用例使用；
+#      严格模式（_StrictModel）重构未完成，未采纳，避免破坏 ChartOptions/InsightDetail/ReportItem 引用。
+
 class MonthlyTrendPoint(BaseModel):
     """月度趋势点（概览卡内嵌小趋势）。"""
 
@@ -95,59 +197,3 @@ class TrendResponse(BaseModel):
     unit: str = Field("count", description="count / score / percent")
     points: list[TrendPoint] = Field(default_factory=list)
     note: str = Field("", description="统计口径说明")
-
-
-# ------------------------------------------------------------------ NL2SQL
-class NL2SQLRequest(_StrictModel):
-    question: str = Field(..., min_length=1, max_length=500, description="自然语言问题")
-    conversation_id: str | None = Field(None, max_length=64, description="会话 ID（可空）")
-    max_rows: int = Field(200, ge=1, le=1000, description="返回行数上限")
-
-
-class NL2SQLResponse(BaseModel):
-    question: str = ""
-    sql: str | None = Field(None, description="校验后的只读 SQL（已注入 LIMIT / 数据范围）")
-    columns: list[str] = Field(default_factory=list)
-    rows: list[list[Any]] = Field(default_factory=list)
-    row_count: int = 0
-    chart: ChartConfig | None = None
-    insight: str = Field("", description="数据解读（AI 或启发式）")
-    elapsed_ms: float = 0.0
-
-
-# ------------------------------------------------------------------ 报告
-class ReportRequest(_StrictModel):
-    report_type: Literal["monthly", "quarterly", "yearly", "custom"] = "monthly"
-    date_range: tuple[str, str] | None = Field(
-        None, description="自定义区间 [start, end]（report_type=custom 时必填）"
-    )
-    format: Literal["pdf", "docx"] = Field("docx", description="导出格式")
-
-
-class ReportTask(BaseModel):
-    """报告生成任务（POST /report 立即返回 task_id，GET /reports 查状态）。"""
-
-    task_id: str
-    status: Literal["pending", "running", "succeeded", "failed"] = "pending"
-    report_type: str = "monthly"
-    requested_format: str = "docx"
-    actual_format: str = Field("", description="实际落盘格式（缺 docx/pdf 依赖时降级为 md）")
-    url: str | None = Field(None, description="报告文件路径（文件中心就绪后转为下载地址）")
-    error: str | None = None
-    created_at: datetime | None = None
-    finished_at: datetime | None = None
-
-
-__all__ = [
-    "ChartConfig",
-    "DashboardOverview",
-    "DistributionItem",
-    "DistributionResponse",
-    "MonthlyTrendPoint",
-    "NL2SQLRequest",
-    "NL2SQLResponse",
-    "ReportRequest",
-    "ReportTask",
-    "TrendPoint",
-    "TrendResponse",
-]

@@ -229,3 +229,90 @@ class AssessmentResult(BaseModel):
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<AssessmentResult id={self.id} assessment_id={self.assessment_id}>"
+
+
+
+# ================================================================ 面试记录
+class InterviewSession(BaseModel):
+    """面试会话（一次测评对应一次面试）。"""
+
+    __tablename__ = "interview_sessions"
+    __table_args__ = (
+        Index("ix_interview_sessions_assessment", "assessment_id"),
+        {"comment": "面试会话表"},
+    )
+
+    assessment_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("assessments.id", ondelete="CASCADE"),
+        nullable=False, unique=True, comment="测评 ID（1:1）",
+    )
+    interviewer: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="面试官")
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    interview_score: Mapped[Decimal | None] = mapped_column(
+        Numeric(5, 2), nullable=True, comment="面试综合分(0-100)"
+    )
+    summary: Mapped[dict | None] = mapped_column(JSON, nullable=True, comment="面试综合点评")
+
+
+class InterviewAnswer(BaseModel):
+    """单条面试问答。"""
+
+    __tablename__ = "interview_answers"
+    __table_args__ = (
+        Index("ix_interview_answers_session", "session_id"),
+        {"comment": "面试问答记录表"},
+    )
+
+    session_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("interview_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    question: Mapped[str] = mapped_column(Text, nullable=False, comment="面试问题")
+    answer: Mapped[str | None] = mapped_column(Text, nullable=True, comment="候选人回答")
+    score: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True, comment="本题得分")
+    note: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="面试官点评")
+
+
+class InterviewRecordSheet(BaseModel):
+    """面试记录表（面试官拍照上传，AI 解析结构化字段后入 MySQL + 向量库）。
+
+    流程：面试官上传记录表照片 -> 视觉大模型解析
+        （面试得分、岗位、综合评价、亮点、不足）-> 本表存档 + 向量化入库
+        -> 生成综合报告时从向量库召回作为分析依据。
+    """
+
+    __tablename__ = "interview_record_sheets"
+    __table_args__ = (
+        Index("ix_interview_records_assessment", "assessment_id"),
+        Index("ix_interview_records_talent", "talent_id"),
+        {"comment": "面试记录表（拍照上传）"},
+    )
+
+    assessment_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("assessments.id", ondelete="CASCADE"),
+        nullable=False, comment="测评 ID（FK -> assessments.id）",
+    )
+    session_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("interview_sessions.id", ondelete="SET NULL"),
+        nullable=True, comment="面试会话 ID（可空）",
+    )
+    talent_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True,
+                                                 comment="人才 ID（冗余，便于向量过滤）")
+    position: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="面试岗位")
+    image_path: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="记录表照片存储路径")
+    interview_score: Mapped[Decimal | None] = mapped_column(
+        Numeric(5, 2), nullable=True, comment="面试得分（0-100）",
+    )
+    comprehensive_evaluation: Mapped[str | None] = mapped_column(
+        Text, nullable=True, comment="综合评价",
+    )
+    highlights: Mapped[list | None] = mapped_column(JSON, nullable=True, comment="亮点列表")
+    weaknesses: Mapped[list | None] = mapped_column(JSON, nullable=True, comment="不足列表")
+    raw_text: Mapped[str | None] = mapped_column(Text, nullable=True, comment="解析原文（OCR/LLM 输出）")
+    parse_status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="parsed", server_default=text("'parsed'"),
+        comment="解析状态：parsed/fallback/failed",
+    )
+    vector_id: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="向量库主键")
+

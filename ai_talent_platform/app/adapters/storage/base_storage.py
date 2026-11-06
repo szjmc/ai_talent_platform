@@ -53,7 +53,7 @@ class BaseStorage(ABC):
     name: str = "base"
 
     @abstractmethod
-    async def save(self, data: bytes, filename: str, subdir: str = "") -> str:
+    async def save(self, data: bytes, filename: str, subdir: str = "", *, before_write=None) -> str:
         """保存文件，返回相对路径 / 对象键（入库用）。"""
 
     @abstractmethod

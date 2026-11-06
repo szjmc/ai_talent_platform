@@ -12,7 +12,7 @@ ORM 层已完整落地：MySQL 25 张业务表 + PgSQL 6 张分析表，全局�
 / LLMManager / Agent 基类与调度 / 上下文 / 记忆 / 文件存储（本地 / MinIO / 阿里云 OSS / S3）/ 事件总线 / 匹配策略，
 见 `docs/plan/05-代码标签与优先级总表.md` 与 `docs/storage_and_llm_adapters.md`；全局 ORM 映射由 `python scripts/dump_orm_mapping.py` 自动生成；
 PgSQL 分析库另有独立初始化脚本 `scripts/init_pgsql.py`（含分区父表和 DEFAULT 分区，数据同步/ETL 仍未实现）；
-其余业务模块（人才、岗位、简历、测评、培训、匹配、知识库、分析、Agent、文件）已建好骨架，
+其余业务模块（人才、分析已实现；岗位、简历、测评、培训、匹配、知识库、文件等）已建好骨架，
 每个文件开头写明实现思路与待写代码，按 TODO 补齐即可。
 
 ---
@@ -111,9 +111,11 @@ config    → 配置：settings / logging / prompt
 | 认证 | `POST /api/v1/auth/register` `POST /api/v1/auth/login` `POST /api/v1/auth/refresh` `GET /api/v1/auth/me` `POST /api/v1/auth/change-password` `POST /api/v1/auth/logout` |
 | 用户 | `GET/POST /api/v1/users` `GET/PUT/DELETE /api/v1/users/{id}` `PATCH /{id}/status` `PUT /{id}/roles` `POST /{id}/reset-password` |
 | 组织 | `GET /api/v1/organizations/tree` `GET/POST /api/v1/organizations` `GET/PUT/DELETE /{id}` `PATCH /{id}/move` |
+| 智能体 | `GET /api/v1/agents` `POST /api/v1/agents/chat` `POST /api/v1/agents/chat/stream` `GET /api/v1/agents/conversations` `GET /api/v1/agents/conversations/{id}/messages` `POST /api/v1/agents/tasks` `GET /api/v1/agents/tasks/{task_id}` |
 | 系统 | `GET /api/v1/system/info` |
 
-其余 11 个模块当前为占位路由（返回 501 + 主责研发组提示，见 `data.owner`），实现后替换 `app/routers/router.py` 中的 include 即可。
+其余 8 个模块当前为占位路由（返回 501 + 主责研发组提示，见 `data.owner`），实现后替换 `app/routers/router.py` 中的 include 即可。
+
 
 ## 目录速览
 

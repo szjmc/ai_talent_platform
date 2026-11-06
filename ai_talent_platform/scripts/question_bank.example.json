@@ -1,0 +1,60 @@
+[
+  {
+    "bank_id": 1,
+    "external_id": "python-mid-single-001",
+    "technology": "python",
+    "difficulty": "intermediate",
+    "question_type": "single",
+    "knowledge_points": [
+      "函数默认参数",
+      "可变对象"
+    ],
+    "stem": "Python函数使用列表作为默认参数时，哪种说法正确？",
+    "options": [
+      {
+        "key": "A",
+        "text": "每次调用都会创建一个新列表"
+      },
+      {
+        "key": "B",
+        "text": "多次调用可能共享同一个列表"
+      }
+    ],
+    "answer": "B",
+    "analysis": "默认参数在定义函数时求值。",
+    "permission_scope": "public"
+  },
+  {
+    "bank_id": 1,
+    "external_id": "python-mid-judge-001",
+    "technology": "python",
+    "difficulty": "intermediate",
+    "question_type": "true_false",
+    "knowledge_points": [
+      "生成器",
+      "迭代器"
+    ],
+    "stem": "Python中的所有生成器都是迭代器。",
+    "answer": true,
+    "analysis": "生成器实现了迭代器协议。",
+    "permission_scope": "public"
+  },
+  {
+    "bank_id": 1,
+    "external_id": "python-mid-blank-001",
+    "technology": "python",
+    "difficulty": "intermediate",
+    "question_type": "fill_blank",
+    "knowledge_points": [
+      "生成器"
+    ],
+    "stem": "Python函数中使用 ____ 关键字产出值并暂停执行，从而构造生成器。",
+    "answer": [
+      [
+        "yield"
+      ]
+    ],
+    "analysis": "yield保存执行状态并返回一个值。",
+    "permission_scope": "public"
+  }
+]

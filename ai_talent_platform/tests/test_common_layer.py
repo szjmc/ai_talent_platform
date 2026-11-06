@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import pytest
 
+from app.config.settings import settings
+
 pytestmark = pytest.mark.asyncio
 
 
@@ -56,13 +58,22 @@ async def test_swagger_available(client):
 
 
 async def test_health_ready(client):
-    """就绪探针：MySQL 必须可用（PgSQL 在测试环境关闭）。"""
+    """就绪探针：MySQL 必须可用（PgSQL 在测试环境关闭）。
+
+    返回结构：mysql / pgsql 已从早期版本的字符串升级为结构化对象
+    （target / status / reason / message / cost_ms），driver 信息在 drivers 字段。
+    """
     resp = await client.get("/health/ready")
     assert resp.status_code == 200
     data = resp.json()["data"]
-    assert data["mysql"] == "up"
-    assert data["pgsql"] == "disabled"
+
+    mysql = data["mysql"]
+    assert isinstance(mysql, dict), f"mysql 应为结构化对象，实际为 {type(mysql)}"
+    assert mysql["status"] == "up", f"MySQL 未就绪：{mysql}"
+    assert mysql["target"].endswith(settings.DB_NAME)
+    assert data["pgsql"]["status"] == "disabled"
     assert data["status"] == "up"
+    assert data["drivers"]["mysql"] == "mysql+aiomysql"
 
 
 async def test_404_unified_response(client):

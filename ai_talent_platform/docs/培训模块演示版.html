@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>智能培训赋能模块 · 交互演示</title>
+<style>
+:root{
+  --bg:#F6F6F3; --card:#FFFFFF; --ink:#1C1C1A; --ink2:#55554F; --ink3:#8B8B83;
+  --line:#E5E5DE; --line2:#D2D2C9;
+  --brand:#1B4D6B; --brand-bg:#E8F0F5;
+  --teal:#0F6E56; --teal-bg:#E1F5EE;
+  --amber:#8A5A0B; --amber-bg:#FAEEDA;
+  --red:#9B2C2C; --red-bg:#FCEBEB;
+  --gray:#6B6B64; --gray-bg:#EFEFE9;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#191918; --card:#222221; --ink:#ECECE6; --ink2:#B0B0A8; --ink3:#82827A;
+    --line:#32322E; --line2:#42423C;
+    --brand:#8FC2DE; --brand-bg:#17303D;
+    --teal:#5DCAA5; --teal-bg:#122F28;
+    --amber:#EFB75E; --amber-bg:#33280F;
+    --red:#F09595; --red-bg:#33201F;
+    --gray:#A8A8A0; --gray-bg:#2A2A27;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+  font-size:14px;line-height:1.7;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.wrap{max-width:1420px;margin:0 auto;padding:0 22px 40px}
+
+header{padding:22px 0 16px;border-bottom:1px solid var(--line);margin-bottom:18px;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+h1{margin:0;font-size:21px;font-weight:500;letter-spacing:-.01em}
+h1 span{color:var(--brand)}
+.tagline{margin:3px 0 0;font-size:12.5px;color:var(--ink3)}
+.hdr-r{display:flex;align-items:center;gap:8px}
+.pill{font-size:11.5px;padding:2px 9px;border-radius:999px;background:var(--brand-bg);color:var(--brand)}
+.pill.warn{background:var(--amber-bg);color:var(--amber)}
+button{font-family:inherit;font-size:12.5px;padding:6px 13px;border-radius:7px;cursor:pointer;
+  border:1px solid var(--line2);background:var(--card);color:var(--ink)}
+button:hover{background:var(--brand-bg);border-color:var(--brand);color:var(--brand)}
+button.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+button.primary:hover{opacity:.9;color:#fff}
+button.sm{padding:3px 9px;font-size:11.5px}
+
+.layout{display:grid;grid-template-columns:280px minmax(0,1fr) 300px;gap:16px;align-items:start}
+.col{position:sticky;top:14px}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:15px 17px;margin-bottom:13px}
+.card h2{margin:0 0 2px;font-size:14.5px;font-weight:500}
+.card .sub{margin:0 0 13px;font-size:11.5px;color:var(--ink3);line-height:1.55}
+.card h2 .no{color:var(--ink3);font-weight:400;margin-right:5px;font-family:ui-monospace,monospace;font-size:12px}
+
+.person{display:flex;gap:9px;align-items:center;padding:9px 10px;border:1px solid var(--line);
+  border-radius:9px;margin-bottom:7px;cursor:pointer;transition:.12s}
+.person:hover{border-color:var(--line2);background:var(--bg)}
+.person.on{border-color:var(--brand);background:var(--brand-bg)}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--gray-bg);color:var(--gray);
+  display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.person.on .avatar{background:var(--brand);color:#fff}
+.person .nm{font-size:13px;line-height:1.35}
+.person .ps{font-size:11px;color:var(--ink3);line-height:1.35}
+
+.field{margin-bottom:12px}
+.field label{display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin-bottom:4px}
+.field label b{font-weight:500;color:var(--ink);font-family:ui-monospace,monospace}
+input[type=range]{width:100%;accent-color:var(--brand);margin:0}
+input[type=number]{width:58px;font-family:ui-monospace,monospace;font-size:12.5px;padding:3px 6px;
+  border:1px solid var(--line2);border-radius:6px;background:var(--card);color:var(--ink);text-align:right}
+
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:2px}
+.kpi{background:var(--bg);border-radius:8px;padding:8px 10px}
+.kpi .v{font-size:16px;font-weight:500;line-height:1.3;font-family:ui-monospace,monospace}
+.kpi .k{font-size:10.5px;color:var(--ink3);line-height:1.3}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{font-size:11px;color:var(--ink3);font-weight:400;text-align:left;padding:6px 7px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:6px 7px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr.done td{color:var(--ink3)}
+tr:last-child td{border-bottom:none}
+.num{font-family:ui-monospace,monospace;text-align:right}
+
+.b{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;line-height:1.65;white-space:nowrap}
+.b.red{background:var(--red-bg);color:var(--red)}
+.b.amber{background:var(--amber-bg);color:var(--amber)}
+.b.gray{background:var(--gray-bg);color:var(--gray)}
+.b.teal{background:var(--teal-bg);color:var(--teal)}
+.b.brand{background:var(--brand-bg);color:var(--brand)}
+
+.weeks{display:grid;gap:9px}
+.wk{background:var(--bg);border-radius:9px;padding:9px 10px;min-height:96px}
+.wk h4{margin:0 0 3px;font-size:11.5px;font-weight:500;color:var(--ink2)}
+.wk .hrs{font-size:10.5px;color:var(--ink3);margin-bottom:7px;font-family:ui-monospace,monospace}
+.unit{background:var(--card);border:1px solid var(--line);border-radius:7px;padding:6px 8px;margin-bottom:6px}
+.unit .dim{font-size:10.5px;color:var(--ink3);display:flex;justify-content:space-between;gap:6px}
+.unit .tt{font-size:12px;line-height:1.45;margin-top:1px}
+.unit.ext{border-style:dashed;background:transparent}
+.unit.ext .tt{color:var(--ink3)}
+
+.alert{display:flex;gap:9px;align-items:flex-start;padding:10px 12px;border-radius:9px;
+  background:var(--red-bg);color:var(--red);font-size:12.5px;margin-bottom:12px;line-height:1.55}
+.alert.teal{background:var(--teal-bg);color:var(--teal)}
+.alert.amber{background:var(--amber-bg);color:var(--amber)}
+.alert .txt{flex:1}
+
+.bar{height:5px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:5px}
+.bar>i{display:block;height:100%;background:var(--brand);transition:width .18s}
+.bar>i.teal{background:var(--teal)}
+.bar>i.red{background:var(--red)}
+.bar>i.amber{background:var(--amber)}
+
+.prow{display:grid;grid-template-columns:96px 1fr 52px;gap:9px;align-items:center;
+  padding:5px 0;border-bottom:1px solid var(--line);font-size:12px}
+.prow:last-child{border-bottom:none}
+.prow .nm{font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow .pc{font-family:ui-monospace,monospace;font-size:11.5px;text-align:right;color:var(--ink3)}
+
+.scorebox{display:flex;gap:9px;align-items:center;margin-bottom:11px}
+.scorebox input[type=number]{width:72px;font-size:15px;padding:5px 8px}
+.verdict{border-radius:9px;padding:11px 13px;font-size:12.5px;line-height:1.6;background:var(--bg)}
+.verdict b{font-weight:500}
+
+.ev{border-left:2px solid var(--line2);padding:5px 0 5px 10px;margin-bottom:5px}
+.ev .ty{font-size:11px;font-family:ui-monospace,monospace;color:var(--brand);word-break:break-all}
+.ev .dt{font-size:11.5px;color:var(--ink2);line-height:1.5}
+.ev.hot{border-left-color:var(--red)}
+.ev.hot .ty{color:var(--red)}
+.ev.ok{border-left-color:var(--teal)}
+.ev.ok .ty{color:var(--teal)}
+.ev .tm{font-size:10px;color:var(--ink3);font-family:ui-monospace,monospace}
+
+.note{font-size:11.5px;color:var(--ink3);line-height:1.65;margin-top:10px;padding-top:9px;border-top:1px dashed var(--line)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+@media (max-width:1240px){
+  .layout{grid-template-columns:1fr}
+  .col{position:static}
+  .kpis{grid-template-columns:repeat(4,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>智能培训赋能模块 · <span>交互演示</span></h1>
+    <p class="tagline">诊断 → 排期 → 匹配 → 落库 → 进度 → 考核，六节点在同一条链路上跑通</p>
+  </div>
+  <div class="hdr-r">
+    <span class="pill warn">演示版 · 前端模拟数据，不写数据库</span>
+    <button onclick="resetAll()">重置</button>
+  </div>
+</header>
+
+<div class="layout">
+
+  <aside class="col">
+    <div class="card">
+      <h2>选择人才</h2>
+      <p class="sub">分数来自测评结果，目标分来自岗位能力模型</p>
+      <div id="persons"></div>
+    </div>
+
+    <div class="card">
+      <h2>计划参数</h2>
+      <p class="sub">改动即时重排，容量装不下会直接报错</p>
+      <div class="field">
+        <label>培训周期 <b id="lblWeeks">4 周</b></label>
+        <input type="range" id="weeks" min="1" max="12" step="1" value="4" oninput="onParam()">
+      </div>
+      <div class="field">
+        <label>每周学时上限 <b id="lblHpw">8 h</b></label>
+        <input type="range" id="hpw" min="2" max="16" step="1" value="8" oninput="onParam()">
+      </div>
+      <div class="kpis" id="kpis"></div>
+    </div>
+
+    <div class="card">
+      <h2>演示提示</h2>
+      <p class="sub" style="margin-bottom:0">
+        ① 把周期调到 2 周 → 看容量不足如何报错并给建议<br>
+        ② 点「生成培训方案」→ 看事件流水<br>
+        ③ 把「模拟当前时间」拖到 75% 左右 → 看落后预警<br>
+        ④ 提交 72 分与 88 分 → 看两条不同分支<br>
+        ⑤ 切到「王强」→ 看「架构设计」库内无课时如何降级
+      </p>
+    </div>
+  </aside>
+
+  <main>
+    <div class="card">
+      <h2><span class="no">01</span>短板诊断</h2>
+      <p class="sub">缺口 = 目标分 − 当前分，≤0 直接不排课；缺口 ≥20 判 P0，权重 ≥0.25 的岗位关键维度一律 P0</p>
+      <div style="overflow-x:auto"><table id="gapTable"></table></div>
+      <div class="note" id="gapNote"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="no">02</span>培训方案与课程匹配</h2>
+      <p class="sub" id="planSub">每周上限 <b id="sHpw">8</b>h、单个单元最长 4h；课程只能来自课程库，没有就降级为外部建议</p>
+      <div id="planBody"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="no">03</span>进度跟踪</h2>
+      <p class="sub">进度只升不降；落后 ≥20% 提醒、≥40% HR 预警；学时明显不足会标记疑似刷课</p>
+      <div class="field" style="margin-bottom:14px">
+        <label>模拟当前时间进度 <b id="lblNow">0%</b></label>
+        <input type="range" id="now" min="0" max="100" step="1" value="0" oninput="onNow()">
+      </div>
+      <div id="progHead" style="margin-bottom:11px"></div>
+      <div id="progRows"></div>
+      <label style="display:flex;gap:7px;align-items:center;font-size:12px;color:var(--ink2);margin-top:11px;cursor:pointer">
+        <input type="checkbox" id="fake" onchange="onFake()" style="accent-color:var(--brand)">
+        模拟「只挂机不学习」（上报学时只有应付的 10%）
+      </label>
+    </div>
+
+    <div class="card">
+      <h2><span class="no">04</span>考核与复测</h2>
+      <p class="sub">及格线 80 分；通过发 retest.required 回流测评，不通过发 plan.adjust 建议延长 2 周</p>
+      <div class="scorebox">
+        <input type="number" id="score" value="72" min="0" max="100" step="1">
+        <span style="font-size:12px;color:var(--ink3)">分</span>
+        <button class="primary" onclick="submitScore()">提交考核</button>
+        <button class="sm" onclick="document.getElementById('score').value=88;submitScore()">直接看通过分支</button>
+      </div>
+      <div id="verdict" class="verdict">尚未提交考核。</div>
+    </div>
+  </main>
+
+  <aside class="col">
+    <div class="card" style="max-height:calc(100vh - 30px);overflow:auto">
+      <h2>事件流水</h2>
+      <p class="sub">模块对外只发事件，不直接调别的模块</p>
+      <div id="events"></div>
+    </div>
+  </aside>
+
+</div>
+</div>
+
+<script>
+const COURSES = [
+  {t:'需求分析实战',   dim:'需求分析',   lv:3, h:8},
+  {t:'用户需求调研',   dim:'需求分析',   lv:2, h:6},
+  {t:'需求管理进阶',   dim:'需求分析',   lv:4, h:7},
+  {t:'SQL 数据分析',   dim:'数据分析',   lv:3, h:8},
+  {t:'指标体系设计',   dim:'数据分析',   lv:4, h:6},
+  {t:'Excel 到 BI',    dim:'数据分析',   lv:2, h:5},
+  {t:'结构化表达',     dim:'沟通表达',   lv:2, h:5},
+  {t:'跨部门沟通',     dim:'沟通表达',   lv:3, h:6},
+  {t:'团队协作基本功', dim:'团队协作',   lv:2, h:4},
+  {t:'冲突处理',       dim:'团队协作',   lv:3, h:5},
+  {t:'敏捷项目管理',   dim:'项目管理',   lv:3, h:8},
+  {t:'项目风险控制',   dim:'项目管理',   lv:4, h:6},
+  {t:'SQL 入门',       dim:'SQL与数据库', lv:1, h:6},
+  {t:'数据库设计',     dim:'SQL与数据库', lv:3, h:7},
+  {t:'SQL 性能优化',   dim:'SQL与数据库', lv:4, h:8},
+  {t:'产品设计基础',   dim:'产品设计',   lv:2, h:5},
+  {t:'B 端产品设计',   dim:'产品设计',   lv:3, h:7},
+  {t:'用户访谈方法',   dim:'用户研究',   lv:2, h:4}
+];
+
+const PEOPLE = [
+  { name:'张伟', pos:'高级产品经理', post:'产品经理 v2',
+    scores:{需求分析:62, 数据分析:55, 沟通表达:78, 团队协作:85, 项目管理:72, SQL与数据库:48},
+    model:{需求分析:{r:85,w:.30}, 数据分析:{r:80,w:.25}, 沟通表达:{r:85,w:.20},
+           团队协作:{r:80,w:.15}, 项目管理:{r:80,w:.10}, SQL与数据库:{r:75,w:.20}} },
+  { name:'李娜', pos:'数据分析师', post:'数据分析师 v1',
+    scores:{数据分析:58, 需求分析:70, 沟通表达:66, 用户研究:74, 产品设计:52, 项目管理:80},
+    model:{数据分析:{r:85,w:.30}, 需求分析:{r:80,w:.20}, 沟通表达:{r:80,w:.20},
+           用户研究:{r:80,w:.15}, 产品设计:{r:75,w:.15}, 项目管理:{r:80,w:.10}} },
+  { name:'王强', pos:'技术主管', post:'技术主管 v2',
+    scores:{SQL与数据库:80, 数据分析:60, 沟通表达:55, 团队协作:75, 项目管理:62, 架构设计:55},
+    model:{SQL与数据库:{r:80,w:.25}, 数据分析:{r:75,w:.20}, 沟通表达:{r:80,w:.20},
+           团队协作:{r:80,w:.20}, 项目管理:{r:75,w:.15}, 架构设计:{r:80,w:.20}} }
+];
+
+const GAP_HIGH=20, GAP_MID=8, KEY_WEIGHT=.25, CHUNK=4, PASS=80;
+const LAG_ALERT=.4, LAG_WARN=.2, MIN_H=3, MAX_H=8, DEFAULT_R=80, DEFAULT_W=.2;
+
+const state={ p:0, weeks:4, hpw:8, overrides:{}, progress:{}, fake:false, now:0, score:null, events:[], lastAlert:'' };
+
+function pyRound(x){const f=Math.floor(x),d=x-f; if(d>.5)return f+1; if(d<.5)return f; return f%2===0?f:f+1;}
+function r1(x){return Math.round(x*10)/10;}
+function r2(x){return Math.round(x*100)/100;}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+function person(){return PEOPLE[state.p];}
+function requiredOf(dim){ const o=state.overrides[dim]; return o!=null?o:person().model[dim].r; }
+
+function priorityOf(delta,w){
+  let p = delta>=GAP_HIGH?'P0':(delta>=GAP_MID?'P1':'P2');
+  if(w>=KEY_WEIGHT) p='P0';
+  return p;
+}
+function estimateHours(delta){ return r1(Math.max(MIN_H, Math.min(MAX_H, pyRound(delta/4)+2))); }
+
+function gaps(){
+  const ps=person(), out=[];
+  Object.keys(ps.scores).forEach(dim=>{
+    const cur=ps.scores[dim], req=requiredOf(dim), w=ps.model[dim].w;
+    const delta=r1(req-cur);
+    if(delta<=0){ out.push({dim,cur,req,w,delta,priority:'—',hours:0,done:true}); return; }
+    out.push({dim,cur,req,w,delta,priority:priorityOf(delta,w),hours:estimateHours(delta)});
+  });
+  const live=out.filter(g=>!g.done);
+  const rank={P0:0,P1:1,P2:2};
+  live.sort((a,b)=> rank[a.priority]-rank[b.priority] || (b.delta*b.w)-(a.delta*a.w));
+  return out.filter(g=>g.done).concat([]).length ? live.concat(out.filter(g=>g.done)) : live;
+}
+
+function schedule(gs){
+  const live=gs.filter(g=>!g.done);
+  const demand=r1(live.reduce((s,g)=>s+g.hours,0));
+  const capacity=state.weeks*state.hpw;
+  if(demand>capacity){
+    const suggest=Math.ceil(demand/state.hpw);
+    return {error:`短板总学时 ${demand}h 超出周期容量 ${capacity}h，建议延长至 ${suggest} 周或下调目标分`,suggest,demand,capacity,items:[]};
+  }
+  const items=[]; let week=1, used=0;
+  live.forEach(g=>{
+    let left=g.hours;
+    while(left>0){
+      const chunk=Math.min(left,CHUNK);
+      if(used+chunk>state.hpw+1e-9){ week++; used=0; }
+      if(week>state.weeks){ return; }
+      items.push({week, dim:g.dim, hours:r1(chunk), delta:g.delta, priority:g.priority});
+      used=r1(used+chunk); left=r1(left-chunk);
+    }
+  });
+  const merged={};
+  items.forEach(it=>{ const k=it.week+'|'+it.dim;
+    merged[k]=merged[k]? {...merged[k], hours:r1(merged[k].hours+it.hours)} : it; });
+  return {error:null, demand, capacity, items:Object.values(merged).sort((a,b)=>a.week-b.week)};
+}
+
+function targetLevel(req){ return req>=85?4:(req>=75?3:2); }
+
+function pick(dim, req){
+  const pool=COURSES.filter(c=>c.dim===dim);
+  if(!pool.length) return null;
+  const tl=targetLevel(req);
+  const fit=pool.filter(c=>Math.abs(c.lv-tl)<=1);
+  const cand=(fit.length?fit:pool).slice();
+  cand.sort((a,b)=> Math.abs(a.lv-tl)-Math.abs(b.lv-tl) || b.h-a.h);
+  return cand[0];
+}
+
+function matched(){
+  const s=schedule(gaps());
+  if(s.error) return {...s, rows:[]};
+  const cache={};
+  const rows=s.items.map(it=>{
+    if(!(it.dim in cache)) cache[it.dim]=pick(it.dim, requiredOf(it.dim));
+    return {...it, course:cache[it.dim]};
+  });
+  const lib=rows.length? rows.filter(r=>r.course).length/rows.length : 0;
+  return {...s, rows, library:lib};
+}
+
+function totalHours(){
+  const m=matched(); if(m.error) return {total:0, done:0};
+  const byDim={};
+  m.rows.forEach(r=>{ if(r.course) byDim[r.dim]=r.course.h; });
+  const total=r1(Object.values(byDim).reduce((a,b)=>a+b,0));
+  const done=r1(Object.keys(byDim).reduce((a,d)=>a+byDim[d]*(state.progress[d]||0)/100,0));
+  return {total, done, byDim};
+}
+
+function progressInfo(){
+  const {total,done}=totalHours();
+  if(total<=0) return {total:0,done:0,expected:0,lag:0,completion:0,alert:'无学习任务'};
+  const expected=r1(total*state.now/100);
+  const lag=(expected-done)/total;
+  const completion=Math.min(1,done/total);
+  let alert='正常';
+  if(done>=total && total>0) alert='已按期完成';
+  else if(lag>=LAG_ALERT) alert='HR预警';
+  else if(lag>=LAG_WARN) alert='提醒';
+  return {total,done,expected,lag:r2(lag),completion:r2(completion),alert};
+}
+
+function alertClass(a){ return a==='HR预警'?'red':(a==='提醒'?'amber':(a==='已按期完成'?'teal':'brand')); }
+
+function pushEvent(type, detail, tone){
+  state.events.unshift({type, detail, tone:tone||'', at:new Date().toLocaleTimeString('zh-CN',{hour12:false})});
+  renderEvents();
+}
+
+function renderEvents(){
+  const box=document.getElementById('events');
+  if(!state.events.length){ box.innerHTML='<div style="font-size:12px;color:var(--ink3)">暂无事件</div>'; return; }
+  box.innerHTML=state.events.map(e=>`
+    <div class="ev ${e.tone}">
+      <div class="ty">${esc(e.type)}</div>
+      <div class="dt">${esc(e.detail)}</div>
+      <div class="tm">${e.at}</div>
+    </div>`).join('');
+}
+
+function renderPersons(){
+  document.getElementById('persons').innerHTML=PEOPLE.map((p,i)=>`
+    <div class="person ${i===state.p?'on':''}" onclick="selectPerson(${i})">
+      <div class="avatar">${esc(p.name[0])}</div>
+      <div><div class="nm">${esc(p.name)}</div><div class="ps">${esc(p.pos)}</div></div>
+    </div>`).join('');
+}
+
+function renderGaps(){
+  const gs=gaps();
+  const rows=gs.map(g=>`
+    <tr class="${g.done?'done':''}">
+      <td>${esc(g.dim)}</td>
+      <td class="num">${g.cur}</td>
+      <td class="num"><input type="number" min="0" max="100" value="${g.req}" style="width:52px"
+           onchange="setReq('${esc(g.dim)}',this.value)"></td>
+      <td class="num">${g.done?'—':g.delta}</td>
+      <td class="num">${g.w.toFixed(2)}</td>
+      <td>${g.done?'<span class="b gray">已达标</span>':'<span class="b '+(g.priority==='P0'?'red':(g.priority==='P1'?'amber':'gray'))+'">'+g.priority+'</span>'}</td>
+      <td class="num">${g.done?'—':g.hours+' h'}</td>
+    </tr>`).join('');
+  document.getElementById('gapTable').innerHTML=`
+    <thead><tr><th>能力维度</th><th class="num">当前</th><th class="num">目标</th><th class="num">缺口</th><th class="num">权重</th><th>优先级</th><th class="num">预估学时</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="7" style="color:var(--ink3)">该人才各维度均已达标</td></tr>'}</tbody>`;
+  const live=gs.filter(g=>!g.done);
+  document.getElementById('gapNote').innerHTML=
+    `标准来源：岗位能力模型 <b>${esc(person().post)}</b> · 真短板 ${live.length} 项 · 需求合计 ${r1(live.reduce((s,g)=>s+g.hours,0))}h`+
+    `　<span style="color:var(--ink3)">（目标分可直接改，改完立刻重排）</span>`;
+}
+
+function renderPlan(){
+  const m=matched();
+  document.getElementById('sHpw').textContent=state.hpw;
+  const body=document.getElementById('planBody');
+
+  if(m.error){
+    body.innerHTML=`
+      <div class="alert">
+        <div class="txt"><b>容量不足，未生成方案。</b><br>${esc(m.error)}</div>
+        <button class="sm" onclick="applySuggest(${m.suggest})">延长到 ${m.suggest} 周</button>
+      </div>
+      <div class="note">排期器不会把学时硬塞进最后一周——装不下就报错，这是刻意设计的。</div>`;
+    return;
+  }
+  if(!m.rows.length){
+    body.innerHTML='<div class="alert teal"><div class="txt">各维度均已达标，本期无需安排培训。</div></div>';
+    return;
+  }
+
+  const byWeek={};
+  m.rows.forEach(r=>{ (byWeek[r.week]=byWeek[r.week]||[]).push(r); });
+  const cols='repeat('+state.weeks+',minmax(120px,1fr))';
+
+  let html='<div class="weeks" style="grid-template-columns:'+cols+'">';
+  for(let w=1;w<=state.weeks;w++){
+    const list=byWeek[w]||[];
+    const hrs=r1(list.reduce((s,x)=>s+x.hours,0));
+    html+=`<div class="wk"><h4>第 ${w} 周${w===state.weeks?' · 结课考核':''}</h4><div class="hrs">排期 ${hrs} h</div>`;
+    list.forEach(r=>{
+      if(r.course){
+        html+=`<div class="unit">
+          <div class="dim"><span>${esc(r.dim)}</span><span class="mono">L${r.course.lv}</span></div>
+          <div class="tt">${esc(r.course.t)}</div>
+          <div class="dim" style="margin-top:3px"><span>本单元 ${r.hours}h · 课程 ${r.course.h}h</span><span>${esc(r.priority)}</span></div>
+        </div>`;
+      }else{
+        html+=`<div class="unit ext">
+          <div class="dim"><span>${esc(r.dim)}</span><span>外部</span></div>
+          <div class="tt">库内暂无该维度课程</div>
+          <div class="dim" style="margin-top:3px"><span>建议外部机构采购</span></div>
+        </div>`;
+      }
+    });
+    if(!list.length) html+='<div style="font-size:11.5px;color:var(--ink3)">—</div>';
+    html+='</div>';
+  }
+  html+='</div>';
+
+  const {total}=totalHours();
+  html+=`<div class="note">排期合计 <b>${m.demand}h</b> · 课程学时合计 <b>${total}h</b> · 平台课程占比 <b>${Math.round(m.library*100)}%</b>`
+     + `　<span style="color:var(--ink3)">差额来自「排期学时」与「课程实际时长」的口径不同，两个数都对外暴露，不互相顶替。</span></div>`;
+
+  html+='<div style="margin-top:11px;display:flex;gap:8px"><button class="primary" onclick="publishPlan()">生成培训方案</button>'
+     +  '<button onclick="resetProgress()">清空模拟进度</button></div>';
+  body.innerHTML=html;
+}
+
+function renderProgress(){
+  updateProgressHead();
+  renderProgressRows();
+}
+
+function updateProgressHead(){
+  const info=progressInfo();
+  document.getElementById('lblNow').textContent=state.now+'%';
+  const head=document.getElementById('progHead');
+  if(!info.total){
+    head.innerHTML='<div style="font-size:12px;color:var(--ink3)">暂无进行中的学习任务</div>';
+    return;
+  }
+  const cls=alertClass(info.alert);
+  head.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;margin-bottom:5px">
+      <span>完成 <b class="mono">${info.done}h</b> / ${info.total}h　应完成 <b class="mono">${info.expected}h</b></span>
+      <span class="b ${cls}">${info.alert}</span>
+    </div>
+    <div class="bar"><i class="${cls}" style="width:${Math.min(100,Math.round(info.completion*100))}%"></i></div>
+    <div style="font-size:11px;color:var(--ink3);margin-top:4px">
+      完成率 ${Math.round(info.completion*100)}% · 落后 ${info.lag>0?Math.round(info.lag*100)+'%':'0%'}
+    </div>`;
+}
+
+function renderProgressRows(){
+  const m=matched();
+  const info=progressInfo();
+  const box=document.getElementById('progRows');
+  if(!info.total){ box.innerHTML=''; return; }
+  const dims=[];
+  m.rows.forEach(r=>{ if(r.course && !dims.includes(r.dim)) dims.push(r.dim); });
+  let html=dims.map(d=>{
+    const p=state.progress[d]||0;
+    return `<div class="prow" data-dim="${esc(d)}">
+      <div class="nm" title="${esc(d)}">${esc(d)}</div>
+      <input type="range" min="0" max="100" step="5" value="${p}" oninput="setProgress('${esc(d)}',this.value)">
+      <div class="pc">${p}%</div>
+    </div>`;
+  }).join('');
+  if(state.fake){
+    html+='<div class="alert amber" style="margin-top:10px"><div class="txt"><b>已标记疑似刷课。</b>上报学时只有应付学时的 10%，低于 30% 阈值——只标记、不阻断，留人工判断。</div></div>';
+  }
+  box.innerHTML=html;
+}
+
+function renderKpis(){
+  const m=matched();
+  const info=progressInfo();
+  const gs=gaps().filter(g=>!g.done);
+  document.getElementById('kpis').innerHTML=`
+    <div class="kpi"><div class="v">${gs.length}</div><div class="k">真短板</div></div>
+    <div class="kpi"><div class="v">${m.error?0:(info.total||0)}<small style="font-size:11px">h</small></div><div class="k">课程学时</div></div>
+    <div class="kpi"><div class="v">${m.error?'—':Math.round((m.library||0)*100)+'%'}</div><div class="k">平台课程占比</div></div>
+    <div class="kpi"><div class="v">${info.total?Math.round(info.completion*100)+'%':'—'}</div><div class="k">完成率</div></div>`;
+}
+
+function renderAll(){
+  renderPersons(); renderGaps(); renderPlan(); renderProgress(); renderKpis();
+}
+
+function selectPerson(i){ state.p=i; state.overrides={}; state.progress={}; state.events=[]; state.now=0; state.lastAlert=''; state.completedOnce=false;
+  document.getElementById('now').value=0; renderAll(); pushEvent('training.plan.created','切换人才，重新诊断并生成方案（模拟）'); }
+
+function setReq(dim,v){ const n=Math.max(0,Math.min(100,Number(v)||0)); state.overrides[dim]=n; renderAll(); }
+
+function onParam(){
+  state.weeks=+document.getElementById('weeks').value;
+  state.hpw=+document.getElementById('hpw').value;
+  document.getElementById('lblWeeks').textContent=state.weeks+' 周';
+  document.getElementById('lblHpw').textContent=state.hpw+' h';
+  renderGaps(); renderPlan(); renderProgress(); renderKpis();
+}
+
+function onNow(){
+  state.now=+document.getElementById('now').value;
+  updateProgressHead(); renderKpis();
+  syncAlertEvent();
+}
+
+function syncAlertEvent(){
+  const info=progressInfo(), a=info.alert;
+  if(a!==state.lastAlert && (a==='HR预警'||a==='提醒')){
+    pushEvent(a==='HR预警'?'training.lag.alert':'training.lag.remind',
+      `落后计划 ${Math.round(info.lag*100)}%（应完成 ${info.expected}h，实际 ${info.done}h）`,
+      a==='HR预警'?'hot':'');
+  }
+  state.lastAlert=a;
+}
+
+function onFake(){ state.fake=document.getElementById('fake').checked; renderProgress(); }
+
+function setProgress(dim,v){
+  state.progress[dim]=+v;
+  const info=progressInfo();
+  updateProgressHead(); renderKpis();
+  const pc=document.querySelector('.prow[data-dim="'+dim+'"] .pc');
+  if(pc) pc.textContent=v+'%';
+  if(info.total && info.done>=info.total && !state.completedOnce){
+    state.completedOnce=true;
+    pushEvent('learning_record.completed','进度达 100%，完成率记为 100%；未提交考核，passed 保持 null','ok');
+  }
+  syncAlertEvent();
+}
+
+function applySuggest(n){ document.getElementById('weeks').value=n; onParam(); pushEvent('plan.regenerated',`按建议把周期延长到 ${n} 周`,''); }
+
+function publishPlan(){
+  const m=matched();
+  if(m.error){ pushEvent('plan.rejected',m.error,'hot'); return; }
+  const {total}=totalHours();
+  pushEvent('training.plan.created',`计划已生成：${m.rows.length} 个学习单元，课程学时 ${total}h，第 ${state.weeks} 周结课考核`);
+  const ext=m.rows.filter(r=>!r.course).length;
+  if(ext) pushEvent('plan.degraded',`${ext} 个单元库内无课，已降级为外部学习建议`,'');
+}
+
+function resetProgress(){ state.progress={}; state.completedOnce=false; renderProgress(); renderKpis(); }
+
+function submitScore(){
+  const v=Number(document.getElementById('score').value);
+  if(!(v>=0&&v<=100)){ document.getElementById('verdict').textContent='分数必须在 0~100 之间。'; return; }
+  state.score=v;
+  const pass=v>=PASS;
+  const dims=[...new Set(matched().rows.map(r=>r.dim))];
+  document.getElementById('verdict').innerHTML=pass
+    ? `<b>通过（${v} 分）</b>　计划状态 → finished，无需人工介入。<br>
+       <span style="color:var(--ink3)">事件：training.retest.required，建议 2 周后复测，携带 ${dims.length} 个维度</span>`
+    : `<b>未通过（${v} 分，低于 80）</b>　计划状态保持 ongoing，need_human = true。<br>
+       <span style="color:var(--ink3)">事件：training.plan.adjust，建议延长 2 周并补强薄弱维度</span>`;
+  pushEvent(pass?'training.retest.required':'training.plan.adjust',
+    pass?`考核 ${v} 分通过，建议 2 周后复测（维度：${dims.join('、')}）`:`考核 ${v} 分未达 80，建议延长 2 周补强`,
+    pass?'ok':'hot');
+}
+
+function resetAll(){
+  state.p=0; state.weeks=4; state.hpw=8; state.overrides={}; state.progress={};
+  state.fake=false; state.now=0; state.events=[]; state.lastAlert=''; state.completedOnce=false;
+  document.getElementById('weeks').value=4;
+  document.getElementById('hpw').value=8;
+  document.getElementById('now').value=0;
+  document.getElementById('fake').checked=false;
+  document.getElementById('score').value=72;
+  document.getElementById('lblWeeks').textContent='4 周';
+  document.getElementById('lblHpw').textContent='8 h';
+  document.getElementById('verdict').textContent='尚未提交考核。';
+  renderAll();
+  pushEvent('training.plan.created','初始化演示：读取测评结果，按岗位能力模型完成诊断与排期');
+}
+
+resetAll();
+</script>
+</body>
+</html>

@@ -120,3 +120,70 @@ export function formatApiError(error: unknown): string {
   }
   return error instanceof Error ? error.message : '操作失败，请稍后重试';
 }
+
+/* ======================= 人才邀约（笔试 / 测评 / 面试间）[Agent组] ======================= */
+export type InviteType = 'written_test' | 'assessment' | 'interview';
+export type InviteChannel = 'sms' | 'email';
+
+export interface InviteCreatePayload {
+  type: InviteType;
+  talent_id?: number;
+  talent_name?: string;
+  mobile?: string;
+  email?: string;
+  channels: InviteChannel[];
+  question_count?: number;
+  duration_minutes?: number;
+  interview_time?: string;
+  expires_hours?: number;
+  title?: string;
+}
+export interface InviteSendResult { channel: string; ok: boolean; mode: string; error?: string | null }
+export interface InviteInfo {
+  id: number; talent_id?: number | null; talent_name?: string | null; type: InviteType; title: string;
+  token: string; url: string; status: string; channels: InviteChannel[]; send_results: InviteSendResult[];
+  question_count?: number | null; duration_minutes: number; interview_time?: string | null;
+  expires_at?: string | null; created_at?: string | null;
+}
+export interface InviteVisit {
+  type: InviteType; title: string; status: string; candidate_name?: string | null;
+  interview_time?: string | null; expires_at?: string | null; duration_minutes: number;
+  question_count?: number | null; proctor_enabled: boolean; proctor_engine: string;
+  frame_interval_seconds: number; ice_servers: { urls: string; username?: string; credential?: string }[];
+}
+export interface ExamQuestion { id: number; seq: number; type: 'single' | 'multiple' | 'text'; content: string; options?: { key: string; text: string }[] | null }
+export interface ExamStart {
+  status: string; started_at?: string | null; deadline?: string | null; questions: ExamQuestion[];
+  total_score: number; proctor_enabled: boolean; proctor_engine: string; frame_interval_seconds: number;
+}
+export interface ExamResult {
+  status: string; score?: number | null; total_score?: number | null; submitted_at?: string | null;
+  violations_count: number; pending_manual: boolean;
+}
+export interface FrameCheck {
+  enabled: boolean; engine: string; violations: { ts: number; type: string; detail: string }[];
+  total_violations: number; person_like: number;
+}
+
+export const invitesApi = {
+  create: (data: InviteCreatePayload) => request<InviteInfo>({ url: '/invites', method: 'post', data }),
+  list: (params?: { talent_id?: number; type?: InviteType; status?: string; keyword?: string; page?: number; page_size?: number }) =>
+    request<{ items: InviteInfo[]; total: number; page: number; page_size: number; pages: number }>({ url: '/invites', params }),
+  visit: (token: string) => request<InviteVisit>({ url: `/invites/visit/${encodeURIComponent(token)}` }),
+  examStart: (token: string) => request<ExamStart>({ url: `/invites/exam/${encodeURIComponent(token)}` }),
+  examSubmit: (token: string, answers: Record<string, unknown>) =>
+    request<ExamResult>({ url: `/invites/exam/${encodeURIComponent(token)}/submit`, method: 'post', data: { answers } }),
+  examFrame: (token: string, image: string) =>
+    request<FrameCheck>({ url: `/invites/exam/${encodeURIComponent(token)}/frame`, method: 'post', data: { image } }),
+  examResult: (token: string) => request<ExamResult>({ url: `/invites/exam/${encodeURIComponent(token)}/result` }),
+};
+
+/** 面试间信令 WS 地址（相对 baseURL 或绝对地址均可；保持与页面同协议）。 */
+export function inviteWsUrl(token: string, role: 'candidate' | 'interviewer'): string {
+  const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+  const url = base.startsWith('http') ? new URL(base) : new URL(base, window.location.origin);
+  url.protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  url.pathname = `${url.pathname.replace(/\/$/, '')}/invites/ws/${encodeURIComponent(token)}`;
+  url.search = `role=${role}`;
+  return url.toString();
+}

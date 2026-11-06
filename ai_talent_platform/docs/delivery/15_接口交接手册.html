@@ -1,0 +1,1591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>接口交接手册｜岗位人才匹配 Agent</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#fff; --ink:#1a1d21; --ink-2:#4a5158; --ink-3:#7a828a;
+    --line:#e5e8ec; --brand:#1f6feb; --brand-soft:#eaf2ff;
+    --ok:#1a7f4b; --ok-soft:#e8f6ee; --warn:#8a5a00; --warn-soft:#fff5e0;
+    --danger:#b42318; --danger-soft:#fdecea;
+    --mono:'SFMono-Regular',Consolas,'Liberation Mono',monospace;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.72 -apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;-webkit-font-smoothing:antialiased}
+  .layout{display:grid;grid-template-columns:246px minmax(0,1fr);gap:26px;max-width:1260px;margin:0 auto;padding:28px 22px 72px}
+  aside{position:sticky;top:24px;align-self:start;max-height:calc(100vh - 48px);overflow:auto}
+  aside .toc-title{font-size:11.5px;letter-spacing:.14em;color:var(--ink-3);font-weight:700;margin:0 0 10px 6px}
+  aside a{display:block;padding:6px 9px;border-radius:9px;color:var(--ink-2);text-decoration:none;font-size:12.8px;line-height:1.45;margin-bottom:1px}
+  aside a:hover{background:#eef2f7;color:var(--ink)}
+  aside a.active{background:var(--brand-soft);color:var(--brand);font-weight:600}
+  aside a.sub{padding-left:20px;font-size:12.2px;color:var(--ink-3)}
+  main{min-width:0}
+  header.hero{background:linear-gradient(135deg,#fff 0%,#f0f5ff 100%);border:1px solid var(--line);border-radius:16px;padding:26px 28px;margin-bottom:18px}
+  .eyebrow{font-size:12px;letter-spacing:.14em;color:var(--brand);font-weight:700}
+  h1{font-size:26px;line-height:1.35;margin:8px 0 6px}
+  .sub{color:var(--ink-2);font-size:14px;margin:0}
+  .badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .badge{font-size:12.5px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink-2)}
+  .badge.ok{background:var(--ok-soft);border-color:#bfe5cf;color:var(--ok);font-weight:600}
+  .badge.warn{background:var(--warn-soft);border-color:#f0dcb4;color:var(--warn);font-weight:600}
+  section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin-bottom:18px}
+  h2{font-size:19px;margin:0 0 4px;display:flex;align-items:center;gap:10px}
+  h2 .no{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;
+    background:var(--brand-soft);color:var(--brand);font:700 13px/1 var(--mono);flex:none}
+  h3{font-size:15.5px;margin:22px 0 8px;padding-top:2px}
+  h3:first-of-type{margin-top:12px}
+  p{margin:8px 0}
+  .lead{color:var(--ink-2);font-size:14px;margin:6px 0 14px}
+  code{font-family:var(--mono);font-size:12.6px;background:#f3f5f7;padding:2px 6px;border-radius:5px;color:#213547}
+  pre{background:#0f1419;color:#d7e0e7;border-radius:10px;padding:14px 16px;overflow:auto;margin:10px 0;font:12.5px/1.6 var(--mono)}
+  .copybar{display:flex;justify-content:space-between;align-items:center;background:#171d24;color:#93a1ad;
+    border-radius:10px 10px 0 0;padding:7px 12px;font-size:11.5px;letter-spacing:.04em;margin-top:12px}
+  .copybar+pre{margin-top:0;border-radius:0 0 10px 10px}
+  .btn{background:#22303c;color:#cfe0ec;border:1px solid #2e3f4d;border-radius:6px;font-size:11.5px;padding:3px 9px;cursor:pointer}
+  .btn:hover{background:#2c3d4b}
+  .btn.done{background:#1a5c3a;border-color:#256f47;color:#d8f5e6}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.4px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#fafbfc;color:var(--ink-3);font-weight:600;font-size:12.4px;white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  .pill{display:inline-block;font:700 11px/1 var(--mono);letter-spacing:.05em;padding:4px 7px;border-radius:5px;color:#fff;background:#7a828a}
+  .m-post{background:#1f6feb}.m-get{background:#1a7f4b}.m-put{background:#8a5a00}.m-del{background:#b42318}.m-patch{background:#6b4fbb}
+  .note{border-left:3px solid var(--brand);background:#fafbfc;border-radius:0 8px 8px 0;padding:10px 14px;color:var(--ink-2);font-size:13.4px;margin:12px 0}
+  .note.warn{border-left-color:#d9a300;background:#fffdf5}
+  .note.danger{border-left-color:var(--danger);background:#fffbfa}
+  .note.ok{border-left-color:var(--ok);background:#f6fdf9}
+  .note b{color:var(--ink)}
+  .note p{margin:4px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:12px 0}
+  .card{border:1px solid var(--line);border-radius:12px;padding:13px 15px;background:#fcfcfd}
+  .card h4{margin:0 0 6px;font-size:13.6px}
+  .card p{margin:0;font-size:12.9px;color:var(--ink-2)}
+  .tag{display:inline-block;font-size:11.5px;padding:2px 8px;border-radius:999px;background:#eef1f5;color:var(--ink-2);margin-right:4px}
+  .tag.ok{background:var(--ok-soft);color:var(--ok)}
+  .tag.bad{background:var(--danger-soft);color:var(--danger)}
+  .tag.warn{background:var(--warn-soft);color:var(--warn)}
+  .tag.auth{background:#f0ecff;color:#5b3fbf}
+  .steps{counter-reset:s;list-style:none;padding:0;margin:14px 0 0}
+  .steps li{position:relative;padding:0 0 0 34px;margin-bottom:10px;color:var(--ink-2);font-size:14px}
+  .steps li::before{counter-increment:s;content:counter(s);position:absolute;left:0;top:1px;width:22px;height:22px;border-radius:50%;
+    background:#eef2f7;color:var(--ink-2);font:700 12px/22px var(--mono);text-align:center}
+  .steps b{color:var(--ink)}
+  /* 接口卡片 */
+  .api{border:1px solid var(--line);border-radius:12px;padding:15px 17px;margin:14px 0;background:#fcfcfd}
+  .api-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+  .api-head .path{font:600 13.2px var(--mono);background:#eef2f7;padding:3px 8px;border-radius:6px;color:#1d3557}
+  .api h4{font-size:12.2px;color:var(--ink-3);letter-spacing:.08em;margin:14px 0 4px;font-weight:700}
+  .api table{margin:5px 0;font-size:13px}
+  .api table td:first-child{font-family:var(--mono);font-size:12.2px;white-space:nowrap;color:#1d3557}
+  .api table th{font-size:11.8px}
+  .req{color:#b42318;font-weight:700}
+  .opt{color:var(--ink-3)}
+  .api-purpose{font-size:13.8px;margin:6px 0 10px;color:var(--ink-2)}
+  .api-purpose b{color:var(--ink)}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 2px}
+  .meta span{font-size:12.3px;background:#fff;border:1px solid var(--line);border-radius:7px;padding:4px 9px;color:var(--ink-2)}
+  .meta span b{color:var(--ink);font-weight:600}
+  details{margin-top:10px}
+  details summary{cursor:pointer;font-size:12.5px;color:var(--brand);outline:none}
+  details summary:hover{text-decoration:underline}
+  details pre{margin-top:8px}
+  .flow{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:12px 0;font-size:12.6px}
+  .flow .node{background:#eef2f7;border-radius:7px;padding:5px 10px;color:#1d3557;font-weight:600}
+  .flow .arrow{color:var(--ink-3)}
+  footer{color:var(--ink-3);font-size:12.5px;text-align:center;padding:10px 0 0;line-height:1.9}
+  @media (max-width:920px){.layout{grid-template-columns:1fr;padding:18px 14px 60px}aside{display:none}.grid2,.grid3{grid-template-columns:1fr}}
+  @media print{body{background:#fff}aside{display:none}.layout{display:block;max-width:none;padding:0}section{break-inside:avoid;border-color:#ddd}.btn{display:none}details{display:block}details pre{display:block}}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside>
+  <p class="toc-title">目录</p>
+  <a href="#howto">0 · 怎么读这份文档</a>
+  <a href="#common">1 · 通用契约</a>
+  <a href="#map">2 · 接口全景表</a>
+  <a href="#auth">3 · 认证（6 个）</a>
+  <a href="#position">4 · 岗位与画像（3 个）</a>
+  <a href="#match">5 · 人岗匹配（5 个）</a>
+  <a href="#user">6 · 用户管理（8 个）</a>
+  <a href="#org">7 · 组织架构（7 个）</a>
+  <a href="#system">8 · 系统与运维（4 个）</a>
+  <a href="#stub">9 · 占位接口（8 个）</a>
+  <a href="#sandbox">10 · 沙箱 8011（11 个）</a>
+  <a href="#schema">11 · 数据结构字典</a>
+  <a href="#flow">12 · 谁调谁：三条链路</a>
+  <a href="#checklist">13 · 交接自查清单</a>
+</aside>
+
+<main>
+<header class="hero">
+  <div class="eyebrow">API HANDOVER · 接口交接手册 · V1.0</div>
+  <h1>每个接口：做什么、传什么、回什么、坑在哪</h1>
+  <p class="sub">面向接手人编写。覆盖真实服务（8010）全部 41 个操作与沙箱（8011）11 个接口，字段说明取自运行中的 OpenAPI，响应示例为实测抓取。</p>
+  <div class="badges">
+    <span class="badge ok">41 个操作 · 33 已实现 / 8 占位</span>
+    <span class="badge">数据源：8010 /openapi.json</span>
+    <span class="badge">实测时间：2026-11-04 15:14</span>
+    <span class="badge warn">岗位 / 人才 CRUD 未实现</span>
+  </div>
+</header>
+
+<section id="howto">
+  <h2><span class="no">0</span>怎么读这份文档</h2>
+  <p class="lead">这不是又一份 Swagger 截图。"目的"是业务语义，"输入/输出"是字段字典，"坑"是我实测踩出来的。三条阅读路径按角色分：</p>
+
+  <div class="grid3">
+    <div class="card">
+      <h4>你是前端</h4>
+      <p>读 <b>1 通用契约</b> → <b>2 全景表</b> → <b>3 认证</b> → <b>5 匹配</b>。<br>你只需要关心：怎么带 token、<code>data</code> 里长什么样、错误码怎么提示用户。</p>
+    </div>
+    <div class="card">
+      <h4>你是后端接手</h4>
+      <p>读 <b>1</b> → <b>4 岗位画像</b> → <b>5 匹配</b> → <b>11 数据结构</b>。<br>重点看"副作用"和"前置条件"，那是会写库、会拦请求的地方。</p>
+    </div>
+    <div class="card">
+      <h4>你对接 Dify / 算法</h4>
+      <p>只读三处：<b>4.1 JD 解析</b>、<b>5.1 执行匹配</b>、<b>5.5 生成解释</b>。<br>这三个是唯一会调外部模型的入口，其余全是纯数据库读写。</p>
+    </div>
+  </div>
+
+  <h3>图例</h3>
+  <table>
+    <tr><th>符号</th><th>含义</th></tr>
+    <tr><td><span class="pill m-get">GET</span> <span class="pill m-post">POST</span> <span class="pill m-put">PUT</span> <span class="pill m-del">DELETE</span> <span class="pill m-patch">PATCH</span></td><td>HTTP 方法。GET 只读、POST 多用于动作（跑批/解析/确认），PUT 整体更新，PATCH 局部改</td></tr>
+    <tr><td><span class="tag ok">已实现</span></td><td>能真实跑通、有数据、返回业务结果</td></tr>
+    <tr><td><span class="tag bad">501 占位</span></td><td>路由存在但未实现，统一返回 <code>code:501</code> + 模块名 + 实现位置提示</td></tr>
+    <tr><td><span class="tag auth">需鉴权</span></td><td>必须带 <code>Authorization: Bearer &lt;token&gt;</code>，否则 401</td></tr>
+    <tr><td><span class="req">必填</span> / <span class="opt">可选</span></td><td>请求体中该字段是否必须出现；路径参数一律必填</td></tr>
+  </table>
+
+  <div class="note">
+    <p><b>一条总原则：</b>所有接口都套同一个信封 <code>{code, message, data, trace_id}</code>。判断成功看 <code>code === 200</code>，不要看 HTTP 状态码——两者绝大多数时候一致，但 501 占位和部分业务错误会让你误判。</p>
+  </div>
+</section>
+
+<section id="common">
+  <h2><span class="no">1</span>通用契约</h2>
+  <p class="lead">先花三分钟看完这节，能省掉后面一半的联调问题。所有接口都遵守，不再逐个重复。</p>
+
+  <h3>1.1 统一响应信封</h3>
+  <div class="copybar"><span>任意接口 · 成功响应</span><button class="btn" data-copy='{"code":200,"message":"OK","data":{},"trace_id":"f887d1e103ff465c"}'>复制</button></div>
+  <pre>{
+  "code": 200,                 <span style="color:#7fb3ff">// 业务码，不是 HTTP 状态码</span>
+  "message": "OK",             <span style="color:#7fb3ff">// 给人看的提示，可直接弹给用户</span>
+  "data": { ... },             <span style="color:#7fb3ff">// 对象 / 数组 / null，形状随接口而变</span>
+  "trace_id": "f887d1e1..."    <span style="color:#7fb3ff">// 排障用：拿它去 logs/app.log 里 grep</span>
+}</pre>
+  <table>
+    <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+    <tr><td>code</td><td>int</td><td>200 成功；其余为失败。与 HTTP 状态码基本一致，但以本字段为准</td></tr>
+    <tr><td>message</td><td>string</td><td>中文提示，已适配前端直接展示。<b>不要用它判断业务结果</b>，文案会改</td></tr>
+    <tr><td>data</td><td>object / array / null</td><td>失败时通常为 <code>null</code>；501 时为 <code>{module, hint}</code></td></tr>
+    <tr><td>trace_id</td><td>string</td><td>每次请求唯一，串联日志用。提 bug 时请带上它</td></tr>
+  </table>
+
+  <h3>1.2 鉴权：怎么带、带多久、哪些不用带</h3>
+  <p>登录拿 <code>access_token</code>，之后每个请求加一个头：</p>
+  <div class="copybar"><span>HTTP Header</span><button class="btn" data-copy='Authorization: Bearer eyJhbGciOi...'>复制</button></div>
+  <pre>Authorization: Bearer &lt;access_token&gt;</pre>
+  <table>
+    <tr><th>项</th><th>实测值</th><th>说明</th></tr>
+    <tr><td>令牌形态</td><td>JWT（长字符串，约 300 字符）</td><td>无状态，<b>服务重启不失效</b>（沙箱是内存态 token，重启就失效——这是两套服务最大的行为差异）</td></tr>
+    <tr><td>有效期</td><td><code>expires_in: 86400</code>（24 小时）</td><td>登录时传 <code>remember_me: true</code> 延长到 7 天</td></tr>
+    <tr><td>刷新</td><td><code>POST /auth/refresh</code></td><td>用 <code>refresh_token</code> 换新的 access_token，前端应在 401 时自动重试一次</td></tr>
+    <tr><td>退出</td><td><code>POST /auth/logout</code></td><td>JWT 无状态，服务端<b>不会</b>让 token 立即失效，需前端自己丢弃</td></tr>
+  </table>
+  <p><b>无需鉴权的接口</b>（可直接访问，用于启动自检和登录）：</p>
+  <p><code>POST /api/v1/auth/login</code> · <code>POST /api/v1/auth/refresh</code> · <code>POST /api/v1/auth/register</code> · <code>GET /health</code> · <code>GET /health/ready</code> · <code>GET /api/v1/system/info</code> · <code>GET /api/v1/system/skills</code> · 以及 8 个 501 占位接口。</p>
+
+  <h3>1.3 分页：三件套 + 五个返回字段</h3>
+  <p>凡返回列表且可能很长的接口（<code>/users</code>、<code>/organizations</code>、<code>/matchings</code>），统一用这套参数：</p>
+  <table>
+    <tr><th>参数</th><th>类型</th><th>默认</th><th>说明</th></tr>
+    <tr><td>page</td><td>int</td><td>1</td><td>页码，<b>从 1 开始</b>（不是 0）</td></tr>
+    <tr><td>page_size</td><td>int</td><td>20</td><td>每页条数</td></tr>
+    <tr><td>order_by</td><td>string</td><td>null</td><td>排序字段，<b>走白名单校验</b>；传白名单外的字段不会报错，会按默认排序返回</td></tr>
+    <tr><td>order</td><td>string</td><td>desc</td><td><code>asc</code> / <code>desc</code></td></tr>
+  </table>
+  <p>返回统一是 <code>data: {items, total, page, page_size, pages}</code>。<b>分页器请用 <code>total</code> 和 <code>pages</code>，不要用 <code>items.length</code> 判断还有没有下一页。</b></p>
+
+  <h3>1.4 ID 与时间</h3>
+  <table>
+    <tr><th>类型</th><th>格式</th><th>当前库里的真实值</th></tr>
+    <tr><td>position_id</td><td>int 自增</td><td><b>只有 1</b>（后端开发工程师）。传 2 / 3 / 999 都是 404「岗位不存在」</td></tr>
+    <tr><td>talent_id</td><td>int 自增</td><td>1~5（张伟 / 李娜 / 王强 / 赵敏 / 陈晨）</td></tr>
+    <tr><td>user_id</td><td>int 自增</td><td>2 = admin，3 = hr_demo</td></tr>
+    <tr><td>org_id</td><td>int 自增</td><td>1 = 研发部（RD）</td></tr>
+    <tr><td>batch_id</td><td>32 位 hex</td><td>一次跑批一个，如 <code>7db4326126ab475780674dfd95ae7a80</code></td></tr>
+    <tr><td>时间</td><td>ISO8601，<b>无时区</b></td><td><code>2026-11-04T15:01:50</code>，按服务器本地时间（GMT+8）</td></tr>
+  </table>
+
+  <h3>1.5 错误码对照表（实测，非文档抄写）</h3>
+  <table>
+    <tr><th>HTTP</th><th>code</th><th>message 实际文案</th><th>触发场景</th></tr>
+    <tr><td>401</td><td>2001</td><td>请先登录</td><td>没带 Authorization 头</td></tr>
+    <tr><td>401</td><td>2001</td><td>登录凭证无效，请重新登录</td><td>token 过期 / 签名错 / 格式不对</td></tr>
+    <tr><td>401</td><td>2002</td><td>用户名或密码错误</td><td>登录失败</td></tr>
+    <tr><td>403</td><td>2004</td><td>权限不足，无法访问该资源</td><td>角色缺少对应权限码</td></tr>
+    <tr><td>404</td><td>3001</td><td>岗位不存在（id=2）</td><td>ID 格式对但数据不存在</td></tr>
+    <tr><td>404</td><td>3001</td><td>该岗位还没有匹配记录（position_id=1）</td><td>画像确认了但没跑过匹配</td></tr>
+    <tr><td>400</td><td>1002</td><td>画像版本已变化（期望 1，当前 2），请刷新后重试</td><td>确认画像时 <code>expected_version</code> 过期</td></tr>
+    <tr><td>400</td><td>1002</td><td>岗位画像尚未确认，不能执行匹配</td><td>跳过 confirm 直接 run</td></tr>
+    <tr><td>422</td><td>—</td><td>FastAPI 校验错误（<code>detail[]</code> 数组）</td><td>类型错、缺必填、字符串过短</td></tr>
+    <tr><td>500</td><td>5000</td><td>系统内部错误</td><td>未捕获异常。先看是不是用错 Python 解释器（缺 aiomysql）</td></tr>
+    <tr><td>501</td><td>501</td><td>xx模块尚未实现，请对接负责人</td><td>占位接口，见第 9 章</td></tr>
+  </table>
+  <div class="note warn">
+    <p><b>422 的响应体结构和业务错误不同</b>：业务错误是 <code>{code, message, data, trace_id}</code>，422 是 FastAPI 原生的 <code>{"detail":[{"loc":[...],"msg":"...","type":"..."}]}</code>。前端错误处理要兼容两种形状，否则参数校验失败时会白屏。</p>
+  </div>
+
+  <h3>1.6 占位接口的统一约定</h3>
+  <p>还没实现的 8 个模块不是 404，而是 <b>501 + 自解释</b>，这是刻意设计——让对接方能立刻知道该找谁：</p>
+  <pre>{
+  "code": 501,
+  "message": "人才档案模块尚未实现，请对接负责人",
+  "data": {
+    "module": "人才档案",
+    "hint": "人才档案 CRUD、画像查询、语义检索、档案合并（见 routers/talent_router.py）"
+  },
+  "trace_id": "dffbf1ecba854604"
+}</pre>
+</section>
+
+<section id="map">
+  <h2><span class="no">2</span>接口全景表</h2>
+  <p class="lead">41 个操作一页看完。按"业务模块"分组，不是按 Swagger 的字母序——交接时你更需要知道"这块归谁管"。</p>
+
+  <h3>2.1 已实现（33 个）</h3>
+  <table>
+    <tr><th>模块</th><th>方法</th><th>路径</th><th>一句话目的</th><th>鉴权</th></tr>
+    <tr><td rowspan="6">认证</td><td><span class="pill m-post">POST</span></td><td>/auth/login</td><td>换 token，一切请求的起点</td><td><span class="opt">否</span></td></tr>
+    <tr><td><span class="pill m-post">POST</span></td><td>/auth/refresh</td><td>用 refresh_token 续期</td><td><span class="opt">否</span></td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/auth/me</td><td>查我是谁、有什么权限</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-post">POST</span></td><td>/auth/logout</td><td>前端丢弃 token（服务端不失效）</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-post">POST</span></td><td>/auth/register</td><td>自助注册，默认 employee 角色</td><td><span class="opt">否</span></td></tr>
+    <tr><td><span class="pill m-post">POST</span></td><td>/auth/change-password</td><td>改自己的密码</td><td><span class="req">是</span></td></tr>
+
+    <tr><td rowspan="3">岗位与画像</td><td><span class="pill m-post">POST</span></td><td>/positions/{id}/jd/parse</td><td>JD 原文 → 结构化画像草稿</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/positions/{id}/profile</td><td>查画像 + 版本 + 是否已确认</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-post">POST</span></td><td>/positions/{id}/profile/confirm</td><td>确认画像，版本 +1，生效</td><td><span class="req">是</span></td></tr>
+
+    <tr><td rowspan="5">人岗匹配</td><td><span class="pill m-post">POST</span></td><td>/matchings/run</td><td><b>核心</b>：跑一次匹配，出四态榜单</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/matchings</td><td>历史台账，分页 + 三条件过滤</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/matchings/positions/{id}</td><td>某岗位最新一批完整结果</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/matchings/talents/{id}</td><td>某人才跨岗位历史</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-post">POST</span></td><td>/matchings/explain</td><td>为什么匹配/为什么被淘汰</td><td><span class="req">是</span></td></tr>
+
+    <tr><td rowspan="8">用户管理</td><td><span class="pill m-get">GET</span></td><td>/users</td><td>用户列表（关键词/部门/状态筛选）</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-post">POST</span></td><td>/users</td><td>建账号，可指定角色</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/users/{id}</td><td>用户详情</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-put">PUT</span></td><td>/users/{id}</td><td>改资料（不含密码）</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-del">DELETE</span></td><td>/users/{id}</td><td>删用户</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-post">POST</span></td><td>/users/{id}/reset-password</td><td>管理员重置密码</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-put">PUT</span></td><td>/users/{id}/roles</td><td>重设角色（覆盖式）</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-patch">PATCH</span></td><td>/users/{id}/status</td><td>启用/禁用，写审计</td><td><span class="req">是</span></td></tr>
+
+    <tr><td rowspan="7">组织架构</td><td><span class="pill m-get">GET</span></td><td>/organizations</td><td>部门分页列表</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-post">POST</span></td><td>/organizations</td><td>建部门（code 唯一）</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/organizations/tree</td><td>整棵树，带 children</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/organizations/{id}</td><td>部门详情</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-put">PUT</span></td><td>/organizations/{id}</td><td>改名/换负责人/启停</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-del">DELETE</span></td><td>/organizations/{id}</td><td>删部门</td><td><span class="req">是</span></td></tr>
+    <tr><td><span class="pill m-patch">PATCH</span></td><td>/organizations/{id}/move</td><td>换上级，重算层级并级联子孙</td><td><span class="req">是</span></td></tr>
+
+    <tr><td rowspan="4">系统</td><td><span class="pill m-get">GET</span></td><td>/health</td><td>存活探针（不看依赖）</td><td><span class="opt">否</span></td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/health/ready</td><td>就绪探针（真连 MySQL）</td><td><span class="opt">否</span></td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/system/info</td><td>框架装配全貌</td><td><span class="opt">否</span></td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/system/skills</td><td>已注册 AI Skills 及参数 Schema</td><td><span class="opt">否</span></td></tr>
+  </table>
+
+  <h3>2.2 占位（8 个，全部 501）</h3>
+  <table>
+    <tr><th>路径</th><th>模块</th><th>实现位置提示</th><th>阻塞什么</th></tr>
+    <tr><td>/talents</td><td>人才档案</td><td>routers/talent_router.py</td><td><b>P0</b>：没有它就没法新增候选人，只能靠种子数据</td></tr>
+    <tr><td>/resumes</td><td>简历管理</td><td>routers/resume_router.py</td><td><b>P0</b>：简历上传、AI 解析</td></tr>
+    <tr><td>/knowledge</td><td>知识库</td><td>routers/knowledge_router.py</td><td>P1：RAG 检索</td></tr>
+    <tr><td>/files</td><td>文件管理</td><td>routers/file_router.py</td><td>P1：MinIO 上传下载</td></tr>
+    <tr><td>/agents</td><td>AI 智能体</td><td>routers/agent_router.py</td><td>P2</td></tr>
+    <tr><td>/analytics</td><td>数据分析</td><td>routers/analytics_router.py</td><td>P2：依赖 PgSQL 分析库</td></tr>
+    <tr><td>/assessments</td><td>人才测评</td><td>routers/assessment_router.py</td><td>P2</td></tr>
+    <tr><td>/trainings</td><td>培训管理</td><td>routers/training_router.py</td><td>P2</td></tr>
+  </table>
+  <div class="note danger">
+    <p><b>交接时必须说清的两点：</b></p>
+    <p><b>① 岗位列表是 404，不是 501。</b>实测 <code>GET /api/v1/positions</code> 返回 <code>{"code":404,"message":"接口不存在"}</code>——因为这条路由<b>根本没注册</b>，连占位都没有。而 <code>/positions/{id}/profile</code> 是好的。也就是说<b>岗位的画像能管，岗位本身既不能建也不能列</b>。前端做"岗位列表页"时会在第一屏就卡住，这不是 bug，是缺口，且比 501 更难被发现。</p>
+    <p><b>② 其余 8 个模块是 501</b>，会明确告诉你"尚未实现 + 去哪个文件写"。两者要区别对待：501 可以直接在菜单里挂"建设中"，404 会让前端以为是接口地址写错。</p>
+  </div>
+</section>
+
+<section id="auth">
+  <h2><span class="no">3</span>认证模块（6 个）</h2>
+  <p class="lead">这组接口解决两件事：<b>证明你是谁</b>（login / refresh / me）、<b>管理你自己的凭据</b>（logout / register / change-password）。业务接口全部依赖这里拿到的 token，所以它是所有链路的第 0 步。</p>
+
+  <div class="api" id="api-login">
+    <div class="api-head">
+      <span class="pill m-post">POST</span><span class="path">/api/v1/auth/login</span>
+      <span class="tag ok">已实现</span><span class="tag">无需鉴权</span>
+    </div>
+    <p class="api-purpose"><b>干什么：</b>用账号密码换一对令牌，同时把用户身份、角色、权限码一次性返回，让前端能立刻渲染菜单。</p>
+    <div class="meta"><span><b>谁在用</b> 登录页</span><span><b>前置</b> 账号已创建且 is_active=true</span><span><b>副作用</b> 更新 users.last_login_at</span></div>
+
+    <h4>输入（Body · JSON）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>username</td><td>string</td><td><span class="req">是</span></td><td>登录名。实测：<code>admin</code></td></tr>
+      <tr><td>password</td><td>string</td><td><span class="req">是</span></td><td>明文密码，服务端比对哈希。<code>Admin@12345</code></td></tr>
+      <tr><td>remember_me</td><td>boolean</td><td><span class="opt">否</span></td><td>true 时 access_token 有效期从 24 小时延长到 7 天</td></tr>
+    </table>
+
+    <h4>输出（data）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>access_token</td><td>string</td><td>后续所有请求放进 <code>Authorization: Bearer &lt;它&gt;</code></td></tr>
+      <tr><td>refresh_token</td><td>string</td><td><b>只能</b>用来调 <code>/auth/refresh</code>，不能当 access_token 用</td></tr>
+      <tr><td>token_type</td><td>string</td><td>固定 <code>bearer</code></td></tr>
+      <tr><td>expires_in</td><td>int</td><td>秒。实测 86400</td></tr>
+      <tr><td>user</td><td>object</td><td>身份信息：id / username / real_name / roles / permissions 等</td></tr>
+      <tr><td>user.roles</td><td>string[]</td><td>角色<b>编码</b>数组，如 <code>["super_admin","admin"]</code></td></tr>
+      <tr><td>user.permissions</td><td>string[]</td><td>权限码数组，超管是 <code>["*"]</code>；前端据此控制按钮显隐</td></tr>
+    </table>
+
+    <details><summary>真实响应（实测，token 已截断）</summary>
+      <pre>{
+  "code": 200,
+  "message": "登录成功",
+  "data": {
+    "access_token": "eyUaoOnwIaHNOqU5LsPmJfQ3wNZ0KttUPBV3.ntEokPHwKh...",
+    "refresh_token": "eyVrfSwcGoTDIhO6HkAoFbQ2pUZ2UtlSBJN8.acOkbRCvGtZb...",
+    "token_type": "bearer",
+    "expires_in": 86400,
+    "user": {
+      "id": 2, "username": "admin", "real_name": "系统管理员",
+      "organization_id": null, "position_title": null,
+      "is_superuser": true,
+      "roles": ["super_admin", "admin"],
+      "permissions": ["*"]
+    }
+  },
+  "trace_id": "e8fb0156d5644733"
+}</pre>
+    </details>
+
+    <div class="note warn">
+      <p><b>坑 1：<code>user.roles</code> 在这里是字符串数组，但在 <code>GET /users</code> 里是对象数组</b>（<code>[{"id":3,"code":"hr","name":"hr"}]</code>）。同一份数据两种形状，前端如果复用同一个渲染函数会崩。</p>
+      <p><b>坑 2：别把 refresh_token 当 access_token 用</b>。两者都是长 JWT，肉眼几乎分不出，但签名用途不同，混用会 401。</p>
+    </div>
+  </div>
+
+  <div class="api">
+    <div class="api-head">
+      <span class="pill m-post">POST</span><span class="path">/api/v1/auth/refresh</span>
+      <span class="tag ok">已实现</span><span class="tag">无需鉴权</span>
+    </div>
+    <p class="api-purpose"><b>干什么：</b>access_token 快过期或已过期时，用 refresh_token 换一套新的，避免让用户重新登录。</p>
+    <div class="meta"><span><b>谁在用</b> 前端请求拦截器</span><span><b>前置</b> 手里有未过期的 refresh_token</span><span><b>副作用</b> 无</span></div>
+
+    <h4>输入（Body · JSON）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>refresh_token</td><td>string</td><td><span class="req">是</span></td><td>登录时返回的那个，<b>不要</b>加 Bearer 前缀</td></tr>
+    </table>
+
+    <h4>输出（data）</h4>
+    <p>结构同 <code>TokenResponse</code>：新的 <code>access_token</code> / <code>refresh_token</code> / <code>token_type</code> / <code>expires_in</code>。<b>不含 user</b>——要刷新用户信息请另调 <code>/auth/me</code>。</p>
+
+    <div class="note">
+      <p><b>推荐的拦截器写法：</b>遇到 401 且 code=2001 时，先判断本地有没有 refresh_token；有就调一次 refresh 并重放原请求，失败再跳登录页。只重试一次，避免死循环。</p>
+    </div>
+  </div>
+
+  <div class="api">
+    <div class="api-head">
+      <span class="pill m-get">GET</span><span class="path">/api/v1/auth/me</span>
+      <span class="tag ok">已实现</span><span class="tag auth">需鉴权</span>
+    </div>
+    <p class="api-purpose"><b>干什么：</b>凭当前 token 反查"我是谁"。刷新页面时用它恢复登录态，也是验证 token 是否还有效的最轻量方式。</p>
+    <div class="meta"><span><b>谁在用</b> 应用初始化、路由守卫</span><span><b>前置</b> 有效的 access_token</span><span><b>副作用</b> 无（纯读）</span></div>
+
+    <h4>输入</h4>
+    <p>无路径参数、无查询参数、无 Body。只靠请求头里的 Bearer token 识别身份。</p>
+
+    <h4>输出（data）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>id</td><td>int</td><td>用户 ID（admin 实测是 2，注意不是 1）</td></tr>
+      <tr><td>username / real_name</td><td>string</td><td>账号名与姓名</td></tr>
+      <tr><td>organization_id / organization_name</td><td>int/null · string/null</td><td>所属部门的 ID 与名称，Service 层补的名称</td></tr>
+      <tr><td>is_superuser</td><td>boolean</td><td>超管标记，为 true 时后端跳过权限码校验</td></tr>
+      <tr><td>roles</td><td>string[]</td><td>角色编码</td></tr>
+      <tr><td>permissions</td><td>string[]</td><td>权限码，<code>["*"]</code> 表示全部</td></tr>
+    </table>
+
+    <details><summary>真实响应</summary>
+      <pre>{"code":200,"message":"success","data":{"id":2,"username":"admin","real_name":"系统管理员",
+"avatar":null,"organization_id":null,"organization_name":null,"position_title":null,
+"is_superuser":true,"roles":["super_admin","admin"],"permissions":["*"]},"trace_id":"52363dac73f04063"}</pre>
+    </details>
+
+    <div class="note warn">
+      <p><b>注意 message 是 "success" 不是 "OK"</b>——这个接口的提示语和其他接口不统一。再次印证：<b>只判断 code，不要判断 message</b>。</p>
+    </div>
+  </div>
+
+  <div class="api">
+    <div class="api-head">
+      <span class="pill m-post">POST</span><span class="path">/api/v1/auth/logout</span>
+      <span class="tag ok">已实现</span><span class="tag auth">需鉴权</span>
+    </div>
+    <p class="api-purpose"><b>干什么：</b>语义上的退出。当前实现<b>不会</b>在服务端作废 token，只是返回成功让前端清本地存储。</p>
+    <div class="meta"><span><b>谁在用</b> 顶栏"退出登录"</span><span><b>前置</b> 已登录</span><span><b>副作用</b> 无（JWT 无状态）</span></div>
+
+    <h4>输入</h4>
+    <p>无参数、无 Body，只带 Bearer token。</p>
+    <h4>输出</h4>
+    <p><code>data</code> 为空（null 或空对象）。前端拿到 200 后：清除 localStorage 里的 token → 跳登录页。</p>
+
+    <div class="note danger">
+      <p><b>安全边界必须写进交接文档：</b>退出后旧 token 在过期前<b>仍然可用</b>（默认还有 24 小时）。如果要"强制下线"，需要引入 Redis 黑名单（记录 <code>jti + exp</code>）——当前 Redis 是 disabled，所以没做。</p>
+    </div>
+  </div>
+
+  <div class="api">
+    <div class="api-head">
+      <span class="pill m-post">POST</span><span class="path">/api/v1/auth/register</span>
+      <span class="tag ok">已实现</span><span class="tag">无需鉴权</span>
+    </div>
+    <p class="api-purpose"><b>干什么：</b>自助注册。注册出来的账号<b>默认绑 employee 角色</b>，权限很低，需要管理员再改角色。</p>
+    <div class="meta"><span><b>谁在用</b> 注册页（若开放）</span><span><b>前置</b> 用户名未被占用</span><span><b>副作用</b> 新增 users 记录 + user_roles 关联</span></div>
+
+    <h4>输入（Body · JSON）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>username</td><td>string</td><td><span class="req">是</span></td><td>4–32 位，仅字母 / 数字 / 下划线</td></tr>
+      <tr><td>password</td><td>string</td><td><span class="req">是</span></td><td><b>必须同时包含字母和数字</b>，否则 422</td></tr>
+      <tr><td>real_name</td><td>string/null</td><td><span class="opt">否</span></td><td>真实姓名</td></tr>
+      <tr><td>mobile</td><td>string/null</td><td><span class="opt">否</span></td><td>手机号</td></tr>
+      <tr><td>email</td><td>string/null</td><td><span class="opt">否</span></td><td>邮箱</td></tr>
+    </table>
+    <h4>输出（data）</h4>
+    <p>新建用户的信息，结构同 <code>UserResponse</code>（见 6.1），<b>不含任何密码字段</b>。</p>
+    <div class="note warn"><p><b>坑：</b>这个接口不需要鉴权，意味着任何人都能注册。生产环境应关掉或加邀请码——交接时要确认产品是否真的要开放。</p></div>
+  </div>
+
+  <div class="api">
+    <div class="api-head">
+      <span class="pill m-post">POST</span><span class="path">/api/v1/auth/change-password</span>
+      <span class="tag ok">已实现</span><span class="tag auth">需鉴权</span>
+    </div>
+    <p class="api-purpose"><b>干什么：</b>登录用户改<b>自己</b>的密码，必须提供原密码。</p>
+    <div class="meta"><span><b>谁在用</b> 个人设置页</span><span><b>前置</b> 已登录且旧密码正确</span><span><b>副作用</b> 更新 users.password_hash</span></div>
+
+    <h4>输入（Body · JSON）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>old_password</td><td>string</td><td><span class="req">是</span></td><td>当前密码，错了返回 400</td></tr>
+      <tr><td>new_password</td><td>string</td><td><span class="req">是</span></td><td>新密码，同样要求含字母和数字</td></tr>
+      <tr><td>confirm_password</td><td>string</td><td><span class="req">是</span></td><td>两次输入一致性由后端校验，不一致返回 400</td></tr>
+    </table>
+    <h4>输出</h4>
+    <p><code>data</code> 为空。改完前端应提示"请重新登录"并清 token——因为旧 token 不会自动失效，但用户的凭据已经变了。</p>
+    <div class="note"><p><b>和 <code>POST /users/{id}/reset-password</code> 的区别：</b>这里是"自己改，要旧密码"；那个是"管理员重置别人，不需要旧密码"。前端别调错。</p></div>
+  </div>
+</section>
+
+<section id="position">
+  <h2><span class="no">4</span>岗位与画像（3 个）</h2>
+  <p class="lead">这是整个系统的<b>输入端</b>：把一段人写的 JD，变成机器能判定的结构化条件。三件套是一条强制流水线——<b>解析 → 确认 → 才能匹配</b>，中间少一步，后面的 run 就报错。</p>
+
+  <div class="flow">
+    <span class="node">JD 原文</span><span class="arrow">→</span>
+    <span class="node">① jd/parse（草稿，不落库）</span><span class="arrow">→</span>
+    <span class="node">HR 修订</span><span class="arrow">→</span>
+    <span class="node">② profile/confirm（落库，版本+1）</span><span class="arrow">→</span>
+    <span class="node">③ matchings/run</span>
+  </div>
+
+  <div class="api">
+    <div class="api-head">
+      <span class="pill m-post">POST</span><span class="path">/api/v1/positions/{position_id}/jd/parse</span>
+      <span class="tag ok">已实现</span><span class="tag auth">需鉴权</span>
+    </div>
+    <p class="api-purpose"><b>干什么：</b>把 JD 原文解析成结构化岗位画像。走"<b>Dify 优先 → LLM 降级 → 规则兜底</b>"三级通道，返回里用 <code>channel</code> 如实标注走了哪一级。</p>
+    <div class="meta"><span><b>谁在用</b> HR 的"岗位画像"编辑页</span><span><b>前置</b> 岗位记录已存在</span><span><b>副作用</b> <b>不写库</b>，只是草稿</span></div>
+
+    <h4>输入</h4>
+    <table>
+      <tr><th>位置</th><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>path</td><td>position_id</td><td>int</td><td><span class="req">是</span></td><td>岗位 ID。库里只有 <code>1</code></td></tr>
+      <tr><td>body</td><td>jd_text</td><td>string</td><td><span class="req">是</span></td><td>JD 原文。实测 20 字以上正常；2 个字这种会被 422 拒掉</td></tr>
+      <tr><td>body</td><td>job_title</td><td>string/null</td><td><span class="opt">否</span></td><td>岗位名称。岗位表已有名称时不必传，仅用于校验解析结果</td></tr>
+    </table>
+
+    <h4>输出（data）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>channel</td><td>string</td><td>实际通道：<code>dify</code> / <code>llm_fallback</code> / <code>rule_fallback</code>。当前实测恒为 <code>rule_fallback</code>（Dify 未接通）</td></tr>
+      <tr><td>profile</td><td>JobProfileParsed</td><td>结构化画像，字段字典见 <b>11.1</b></td></tr>
+      <tr><td>message</td><td>string</td><td>提示语，含缺失字段说明</td></tr>
+    </table>
+
+    <details><summary>真实响应（实测 · 注意 required_conditions 是空数组）</summary>
+      <pre>{
+  "code": 200, "message": "解析完成",
+  "data": {
+    "channel": "rule_fallback",
+    "profile": {
+      "job_title": "后端开发工程师",
+      "responsibilities": ["岗位职责：负责企业级AI招聘平台的算法设计与落地，构建人岗匹配模型。..."],
+      "required_conditions": [],          <span style="color:#e6b800">// ⚠ 空数组，硬条件不在这里</span>
+      "preferred_conditions": [],
+      "required_skills": ["AI", "机器学习", "Python", "深度学习"],
+      "preferred_skills": [],
+      "min_education": "本科",
+      "min_work_years": 3,
+      "location": null, "salary_range": null,
+      "missing_fields": [], "conflicts": [],
+      "review_required": true,
+      "source": "manual", "prompt_version": "rule-v1"
+    },
+    "message": "解析完成"
+  },
+  "trace_id": "1a958be755644241"
+}</pre>
+    </details>
+
+    <div class="note danger">
+      <p><b>这是最容易读错结构的接口，务必记住：</b></p>
+      <p>真实的硬条件落在<b>扁平字段</b> <code>min_education</code> / <code>min_work_years</code> / <code>required_skills</code> 上，而 <code>required_conditions</code> 实测是<b>空数组</b>。如果你按"遍历 required_conditions 做硬过滤"的思路写代码，会得到"零条件、全员 PASS"的错误结果。</p>
+      <p>正确的读法：<code>required_conditions</code> 是文本级的条件条目（带 <code>source_span</code> 供人工追溯），结构化判定值在扁平字段里。</p>
+    </div>
+
+    <div class="note warn">
+      <p><b>副作用很重要：这个接口不落库。</b>解析结果只是返回给你，必须调 <code>profile/confirm</code> 才会写进 <code>position_requirements</code> 并生成新版本。所以"解析了但没确认"在库里是查不到的。</p>
+    </div>
+  </div>
+
+  <div class="api">
+    <div class="api-head">
+      <span class="pill m-get">GET</span><span class="path">/api/v1/positions/{position_id}/profile</span>
+      <span class="tag ok">已实现</span><span class="tag auth">需鉴权</span>
+    </div>
+    <p class="api-purpose"><b>干什么：</b>查岗位当前画像，同时告诉你<b>版本号</b>和<b>是否已确认</b>。确认画像前必须先调它拿 <code>version</code>，否则乐观锁会拒你。</p>
+    <div class="meta"><span><b>谁在用</b> 画像页、确认前的取版本、匹配前的前置检查</span><span><b>前置</b> 岗位存在</span><span><b>副作用</b> 无</span></div>
+
+    <h4>输入</h4>
+    <table>
+      <tr><th>位置</th><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>path</td><td>position_id</td><td>int</td><td><span class="req">是</span></td><td>岗位 ID</td></tr>
+      <tr><td>query</td><td>version</td><td>int/null</td><td><span class="opt">否</span></td><td>指定版本号可取<b>历史版本</b>；不传取最新。<b>取版本的历史用法，不要拿它做"强制复制"</b></td></tr>
+    </table>
+
+    <h4>输出（data · JobProfileView）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>position_id</td><td>int</td><td>岗位 ID</td></tr>
+      <tr><td>position_title</td><td>string</td><td>岗位名称（来自 positions 表，不是画像里的）</td></tr>
+      <tr><td>version</td><td>int</td><td><b>当前版本号</b>。实测 v11；每确认一次 +1</td></tr>
+      <tr><td>confirmed</td><td>boolean</td><td>是否已由 HR 确认。<b>false 时不能跑匹配</b></td></tr>
+      <tr><td>profile</td><td>JobProfileParsed</td><td>画像内容</td></tr>
+      <tr><td>confirmed_by</td><td>int/null</td><td>确认人用户 ID（实测 2 = admin）</td></tr>
+      <tr><td>confirmed_at</td><td>string/null</td><td>确认时间</td></tr>
+    </table>
+
+    <details><summary>真实响应（实测 v11）</summary>
+      <pre>{"code":200,"message":"OK","data":{"position_id":1,"position_title":"后端开发工程师",
+"version":11,"confirmed":true,
+"profile":{"job_title":"后端开发工程师",
+  "responsibilities":["1. 负责公司核心业务系统的后端服务开发，参与需求评审与技术方案设计；","2. 负责接口性能优化，保障系统稳定性；","3. 参与技术文档编写与代码评审。"],
+  "required_conditions":[],"preferred_conditions":[],
+  "required_skills":["Python","FastAPI","MySQL"],"preferred_skills":["Redis"],
+  "min_education":"本科","min_work_years":3,"location":null,"salary_range":"25k-35k",
+  "missing_fields":[],"conflicts":[],"review_required":true,
+  "source":"manual","prompt_version":"rule-v1"},
+"confirmed_by":2,"confirmed_at":"2026-11-04T12:24:57"},"trace_id":"f887d1e103ff465c"}</pre>
+    </details>
+
+    <div class="note"><p><b>version 为什么已经 11 了？</b>因为我联调时反复确认过 10 次，每次 +1。这正好说明版本号是<b>单调递增的审计链</b>，不是"画像更新次数"这种业务指标，别拿它做展示。</p></div>
+  </div>
+
+  <div class="api">
+    <div class="api-head">
+      <span class="pill m-post">POST</span><span class="path">/api/v1/positions/{position_id}/profile/confirm</span>
+      <span class="tag ok">已实现</span><span class="tag auth">需鉴权</span>
+    </div>
+    <p class="api-purpose"><b>干什么：</b>把画像"定稿"。写入 <code>position_requirements</code>，版本 +1，标记 <code>confirmed=true</code>，<b>从此这次匹配才允许用这个画像</b>。HR 可以先把 parse 结果改一改再确认。</p>
+    <div class="meta"><span><b>谁在用</b> 画像页的"确认"按钮</span><span><b>前置</b> 岗位存在；<code>expected_version</code> 必须等于当前版本</span><span><b>副作用</b> <b>写库</b>，新增一条版本记录</span></div>
+
+    <h4>输入</h4>
+    <table>
+      <tr><th>位置</th><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>path</td><td>position_id</td><td>int</td><td><span class="req">是</span></td><td>岗位 ID</td></tr>
+      <tr><td>body</td><td>profile</td><td>JobProfileParsed</td><td><span class="req">是</span></td><td>完整画像对象。<b>直接把 GET 回来的 profile 原样传回最省事</b>，要改就改后再传</td></tr>
+      <tr><td>body</td><td>expected_version</td><td>int/null</td><td><span class="opt">否</span></td><td>乐观锁。<b>必填的业务意义很强</b>：填当前 version，不一致就 400，防止覆盖别人的确认</td></tr>
+      <tr><td>body</td><td>note</td><td>string/null</td><td><span class="opt">否</span></td><td>确认备注，写进版本元数据（建议写"谁因为什么改了什么"）</td></tr>
+    </table>
+
+    <h4>输出（data · JobProfileView）</h4>
+    <p>结构同 4.2，但 <code>version</code> 已经 +1，<code>confirmed</code> 为 true，<code>confirmed_by</code> / <code>confirmed_at</code> 已填。</p>
+
+    <h4>典型请求体</h4>
+    <div class="copybar"><span>确认画像 · 先 GET profile 拿到 version 再填</span><button class="btn" data-copy='{"profile":{"job_title":"后端开发工程师","required_skills":["Python","FastAPI","MySQL"],"min_education":"本科","min_work_years":3},"expected_version":11,"note":"HR 修订：补充 FastAPI 要求"}'>复制</button></div>
+    <pre>{
+  "profile": { ... 从 GET /profile 拿到的 profile 原样 ... },
+  "expected_version": 11,
+  "note": "HR 修订：补充 FastAPI 要求"
+}</pre>
+
+    <div class="note warn">
+      <p><b>版本冲突是 400，不是 409。</b>实测返回 <code>{"code":1002,"message":"画像版本已变化（期望 1，当前 2），请刷新后重试"}</code>。前端遇到这个应该提示"有人刚改过，正在刷新"，然后重新拉取画像，而不是直接弹红色错误。</p>
+      <p><b>正确的两步写法：</b><code>GET /profile</code> 拿 <code>version</code> → 用户编辑 → <code>POST /confirm</code> 带 <code>expected_version=version</code>。</p>
+    </div>
+
+    <div class="note danger">
+      <p><b>会写库，慎重点：</b>每次确认都产生一个新版本，且不可回滚（只能再确认一次覆盖）。在真实服务上测试时，请不要循环点确认——会把 version 推到很高。</p>
+    </div>
+  </div>
+</section>
+
+<section id="match">
+  <h2><span class="no">5</span>人岗匹配（5 个）</h2>
+  <p class="lead">这是整个系统的<b>核心产出</b>。五个接口分两类：<b>算</b>（run / explain）和<b>查</b>（列表、按岗位、按人才）。算的会写库、可能调外部模型；查的全是纯读。</p>
+
+  <div class="note danger">
+    <p><b>先记住这条铁律，能避免 80% 的困惑：</b>匹配不是"打分排名"，是<b>四态硬条件判定 + 分数排序</b>。四种状态里<b>只有 FAIL 会被淘汰</b>，UNKNOWN（档案缺数据）和 NEEDS_REVIEW（需人工看）都会<b>保留在榜单里</b>。所以"榜单有 4 个人，但候选人 5 个"是正常现象。</p>
+  </div>
+
+  <h3>四态语义（贯穿全部 5 个接口）</h3>
+  <table>
+    <tr><th>状态</th><th>含义</th><th>是否淘汰</th><th>前端怎么展示</th></tr>
+    <tr><td><span class="tag ok">PASS</span></td><td>硬条件满足，有证据支撑</td><td>否</td><td>绿色"符合"</td></tr>
+    <tr><td><span class="tag bad">FAIL</span></td><td>明确不满足（如要求本科、实际大专）</td><td><b>是</b></td><td>红色"不符合"，并给原因</td></tr>
+    <tr><td><span class="tag warn">UNKNOWN</span></td><td>人才档案里没这项数据，<b>无法判定</b></td><td>否</td><td>灰色"待补充"，提示去补档案</td></tr>
+    <tr><td><span class="tag">NEEDS_REVIEW</span></td><td>数据有歧义或冲突，需人工判断</td><td>否</td><td>黄色"需复核"，进人工队列</td></tr>
+  </table>
+  <p><b>为什么 UNKNOWN 不淘汰？</b>因为"档案没写"不等于"不具备"。淘汰它等于把潜在合格者误杀，这在招聘场景里代价很高。这是我实测确认过的设计，也是这套系统与普通关键词筛选的本质区别。</p>
+
+  <div class="api">
+    <div class="api-head">
+      <span class="pill m-post">POST</span><span class="path">/api/v1/matchings/run</span>
+      <span class="tag ok">已实现</span><span class="tag auth">需鉴权</span>
+    </div>
+    <p class="api-purpose"><b>干什么：</b>对某岗位执行一次完整匹配：召回候选人 → 逐项硬条件四态判定 → 打分 → 排序 → 生成证据 → 落库。返回批次 ID、统计、榜单、淘汰名单。</p>
+    <div class="meta"><span><b>谁在用</b> HR 点"开始匹配"</span><span><b>前置</b> 画像已确认（否则 400）</span><span><b>副作用</b> <b>写库</b>：matching_records 新增一批</span></div>
+
+    <h4>输入（Body · JSON）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>必填</th><th>默认</th><th>说明</th></tr>
+      <tr><td>position_id</td><td>int</td><td><span class="req">是</span></td><td>—</td><td>岗位 ID</td></tr>
+      <tr><td>talent_ids</td><td>int[]/null</td><td><span class="opt">否</span></td><td>null</td><td>指定候选人。<b>为空 = 全库按岗位条件召回</b>；传了就只算这几个（适合"单独复算某人"）</td></tr>
+      <tr><td>top_k</td><td>int</td><td><span class="opt">否</span></td><td>—</td><td>返回人数上限，截断的是<b>输出</b>，不影响 stats 里的 candidates</td></tr>
+      <tr><td>min_score</td><td>float</td><td><span class="opt">否</span></td><td>—</td><td>最低分过滤。<b>只过滤输出，不改变排序</b>——第 5 名不会因为第 1 名被过滤就变成第 1</td></tr>
+      <tr><td>strategy</td><td>string</td><td><span class="opt">否</span></td><td>hybrid</td><td><code>hard</code> 只做硬过滤 / <code>soft</code> 只打分不淘汰 / <code>hybrid</code> 先硬后软</td></tr>
+      <tr><td>with_explanation</td><td>boolean</td><td><span class="opt">否</span></td><td>false</td><td>true 会调 Dify/LLM 生成解释，<b>有费用和延迟</b>；false 只用确定性规则</td></tr>
+      <tr><td>requirement_version</td><td>int/null</td><td><span class="opt">否</span></td><td>null</td><td>指定画像版本；为空用最新已确认版本</td></tr>
+    </table>
+
+    <h4>输出（data · MatchRunResponse）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>batch_id</td><td>string</td><td>本次跑批 ID（32 位 hex）。后续按岗位查、解释、批次对比都用它定位</td></tr>
+      <tr><td>position_id / position_title</td><td>int / string</td><td>岗位标识</td></tr>
+      <tr><td>requirement_version</td><td>int</td><td>本次用的画像版本（用来回答"当时按哪个标准算的"）</td></tr>
+      <tr><td>recall_mode</td><td>string</td><td>召回方式。<b>实测 <code>sql_fallback</code></b>（Milvus 未启用）。这是如实标注，不虚报"向量召回"</td></tr>
+      <tr><td>matched_at</td><td>string</td><td>跑批时间</td></tr>
+      <tr><td>stats</td><td>object</td><td>五个统计数，见下表</td></tr>
+      <tr><td>items</td><td>MatchItem[]</td><td>榜单，已按分数倒序，含 rank</td></tr>
+      <tr><td>excluded</td><td>ExcludedItem[]</td><td>被 FAIL 淘汰的人及逐条原因</td></tr>
+    </table>
+
+    <h4>stats 五个数怎么读（最容易搞错的地方）</h4>
+    <table>
+      <tr><th>字段</th><th>实测值</th><th>准确含义</th></tr>
+      <tr><td>candidates</td><td>5</td><td><b>参与判定</b>的候选人数（召回后的全集）</td></tr>
+      <tr><td>excluded_by_hard</td><td>2</td><td>因 <b>FAIL</b> 被淘汰的人数</td></tr>
+      <tr><td>unknown</td><td>1</td><td>存在 UNKNOWN 项的人数（<b>保留</b>在榜单里）</td></tr>
+      <tr><td>needs_review</td><td>1</td><td>存在 NEEDS_REVIEW 项的人数（<b>保留</b>）</td></tr>
+      <tr><td>output</td><td>3</td><td>最终返回人数 = candidates − excluded_by_hard（再受 top_k / min_score 影响）</td></tr>
+    </table>
+    <div class="note warn">
+      <p><b>不要写成 <code>candidates − unknown − needs_review</code>。</b>unknown / needs_review 是"标签计数"，一个人可能同时命中两个标签，它们和 output 不是加减关系。判断是否相等只看 <code>candidates − excluded_by_hard ≈ output</code>。</p>
+    </div>
+
+    <h4>items 里每一项（MatchItem）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>rank</td><td>int</td><td>名次，从 1 开始。0 表示未计算</td></tr>
+      <tr><td>talent_id / talent_name</td><td>int / string</td><td>候选人标识</td></tr>
+      <tr><td>score</td><td>float</td><td>综合分 0–100。<b>字段名是 score，不是 total_score</b></td></tr>
+      <tr><td>decision</td><td>enum</td><td>整体判定，按 <code>FAIL &gt; NEEDS_REVIEW &gt; UNKNOWN &gt; PASS</code> 聚合（取最严重的那个）</td></tr>
+      <tr><td>dimension_scores</td><td>object</td><td>四维分：<code>{skill, quality, education, experience}</code></td></tr>
+      <tr><td>defaulted_dimensions</td><td>string[]</td><td>因数据缺失而用默认值的维度——<b>这是可信度提示</b>，非空时分数要打折看</td></tr>
+      <tr><td>data_completeness</td><td>float</td><td>档案完整度 0–1</td></tr>
+      <tr><td>matched_skills</td><td>string[]</td><td>命中的技能（事实，非解释）</td></tr>
+      <tr><td>highlights / gaps</td><td>string[]</td><td>优势 / 差距说明（解释性文字）</td></tr>
+      <tr><td>hard_results</td><td>object[]</td><td><b>逐项四态明细</b>，是审计的核心，见 11.2</td></tr>
+      <tr><td>suggestion</td><td>string/null</td><td>适配建议</td></tr>
+      <tr><td>explanation_source</td><td>string/null</td><td>解释来源：dify / llm_fallback / rule_fallback；未生成为 null</td></tr>
+    </table>
+
+    <details><summary>真实响应（实测 · 已截断到第 1 名）</summary>
+      <pre>{"code":200,"message":"OK","data":{
+ "batch_id":"7db4326126ab475780674dfd95ae7a80","position_id":1,"position_title":"后端开发工程师",
+ "requirement_version":11,"recall_mode":"sql_fallback","matched_at":"2026-11-04T15:01:50",
+ "stats":{"candidates":5,"excluded_by_hard":2,"unknown":1,"needs_review":1,"output":3},
+ "items":[{
+   "talent_id":1,"talent_name":"张伟","rank":1,"decision":"PASS","score":99.5,
+   "dimension_scores":{"skill":100.0,"quality":95.0,"education":100.0,"experience":100.0},
+   "defaulted_dimensions":[],"data_completeness":1.0,
+   "matched_skills":["fastapi","mysql","python"],
+   "highlights":["min_education：学历满足：要求「本科」，实际「本科」",
+                  "min_work_years：工作年限满足：要求 3 年，实际 5 年",
+                  "required_skills：必备技能全部命中（3/3）"],
+   "gaps":[],
+   "hard_results":[
+     {"item":"min_education","required":"本科","actual":"本科","status":"PASS",
+      "reason":"学历满足：要求「本科」，实际「本科」","evidence_id":"EVID-1-1-1"},
+     {"item":"min_work_years","required":3.0,"actual":5.0,"status":"PASS",
+      "reason":"工作年限满足：要求 3 年，实际 5 年","evidence_id":"EVID-1-1-2"},
+     {"item":"required_skills","required":["fastapi","mysql","python"],
+      "actual":["fastapi","mysql","python"],"status":"PASS",
+      "reason":"必备技能全部命中（3/3）", ...}
+   ], ...}],
+ "excluded":[{"talent_id":2,"talent_name":"李娜","status":"FAIL",
+              "reasons":["min_education：学历不满足：要求「本科」，实际「大专」"]}, ...]
+}}</pre>
+    </details>
+
+    <div class="note danger">
+      <p><b>三个必须记住的字段事实：</b></p>
+      <p>1. 分数字段叫 <code>score</code>，不是 <code>total_score</code>（我第一版脚本就写错，全拿到 null）。</p>
+      <p>2. 证据 ID 形如 <code>EVID-{position_id}-{talent_id}-{seq}</code>，<b>每项硬条件一条</b>。UNKNOWN 项的 <code>evidence_id</code> 可以是 null。</p>
+      <p>3. <code>decision</code> 与 <code>hard_results[].status</code> 是两种粒度：前者是"这个人整体"，后者是"这一条条件"。</p>
+    </div>
+  </div>
+
+  <div class="api">
+    <div class="api-head">
+      <span class="pill m-get">GET</span><span class="path">/api/v1/matchings</span>
+      <span class="tag ok">已实现</span><span class="tag auth">需鉴权</span>
+    </div>
+    <p class="api-purpose"><b>干什么：</b>匹配记录的<b>历史台账</b>，一条 = 一次跑批里的一个候选人。用于"翻历史""按人筛""按分筛"，不是"看最新榜单"。</p>
+    <div class="meta"><span><b>谁在用</b> 匹配记录列表页</span><span><b>前置</b> 至少跑过一次</span><span><b>副作用</b> 无</span></div>
+
+    <h4>输入（Query）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>必填</th><th>默认</th><th>说明</th></tr>
+      <tr><td>position_id</td><td>int</td><td><span class="opt">否</span></td><td>null</td><td>按岗位过滤。<b>后端真实过滤</b>，不是前端筛</td></tr>
+      <tr><td>talent_id</td><td>int</td><td><span class="opt">否</span></td><td>null</td><td>按人才过滤</td></tr>
+      <tr><td>min_score</td><td>float</td><td><span class="opt">否</span></td><td>null</td><td>最低综合分</td></tr>
+      <tr><td>page / page_size</td><td>int</td><td><span class="opt">否</span></td><td>1 / 20</td><td>分页</td></tr>
+      <tr><td>order_by / order</td><td>string</td><td><span class="opt">否</span></td><td>null / desc</td><td>排序，白名单校验</td></tr>
+    </table>
+
+    <h4>输出（data · PageResult&lt;MatchHistoryItem&gt;）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>items[].batch_id</td><td>string</td><td>属于哪一批</td></tr>
+      <tr><td>items[].position_id / position_title</td><td>int / string</td><td>岗位（title 可能为 null，岗位被删时）</td></tr>
+      <tr><td>items[].talent_id / talent_name</td><td>int / string</td><td>人才（档案被删时 name 为 null）</td></tr>
+      <tr><td>items[].score</td><td>float</td><td>综合分</td></tr>
+      <tr><td>items[].strategy</td><td>string</td><td>当时用的策略</td></tr>
+      <tr><td>items[].requirement_version</td><td>int</td><td><b>当时的画像版本</b>——跨版本对比时靠它区分</td></tr>
+      <tr><td>items[].matched_at</td><td>string</td><td>跑批时间</td></tr>
+      <tr><td>items[].explanation_source</td><td>string/null</td><td>解释来源，未生成为 null</td></tr>
+      <tr><td>total / page / page_size / pages</td><td>int</td><td>实测 total = <b>67</b>，pages = 34（我跑了很多次批，累积下来的）</td></tr>
+    </table>
+
+    <div class="note warn">
+      <p><b>为什么 total 是 67，但 run 只返回 3 条？</b>因为这个接口查的是<b>历史累积台账</b>（每次跑批 × 每个候选人 = 一条），多次跑批会重复记录同一个人。想看"最新一批"请用 <code>/matchings/positions/{id}</code>，不要用这个。</p>
+      <p><b>过滤参数实测结果（2026-11-04 15:2x）：</b></p>
+      <p><code>（无过滤）67</code> · <code>position_id=1 → 67</code> · <code>talent_id=1 → 20</code> · <code>talent_id=99 → 0</code> · <code>min_score=90 → 38</code> · <code>position_id=1&talent_id=3 → 21</code></p>
+      <p><b>注意 <code>position_id=1</code> 没有让数字变小</b>——因为库里只有这一个岗位，按它筛等于不筛。这不是"过滤失效"，恰恰证明过滤是走 SQL 条件而不是硬编码。验证过滤是否真的生效，请用 <code>talent_id=99</code>（应得 0）或 <code>talent_id=1</code>（应得 20）。</p>
+    </div>
+  </div>
+
+  <div class="api">
+    <div class="api-head">
+      <span class="pill m-get">GET</span><span class="path">/api/v1/matchings/positions/{position_id}</span>
+      <span class="tag ok">已实现</span><span class="tag auth">需鉴权</span>
+    </div>
+    <p class="api-purpose"><b>干什么：</b>取该岗位<b>最近一次</b>跑批的完整结果——含 stats、榜单、淘汰名单。<b>从库里还原，不重算</b>，所以快且稳定。</p>
+    <div class="meta"><span><b>谁在用</b> 岗位详情页的"匹配结果"tab</span><span><b>前置</b> 该岗位跑过匹配</span><span><b>副作用</b> 无</span></div>
+
+    <h4>输入</h4>
+    <table>
+      <tr><th>位置</th><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>path</td><td>position_id</td><td>int</td><td><span class="req">是</span></td><td>岗位 ID</td></tr>
+    </table>
+    <p>输出结构与 <code>matchings/run</code> 的 <code>data</code> <b>完全一致</b>（batch_id / stats / items / excluded），可直接复用同一套渲染组件。</p>
+
+    <div class="note ok">
+      <p><b>这是前端最该用的接口。</b>"进入岗位页 → 看当前候选人"用它；只有用户主动点"重新匹配"时才调 run。两者返回同构，切换成本为零。</p>
+    </div>
+    <div class="note warn">
+      <p><b>坑：</b>如果该岗位<b>从未跑过</b>匹配，返回 404 / 3001「该岗位还没有匹配记录（position_id=1）」，而不是空列表。前端要把它处理成"空状态引导"，不要当错误弹窗。</p>
+    </div>
+  </div>
+
+  <div class="api">
+    <div class="api-head">
+      <span class="pill m-get">GET</span><span class="path">/api/v1/matchings/talents/{talent_id}</span>
+      <span class="tag ok">已实现</span><span class="tag auth">需鉴权</span>
+    </div>
+    <p class="api-purpose"><b>干什么：</b>看某位候选人在<b>各个岗位</b>上的历史匹配记录——"这个人还适合哪些岗位"。</p>
+    <div class="meta"><span><b>谁在用</b> 人才详情页</span><span><b>前置</b> 该人才参与过至少一次匹配</span><span><b>副作用</b> 无</span></div>
+
+    <h4>输入</h4>
+    <table>
+      <tr><th>位置</th><th>字段</th><th>类型</th><th>必填</th><th>默认</th><th>说明</th></tr>
+      <tr><td>path</td><td>talent_id</td><td>int</td><td><span class="req">是</span></td><td>—</td><td>人才 ID</td></tr>
+      <tr><td>query</td><td>limit</td><td>int</td><td><span class="opt">否</span></td><td>50</td><td>最多返回几条（按时间倒序）</td></tr>
+    </table>
+    <h4>输出（data）</h4>
+    <p><b>直接是数组</b>（不像 <code>/matchings</code> 包在 <code>items</code> 里），每项是 <code>MatchHistoryItem</code>。<b>无分页</b>，只有 limit。前端不要去找 <code>data.items</code>——这里没有。</p>
+
+    <details><summary>真实响应</summary>
+      <pre>{"code":200,"message":"OK","data":[
+ {"batch_id":"7db4326126ab475780674dfd95ae7a80","position_id":1,"position_title":"后端开发工程师",
+  "talent_id":1,"talent_name":"张伟","score":99.5,"strategy":"hybrid","requirement_version":11,
+  "matched_at":"2026-11-04T15:01:50","explanation_source":"rule_fallback"},
+ {"batch_id":"5bcff79e9db349bfa4d8f34a89a30bfb","position_id":1,"position_title":"后端开发工程师",
+  "talent_id":1,"talent_name":"张伟","score":99.5,"strategy":"hybrid","requirement_version":11,
+  "matched_at":"2026-11-04T13:35:54","explanation_source":"rule_fallback"}
+],"trace_id":"15e5ec160b1e4d8b"}</pre>
+    </details>
+    <div class="note"><p><b>同一个人同一岗位出现两条</b>，是因为跑了两批。做"该人才最佳匹配岗位"时记得前端按 position_id 去重取最高分。</p></div>
+  </div>
+
+  <div class="api">
+    <div class="api-head">
+      <span class="pill m-post">POST</span><span class="path">/api/v1/matchings/explain</span>
+      <span class="tag ok">已实现</span><span class="tag auth">需鉴权</span>
+    </div>
+    <p class="api-purpose"><b>干什么：</b>生成"为什么匹配 / 为什么没出现"的解释。<b>被淘汰的人也能调</b>——这正是它最大的价值：回答候选人"我为什么被刷"。</p>
+    <div class="meta"><span><b>谁在用</b> 候选人卡片上的"查看理由"</span><span><b>前置</b> 该岗位有已确认画像</span><span><b>副作用</b> 可能调外部模型（有费用），结果可缓存</span></div>
+
+    <h4>输入（Body · JSON）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>position_id</td><td>int</td><td><span class="req">是</span></td><td>岗位 ID</td></tr>
+      <tr><td>talent_id</td><td>int</td><td><span class="req">是</span></td><td>人才 ID</td></tr>
+      <tr><td>requirement_version</td><td>int/null</td><td><span class="opt">否</span></td><td>指定画像版本；为空用最新已确认</td></tr>
+    </table>
+
+    <h4>输出（data · MatchExplanation）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>summary</td><td>string</td><td>一句话总评，含四项计数（满足/不满足/缺失/待复核）与完整度</td></tr>
+      <tr><td>highlights</td><td>Claim[]</td><td>核心优势。<b>每条必须带 evidence_ids</b>，否则会被校验器剔除</td></tr>
+      <tr><td>gaps</td><td>Claim[]</td><td>能力差距</td></tr>
+      <tr><td>risks</td><td>Claim[]</td><td>潜在风险</td></tr>
+      <tr><td>interview_suggestions</td><td>string[]</td><td>建议面试问题</td></tr>
+      <tr><td>pending_verification</td><td>string[]</td><td>待核实事项（含 UNKNOWN 项与被剔除项）</td></tr>
+      <tr><td>rejected_claims</td><td>RejectedClaim[]</td><td><b>被校验器剔除的无依据结论</b>——这是防幻觉的关键字段，不要隐藏它</td></tr>
+      <tr><td>source</td><td>string</td><td>dify / llm_fallback / rule_fallback</td></tr>
+      <tr><td>prompt_version</td><td>string</td><td>提示词版本，用于 A/B 与回溯</td></tr>
+    </table>
+
+    <details><summary>真实响应（实测 · 张伟）</summary>
+      <pre>{"code":200,"message":"OK","data":{
+ "summary":"本次判定共 3 项硬性条件：满足 3 项、不满足 0 项、档案缺失 0 项、需人工复核 0 项；档案完整度 100%。（综合分 99.50）",
+ "highlights":[
+   {"text":"min_education：学历满足：要求「本科」，实际「本科」","evidence_ids":["EVID-1-1-1"],"claim_type":"fact"},
+   {"text":"min_work_years：工作年限满足：要求 3 年，实际 5 年","evidence_ids":["EVID-1-1-2"],"claim_type":"fact"},
+   {"text":"required_skills：必备技能全部命中（3/3）","evidence_ids":["EVID-1-1-3"],"claim_type":"fact"}],
+ "gaps":[],"risks":[],"interview_suggestions":[],"pending_verification":[],"rejected_claims":[],
+ "source":"rule_fallback","prompt_version":"rule-v1"},"trace_id":"d33577d4674245e7"}</pre>
+    </details>
+
+    <div class="note">
+      <p><b><code>claim_type</code> 只有两种：<code>fact</code>（事实陈述）和推断类。</b>推断类必须人工复核。前端可以用不同颜色区分——这是"AI 说话有边界"的体现。</p>
+      <p><b><code>rejected_claims</code> 非空不是 bug，是特性。</b>说明模型说了没证据的话，被校验器拦住了。交接时务必让前端展示（可以折叠），否则"零幻觉"这个卖点就看不见了。</p>
+    </div>
+  </div>
+</section>
+
+<section id="user">
+  <h2><span class="no">6</span>用户管理（8 个）</h2>
+  <p class="lead">标准 CRUD + 三个动作接口（重置密码 / 分配角色 / 启停）。这组是<b>已完成度最高、最可参照</b>的模块——如果你要新写岗位或人才 CRUD，照它的结构写就行。全部需鉴权，管理员类操作走权限码校验（超管 <code>["*"]</code> 直接通过）。</p>
+
+  <h3>6.1 先看输出模型：UserResponse</h3>
+  <p>8 个接口里有 5 个返回它，字段一次性记住：</p>
+  <table>
+    <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+    <tr><td>id</td><td>int</td><td>用户 ID</td></tr>
+    <tr><td>username</td><td>string</td><td>登录名，唯一，不可改</td></tr>
+    <tr><td>real_name / mobile / email / avatar</td><td>string/null</td><td>资料字段，都可能为 null</td></tr>
+    <tr><td>organization_id / organization_name</td><td>int/null · string/null</td><td>部门 ID 与名称（名称由 Service 补充）</td></tr>
+    <tr><td>position_title</td><td>string/null</td><td>职务</td></tr>
+    <tr><td>is_active</td><td>boolean</td><td>是否启用。false 时不能登录</td></tr>
+    <tr><td>is_superuser</td><td>boolean</td><td>超管标记</td></tr>
+    <tr><td>roles</td><td>object[]</td><td><b>对象数组</b>：<code>[{"id":3,"code":"hr","name":"hr"}]</code>。<br>⚠ 与 <code>/auth/me</code> 的字符串数组不同</td></tr>
+    <tr><td>last_login_at / created_at</td><td>string/null</td><td>时间，ISO8601</td></tr>
+  </table>
+  <div class="note danger"><p><b>结构里没有任何密码字段</b>——这是刻意设计。后端不会返回 password_hash，前端也不要传密码进 PUT。</p></div>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-get">GET</span><span class="path">/api/v1/users</span><span class="tag ok">已实现</span><span class="tag auth">需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b>用户列表，支持关键词、部门、启停状态三个筛选条件，分页返回。</p>
+    <div class="meta"><span><b>谁在用</b> 系统设置 → 用户管理</span><span><b>前置</b> 无</span><span><b>副作用</b> 无</span></div>
+    <h4>输入（Query，全部可选）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>keyword</td><td>string</td><td>模糊搜索，匹配 <b>用户名 / 姓名 / 手机号 / 邮箱</b> 四个字段</td></tr>
+      <tr><td>organization_id</td><td>int</td><td>按部门筛</td></tr>
+      <tr><td>is_active</td><td>boolean</td><td>按启停状态筛</td></tr>
+      <tr><td>page / page_size / order_by / order</td><td>—</td><td>分页排序，见 1.3</td></tr>
+    </table>
+    <h4>输出（data）</h4>
+    <p><code>{items: UserResponse[], total, page, page_size, pages}</code>。实测库里有 2 个用户：admin（id=2）、hr_demo（id=3）。</p>
+    <div class="note warn"><p><b>坑：</b><code>keywords</code> 是错的，参数名是 <code>keyword</code>（单数）。传错不会报错，会静默忽略——这是最常见的"筛选不生效"原因。</p></div>
+  </div>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-post">POST</span><span class="path">/api/v1/users</span><span class="tag ok">已实现</span><span class="tag auth">需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b>管理员建账号，可以一次性指定部门和多个角色（区别于自助注册只能拿 employee）。</p>
+    <div class="meta"><span><b>谁在用</b> 用户管理页"新增"</span><span><b>前置</b> username 未被占用</span><span><b>副作用</b> 写 users + user_roles</span></div>
+    <h4>输入（Body · JSON）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>username</td><td>string</td><td><span class="req">是</span></td><td>登录名，唯一</td></tr>
+      <tr><td>password</td><td>string</td><td><span class="req">是</span></td><td>初始密码，<b>需含字母和数字</b></td></tr>
+      <tr><td>real_name</td><td>string/null</td><td><span class="opt">否</span></td><td>姓名</td></tr>
+      <tr><td>mobile / email</td><td>string/null</td><td><span class="opt">否</span></td><td>联系方式</td></tr>
+      <tr><td>organization_id</td><td>int/null</td><td><span class="opt">否</span></td><td>所属部门。实测只有 1（研发部）</td></tr>
+      <tr><td>position_title</td><td>string/null</td><td><span class="opt">否</span></td><td>职务</td></tr>
+      <tr><td>is_active</td><td>boolean</td><td><span class="opt">否</span></td><td>默认启用</td></tr>
+      <tr><td>role_codes</td><td>string[]</td><td><span class="opt">否</span></td><td>角色<b>编码</b>数组，如 <code>["hr"]</code>。是编码不是 id</td></tr>
+    </table>
+    <h4>输出（data）</h4>
+    <p>新建的 UserResponse，含刚分配的角色。</p>
+  </div>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-get">GET</span><span class="path">/api/v1/users/{user_id}</span><span class="tag ok">已实现</span><span class="tag auth">需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b>查单个用户详情，用于编辑页回填。</p>
+    <div class="meta"><span><b>谁在用</b> 用户编辑页</span><span><b>前置</b> 用户存在</span><span><b>副作用</b> 无</span></div>
+    <h4>输入</h4>
+    <p>Path 参数 <code>user_id</code>（int，必填）。无 Body、无 Query。</p>
+    <h4>输出</h4>
+    <p>单个 UserResponse。</p>
+  </div>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-put">PUT</span><span class="path">/api/v1/users/{user_id}</span><span class="tag ok">已实现</span><span class="tag auth">需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b>改用户资料。<b>不含用户名、密码、角色、启用状态</b>——那三样各有专属接口。</p>
+    <div class="meta"><span><b>谁在用</b> 用户编辑页"保存"</span><span><b>前置</b> 用户存在</span><span><b>副作用</b> 更新 users（部分字段）</span></div>
+    <h4>输入</h4>
+    <table>
+      <tr><th>位置</th><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>path</td><td>user_id</td><td>int</td><td><span class="req">是</span></td><td>用户 ID</td></tr>
+      <tr><td>body</td><td>real_name / mobile / email / avatar / organization_id / position_title</td><td>—</td><td><span class="opt">全部可选</span></td><td><b>只传要改的字段</b>；不传的保持原值</td></tr>
+    </table>
+    <h4>输出</h4>
+    <p>更新后的 UserResponse。</p>
+    <div class="note"><p><b>为什么没有 username：</b>登录名是审计锚点，改了会断掉历史记录归属。同理密码走 <code>reset-password</code>、角色走 <code>roles</code>、启停走 <code>status</code>——<b>单字段单接口</b>，便于审计和权限细分。这个设计值得沿用。</p></div>
+  </div>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-del">DELETE</span><span class="path">/api/v1/users/{user_id}</span><span class="tag ok">已实现</span><span class="tag auth">需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b>删用户。</p>
+    <div class="meta"><span><b>谁在用</b> 用户管理页"删除"</span><span><b>前置</b> 用户存在</span><span><b>副作用</b> 删除用户及其角色关联</span></div>
+    <h4>输入 / 输出</h4>
+    <p>输入只有 path 的 <code>user_id</code>；输出 <code>data</code> 为空。</p>
+    <div class="note warn"><p><b>未实测（会改数据，我没删）。</b>交接时必须确认一件事：这是<b>物理删除</b>还是<b>软删除</b>（置 is_active=false）？如果用户已产生匹配记录、审计日志，物理删除会让 <code>confirmed_by</code> 变成悬空外键。建议生产上改成软删——这一点请找后端负责人确认后再定。</p></div>
+  </div>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-post">POST</span><span class="path">/api/v1/users/{user_id}/reset-password</span><span class="tag ok">已实现</span><span class="tag auth">需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b>管理员重置<b>别人</b>的密码，<b>不需要旧密码</b>。用于"员工忘密码"。</p>
+    <div class="meta"><span><b>谁在用</b> 用户管理页"重置密码"</span><span><b>前置</b> 操作用户有管理权限</span><span><b>副作用</b> 更新 password_hash</span></div>
+    <h4>输入</h4>
+    <table>
+      <tr><th>位置</th><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>path</td><td>user_id</td><td>int</td><td><span class="req">是</span></td><td>被重置的用户</td></tr>
+      <tr><td>body</td><td>new_password</td><td>string</td><td><span class="req">是</span></td><td>新密码，同样需含字母和数字</td></tr>
+    </table>
+    <h4>输出</h4>
+    <p><code>data</code> 为空。建议前端重置后提示"已重置，请通知本人用新密码登录"。</p>
+  </div>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-put">PUT</span><span class="path">/api/v1/users/{user_id}/roles</span><span class="tag ok">已实现</span><span class="tag auth">需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b>重设用户的角色集合。</p>
+    <div class="meta"><span><b>谁在用</b> 用户管理页"分配角色"</span><span><b>前置</b> 角色编码存在</span><span><b>副作用</b> <b>覆盖</b> user_roles</span></div>
+    <h4>输入</h4>
+    <table>
+      <tr><th>位置</th><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>path</td><td>user_id</td><td>int</td><td><span class="req">是</span></td><td>用户 ID</td></tr>
+      <tr><td>body</td><td>role_codes</td><td>string[]</td><td><span class="req">是</span></td><td><b>覆盖式</b>：传什么就是什么。想"加一个"也必须把原有的全带上</td></tr>
+    </table>
+    <h4>输出</h4>
+    <p>更新后的 UserResponse（roles 已变）。</p>
+    <div class="note danger"><p><b>这是最容易被误用的接口。</b>如果只想加 hr 角色而传 <code>["hr"]</code>，用户原有的 admin 角色会被<b>删掉</b>。前端应该做成多选（默认勾选当前角色），而不是"新增一个角色"的输入框。</p></div>
+  </div>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-patch">PATCH</span><span class="path">/api/v1/users/{user_id}/status</span><span class="tag ok">已实现</span><span class="tag auth">需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b>启用 / 禁用账号。禁用后<b>不能登录</b>，但历史数据仍在。</p>
+    <div class="meta"><span><b>谁在用</b> 用户管理页的开关</span><span><b>前置</b> 用户存在</span><span><b>副作用</b> 更新 is_active + <b>写审计日志</b></span></div>
+    <h4>输入</h4>
+    <table>
+      <tr><th>位置</th><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>path</td><td>user_id</td><td>int</td><td><span class="req">是</span></td><td>用户 ID</td></tr>
+      <tr><td>body</td><td>is_active</td><td>boolean</td><td><span class="req">是</span></td><td>true 启用 / false 禁用</td></tr>
+      <tr><td>body</td><td>reason</td><td>string/null</td><td><span class="opt">否</span></td><td>变更原因，<b>写入审计</b>。强烈建议必填（前端可以默认提示"离职 / 转岗 / 安全事件"）</td></tr>
+    </table>
+    <h4>输出</h4>
+    <p>更新后的 UserResponse。</p>
+    <div class="note ok"><p><b>这是全项目唯一带 <code>reason</code> 审计字段的接口</b>，说明设计上意识到了"谁在什么时候为什么改了状态"的重要性。新人接手时请保持这个习惯：<b>凡是改变人可见状态的操作，都留 reason</b>。</p></div>
+  </div>
+</section>
+
+<section id="org">
+  <h2><span class="no">7</span>组织架构（7 个）</h2>
+  <p class="lead">树形部门的增删改查 + 移动。比普通 CRUD 多两件事：<b>树结构维护</b>（level / path / children）和<b>移动时的级联修正</b>。</p>
+
+  <h3>7.0 先理解 level 与 path</h3>
+  <p>每个部门存两个冗余字段，用来避免递归查询：</p>
+  <table>
+    <tr><th>字段</th><th>含义</th><th>实测值</th></tr>
+    <tr><td>level</td><td>层级深度，根为 1，子级 +1</td><td>研发部 level=1</td></tr>
+    <tr><td>path</td><td>从根到自己的 ID 路径串，用于前缀匹配查子孙</td><td>类似 <code>/1</code>；子部门是 <code>/1/5</code></td></tr>
+  </table>
+  <p>所以<b>移动部门时必须重算自己 + 所有子孙的 level 和 path</b>，这就是 <code>PATCH /move</code> 存在的原因——不能直接改 <code>parent_id</code>。</p>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-get">GET</span><span class="path">/api/v1/organizations</span><span class="tag ok">已实现</span><span class="tag auth">需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b>部门<b>分页列表</b>（不是树）。用于表格视图或下拉选择器。</p>
+    <div class="meta"><span><b>谁在用</b> 组织管理表格、用户表单的部门下拉</span><span><b>前置</b> 无</span><span><b>副作用</b> 无</span></div>
+    <h4>输入（Query）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>keyword</td><td>string</td><td><span class="opt">否</span></td><td>按<b>名称或编码</b>模糊搜索</td></tr>
+      <tr><td>page / page_size / order_by / order</td><td>—</td><td><span class="opt">否</span></td><td>分页排序</td></tr>
+    </table>
+    <h4>输出（data · PageResult&lt;OrgResponse&gt;）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>id / parent_id</td><td>int / int-null</td><td>自身与上级（根为 null）</td></tr>
+      <tr><td>code / name</td><td>string</td><td>编码（唯一、不可改）与名称</td></tr>
+      <tr><td>level / path</td><td>int / string</td><td>层级与路径，见 7.0</td></tr>
+      <tr><td>leader_id / leader_name</td><td>int-null / string-null</td><td>负责人，名称由 Service 补</td></tr>
+      <tr><td>sort / is_active / remark</td><td>—</td><td>排序号（越小越前）、启用、备注</td></tr>
+      <tr><td>user_count</td><td>int</td><td>部门在职人数，<b>Service 统计</b>，不是表字段</td></tr>
+      <tr><td>created_at</td><td>string</td><td>创建时间</td></tr>
+    </table>
+    <div class="note"><p>实测库里只有 1 个部门：<code>{id:1, code:"RD", name:"研发部", level:1, user_count:0}</code>。数据量太小，看不出树的行为——做多级删除/移动测试前需要先造数据。</p></div>
+  </div>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-post">POST</span><span class="path">/api/v1/organizations</span><span class="tag ok">已实现</span><span class="tag auth">需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b>新建部门。服务端会根据 <code>parent_id</code> 自动推导 <code>level</code> 和 <code>path</code>。</p>
+    <div class="meta"><span><b>谁在用</b> 组织管理"新增部门"</span><span><b>前置</b> code 未被占用；父部门存在</span><span><b>副作用</b> 写 organizations</span></div>
+    <h4>输入（Body · JSON）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>code</td><td>string</td><td><span class="req">是</span></td><td>部门编码，<b>唯一</b>，建后不可改（如 <code>RD</code> / <code>RD_BACKEND</code>）</td></tr>
+      <tr><td>name</td><td>string</td><td><span class="req">是</span></td><td>部门名称（如"后端组"）</td></tr>
+      <tr><td>parent_id</td><td>int/null</td><td><span class="opt">否</span></td><td>上级部门；<b>null = 根部门</b></td></tr>
+      <tr><td>leader_id</td><td>int/null</td><td><span class="opt">否</span></td><td>负责人用户 ID</td></tr>
+      <tr><td>sort</td><td>int</td><td><span class="opt">否</span></td><td>排序号，<b>越小越靠前</b></td></tr>
+      <tr><td>is_active</td><td>boolean</td><td><span class="opt">否</span></td><td>默认启用</td></tr>
+      <tr><td>remark</td><td>string/null</td><td><span class="opt">否</span></td><td>备注</td></tr>
+    </table>
+    <h4>输出</h4>
+    <p>新建的 OrgResponse（含自动算出的 level / path）。</p>
+  </div>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-get">GET</span><span class="path">/api/v1/organizations/tree</span><span class="tag ok">已实现</span><span class="tag auth">需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b>返回<b>整棵树</b>，已按 sort 排好序，子节点嵌在 <code>children</code> 里。用于左侧树形导航。</p>
+    <div class="meta"><span><b>谁在用</b> 组织架构页、任何需要部门树的组件</span><span><b>前置</b> 无</span><span><b>副作用</b> 无</span></div>
+    <h4>输入</h4>
+    <p>无参数，<b>不分页</b>（返回全量树）。</p>
+    <h4>输出（data · OrgTreeNode[]）</h4>
+    <p>数组，每个节点含 <code>id / parent_id / code / name / leader_id / sort / is_active / user_count / children[]</code>。<code>children</code> 递归同样的结构，叶子节点为空数组。</p>
+    <details><summary>真实响应</summary>
+      <pre>{"code":200,"message":"success","data":[
+ {"id":1,"parent_id":null,"code":"RD","name":"研发部","leader_id":null,
+  "sort":0,"is_active":true,"user_count":0,"children":[]}
+],"trace_id":"c25864144e5044b3"}</pre>
+    </details>
+    <div class="note warn"><p><b>坑：<code>data</code> 是数组，不是 <code>{items:[]}</code>。</b>和 <code>GET /organizations</code> 的形状不同，别复用同一段解析代码。另外它不带 <code>level</code>/<code>path</code>/<code>remark</code>，要完整字段请用详情接口。</p></div>
+  </div>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-get">GET</span><span class="path">/api/v1/organizations/{org_id}</span><span class="tag ok">已实现</span><span class="tag auth">需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b>查单个部门完整详情（含 level / path / remark / user_count），用于编辑页回填。</p>
+    <div class="meta"><span><b>谁在用</b> 部门编辑页</span><span><b>前置</b> 部门存在</span><span><b>副作用</b> 无</span></div>
+    <h4>输入 / 输出</h4>
+    <p>输入只有 path 的 <code>org_id</code>；输出单个 OrgResponse。</p>
+  </div>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-put">PUT</span><span class="path">/api/v1/organizations/{org_id}</span><span class="tag ok">已实现</span><span class="tag auth">需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b>改部门信息。<b>注意：改不了 code，也改不了上级</b>——换上级必须走 <code>/move</code>。</p>
+    <div class="meta"><span><b>谁在用</b> 部门编辑页"保存"</span><span><b>前置</b> 部门存在</span><span><b>副作用</b> 更新 organizations 指定字段</span></div>
+    <h4>输入</h4>
+    <table>
+      <tr><th>位置</th><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>path</td><td>org_id</td><td>int</td><td><span class="req">是</span></td><td>部门 ID</td></tr>
+      <tr><td>body</td><td>name / leader_id / sort / is_active / remark</td><td>—</td><td><span class="opt">全部可选</span></td><td>只传要改的字段</td></tr>
+    </table>
+    <h4>输出</h4>
+    <p>更新后的 OrgResponse。</p>
+    <div class="note"><p><b>为什么 code 不可改：</b>编码通常被外部系统（HR 系统、SSO）当稳定标识。改 code 会造成映射断裂。这条约束<b>没有在接口上强制报错，是"不接收该字段"的软约束</b>——前端别把 code 放进编辑表单。</p></div>
+  </div>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-del">DELETE</span><span class="path">/api/v1/organizations/{org_id}</span><span class="tag ok">已实现</span><span class="tag auth">需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b>删部门。</p>
+    <div class="meta"><span><b>谁在用</b> 组织管理"删除"</span><span><b>前置</b> 部门存在（是否有子部门/在职人员的前置校验<b>需确认</b>）</span><span><b>副作用</b> 删 organizations 记录</span></div>
+    <h4>输入 / 输出</h4>
+    <p>输入只有 path 的 <code>org_id</code>；输出 <code>data</code> 为空。</p>
+    <div class="note danger"><p><b>未实测（会改数据）。</b>交接时务必向后端确认三件事：① 有子部门时是拒绝还是级联删？② 有在职用户时怎么处理（应该拒绝）？③ 是物理删还是软删（is_active=false）？这三个答案直接决定前端要不要做二次确认弹窗。</p></div>
+  </div>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-patch">PATCH</span><span class="path">/api/v1/organizations/{org_id}/move</span><span class="tag ok">已实现</span><span class="tag auth">需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b>把部门挪到另一个上级下面。<b>服务端会自动重算 level / path，并级联修正所有子孙节点</b>——这是这个接口唯一该被使用的场景，不要试图直接 PUT parent_id。</p>
+    <div class="meta"><span><b>谁在用</b> 组织树拖拽</span><span><b>前置</b> 目标父部门存在；不能移到自己或自己的子孙下</span><span><b>副作用</b> 批量更新本节点 + 全部子孙的 level / path</span></div>
+    <h4>输入</h4>
+    <table>
+      <tr><th>位置</th><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
+      <tr><td>path</td><td>org_id</td><td>int</td><td><span class="req">是</span></td><td>要移动的部门</td></tr>
+      <tr><td>body</td><td>new_parent_id</td><td>int/null</td><td><span class="opt">否</span></td><td>新上级；<b>null = 移到根</b></td></tr>
+    </table>
+    <h4>输出</h4>
+    <p>移动后的 OrgResponse。</p>
+    <div class="note warn"><p><b>环检测：</b>"把父部门移到自己的子部门下"会形成环（A→B→A），这类操作应该被服务端拒绝。我未实测该分支，前端做拖拽时必须自己先拦住（判断目标节点是否是当前节点的子孙），否则可能把树搞坏。</p></div>
+  </div>
+</section>
+
+<section id="system">
+  <h2><span class="no">8</span>系统与运维（4 个）</h2>
+  <p class="lead">两个探针 + 两个自查。全部<b>无需鉴权</b>，可以直接用 curl 或浏览器访问——出问题时第一时间打这几个。</p>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-get">GET</span><span class="path">/health</span><span class="tag ok">已实现</span><span class="tag">无需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b><b>存活探针</b>。只证明"进程还活着"，<b>不检查数据库</b>。K8s liveness 用它。</p>
+    <div class="meta"><span><b>谁在用</b> 运维监控、启动自检</span><span><b>前置</b> 无</span><span><b>副作用</b> 无</span></div>
+    <h4>输入</h4><p>无。</p>
+    <h4>输出（data）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>status</td><td>string</td><td><code>up</code></td></tr>
+      <tr><td>version</td><td>string</td><td>服务版本，实测 1.0.0</td></tr>
+      <tr><td>env</td><td>string</td><td>环境，实测 dev</td></tr>
+      <tr><td>databases</td><td>object</td><td>只回显配置（mysql 地址、pgsql/redis/milvus 为 disabled），<b>不代表真连上了</b></td></tr>
+    </table>
+    <details><summary>真实响应</summary>
+      <pre>{"code":200,"message":"OK","data":{"status":"up","version":"1.0.0","env":"dev",
+"databases":{"mysql":"127.0.0.1:3306/ai_talent_platform","pgsql":"disabled",
+"redis":"disabled","milvus":"disabled"}},"trace_id":"e55ccb0922264506"}</pre>
+    </details>
+    <div class="note warn"><p><b>别用 /health 判断"能不能用"。</b>MySQL 挂了它照样返回 200（因为不查库）。要判断业务可用性用 <code>/health/ready</code>。</p></div>
+  </div>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-get">GET</span><span class="path">/health/ready</span><span class="tag ok">已实现</span><span class="tag">无需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b><b>就绪探针</b>。真的去连 MySQL，决定这个实例能不能接流量。K8s readiness 用它。</p>
+    <div class="meta"><span><b>谁在用</b> 运维、发布前验证</span><span><b>前置</b> 无</span><span><b>副作用</b> 无（发起一次 DB 探测）</span></div>
+    <h4>输入</h4><p>无。</p>
+    <h4>输出（data）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>status</td><td>string</td><td><code>up</code> / <code>degraded</code> / <code>down</code></td></tr>
+      <tr><td>mysql</td><td>object</td><td><code>{target, status, reason, message, elapsed_ms}</code>。<b>实测 status=up，elapsed_ms≈22</b></td></tr>
+      <tr><td>pgsql</td><td>object</td><td>实测 <code>disabled</code>，message 明确说"分析类功能降级为仅统计 MySQL"</td></tr>
+      <tr><td>drivers</td><td>object</td><td>实际驱动，实测 <code>mysql: "mysql+aiomysql"</code></td></tr>
+    </table>
+    <details><summary>真实响应</summary>
+      <pre>{"code":200,"message":"OK","data":{"status":"up",
+"mysql":{"target":"127.0.0.1:3306/ai_talent_platform","status":"up","reason":"ok",
+ "message":"MySQL 连接正常","elapsed_ms":22.5},
+"pgsql":{"target":"127.0.0.1:5432/ai_talent_analytics","status":"disabled","reason":"ok",
+ "message":"PgSQL 未启用（PGSQL_ENABLED=False），分析类功能降级为仅统计 MySQL","elapsed_ms":0.0},
+"redis":"disabled","milvus":"disabled","drivers":{"mysql":"mysql+aiomysql","pgsql":"disabled"}},
+"trace_id":"fdb8dd1e8ebd4c83"}</pre>
+    </details>
+    <div class="note ok"><p><b>这个接口是排查 500 的第一站。</b>如果它返回 503 且 <code>mysql.status=down</code>，那所有业务接口都会挂，跟代码无关。如果它是 200 但业务 500，才去看 <code>drivers</code>——<b>缺 aiomysql 这类问题在这里会直接暴露</b>。</p></div>
+  </div>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-get">GET</span><span class="path">/api/v1/system/info</span><span class="tag ok">已实现</span><span class="tag">无需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b>一次性看清后端装配了哪些能力：用了哪个库、连没连上、有哪些表、哪些模块已实现、AI 是否就绪。</p>
+    <div class="meta"><span><b>谁在用</b> 联调时的"体检报告"</span><span><b>前置</b> 无</span><span><b>副作用</b> 无</span></div>
+    <h4>输入</h4><p>无。</p>
+    <h4>输出（data）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>name / version / env / api_prefix</td><td>string</td><td>服务自述。<code>api_prefix=/api/v1</code></td></tr>
+      <tr><td>databases</td><td>object</td><td>mysql 连接串；pgsql / redis / milvus 均 disabled</td></tr>
+      <tr><td>connection_status</td><td>object</td><td>比 <code>/health/ready</code> 更详细，含每库的 target / status / reason / message / elapsed_ms</td></tr>
+      <tr><td>orm_tables</td><td>string[]</td><td><b>25 张表的清单</b>（见下）——这是判断"哪些功能有数据底座"的钥匙</td></tr>
+      <tr><td>implemented_modules</td><td>object/array</td><td>已实现模块标记</td></tr>
+      <tr><td>ai_ready</td><td>boolean</td><td>AI 能力是否就绪（当前受 Dify/Milvus 未接通影响）</td></tr>
+      <tr><td>pgsql_enabled / redis_enabled / milvus_enabled</td><td>boolean</td><td>三个开关，实测全 false</td></tr>
+    </table>
+    <div class="note">
+      <p><b>实测 orm_tables 有 25 张，其中和匹配直接相关的 6 张：</b></p>
+      <p><code>positions</code> · <code>position_requirements</code>（画像版本） · <code>talents</code> · <code>talent_portraits</code>（人才画像） · <code>matching_records</code>（匹配记录） · <code>audit_logs</code>（审计）</p>
+      <p>另外 <code>resumes</code> / <code>resume_experiences</code> / <code>knowledge_docs</code> / <code>knowledge_chunks</code> / <code>files</code> 表已建好但接口是 501——<b>表在、接口没写</b>，这是判断工作量的重要线索。</p>
+    </div>
+  </div>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-get">GET</span><span class="path">/api/v1/system/skills</span><span class="tag ok">已实现</span><span class="tag">无需鉴权</span></div>
+    <p class="api-purpose"><b>干什么：</b>列出已注册的 8 个 AI Skill，每个带<b>参数 JSON Schema</b>、所需权限、依赖的实现函数、超时。这是给 Agent/工具调用层用的"能力清单"。</p>
+    <div class="meta"><span><b>谁在用</b> Agent 编排、Dify 工具配置</span><span><b>前置</b> 无</span><span><b>副作用</b> 无</span></div>
+    <h4>输入</h4><p>无。</p>
+    <h4>输出（data · Skill[]）</h4>
+    <table>
+      <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+      <tr><td>name</td><td>string</td><td>技能名，调用时用</td></tr>
+      <tr><td>description</td><td>string</td><td>给模型看的自然语言说明（决定它会不会被选中）</td></tr>
+      <tr><td>category</td><td>string</td><td>business / retrieval / data</td></tr>
+      <tr><td>version</td><td>string</td><td>技能版本</td></tr>
+      <tr><td>enabled</td><td>boolean</td><td>是否启用</td></tr>
+      <tr><td>parameters</td><td>object</td><td><b>JSON Schema</b>：properties / required / minimum / maximum / default</td></tr>
+      <tr><td>required_permission</td><td>string</td><td>调用所需权限码，如 <code>matching:read</code></td></tr>
+      <tr><td>requires</td><td>string[]</td><td>绑定的实现函数路径，如 <code>app.services.matching_service.MatchingService.list_candidates</code></td></tr>
+      <tr><td>timeout_seconds</td><td>float</td><td>超时，实测 30.0</td></tr>
+    </table>
+    <h4>实测的 8 个技能</h4>
+    <table>
+      <tr><th>name</th><th>category</th><th>需要的权限</th><th>用途</th></tr>
+      <tr><td>candidate_list</td><td>business</td><td>matching:read</td><td>查某岗位候选人排序（top_k / min_score）</td></tr>
+      <tr><td>matching_score</td><td>business</td><td>matching:read</td><td>单人对单岗位打分</td></tr>
+      <tr><td>position_search</td><td>business</td><td>position:read</td><td>按条件找岗位</td></tr>
+      <tr><td>resume_parse</td><td>business</td><td>resume:parse</td><td>简历结构化解析</td></tr>
+      <tr><td>resume_skill_extract</td><td>business</td><td>resume:parse</td><td>从简历抽技能</td></tr>
+      <tr><td>resume_dedupe</td><td>business</td><td>resume:parse</td><td>简历去重</td></tr>
+      <tr><td>knowledge_search</td><td>retrieval</td><td>knowledge:read</td><td>知识库检索（question / top_k / category）</td></tr>
+      <tr><td>sql_query</td><td>data</td><td>analytics:read</td><td>只读 SQL 查询（分析场景）</td></tr>
+    </table>
+    <div class="note warn">
+      <p><b>注意：技能清单里 8 个都 enabled=true，但其中 5 个依赖的实现（简历解析、知识库检索、SQL 分析）对应的 HTTP 接口还是 501。</b>也就是说技能"声明"了能力，底层 Service 可能还没写完。接手时不要按这份清单判断"功能已可用"。</p>
+    </div>
+  </div>
+</section>
+
+<section id="stub">
+  <h2><span class="no">9</span>占位接口（8 个）</h2>
+  <p class="lead">这 8 个路由<b>注册了但没实现</b>，统一返回 501 + 自解释。它们不是"坏掉的接口"，而是"已知的缺口标记"。这张表是你排期时最该看的一页。</p>
+
+  <div class="api">
+    <div class="api-head"><span class="pill m-get">GET</span><span class="path">/api/v1/talents</span><span class="tag bad">501 占位</span><span class="tag">无需鉴权</span></div>
+    <p class="api-purpose"><b>干什么（将来）：</b>人才档案 CRUD、画像查询、语义检索、档案合并。<b>现在：</b>返回 501。</p>
+    <h4>输出（data）</h4>
+    <pre>{
+  "code": 501,
+  "message": "人才档案模块尚未实现，请对接负责人",
+  "data": {
+    "module": "人才档案",
+    "hint": "人才档案 CRUD、画像查询、语义检索、档案合并（见 routers/talent_router.py）"
+  },
+  "trace_id": "dffbf1ecba854604"
+}</pre>
+    <div class="note danger"><p><b>这是全项目最关键的 P0 缺口。</b>没有写入接口，候选人只能靠数据库种子数据；匹配功能再准，也接不进真实简历。<b>接手第一件事应该是确认这块的排期。</b></p></div>
+  </div>
+
+  <h3>其余 7 个占位（结构完全一致，只换 module / hint）</h3>
+  <table>
+    <tr><th>方法</th><th>路径</th><th>module</th><th>hint（实现位置）</th><th>优先级</th></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/api/v1/resumes</td><td>简历管理</td><td>简历上传、AI 解析、解析结果查询（routers/resume_router.py）</td><td><b>P0</b></td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/api/v1/knowledge</td><td>知识库</td><td>知识库文档与检索（routers/knowledge_router.py）</td><td>P1</td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/api/v1/files</td><td>文件管理</td><td>文件上传下载（routers/file_router.py）</td><td>P1</td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/api/v1/agents</td><td>AI 智能体</td><td>Agent 编排（routers/agent_router.py）</td><td>P2</td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/api/v1/analytics</td><td>数据分析</td><td>统计报表（routers/analytics_router.py），依赖 PgSQL</td><td>P2</td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/api/v1/assessments</td><td>人才测评</td><td>测评题库与结果（routers/assessment_router.py）</td><td>P2</td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/api/v1/trainings</td><td>培训管理</td><td>培训计划（routers/training_router.py）</td><td>P2</td></tr>
+  </table>
+
+  <div class="note danger">
+    <p><b>一个例外：<code>/api/v1/positions</code> 不在这张表里，因为它返回的是 404 而不是 501。</b>实测结果是 <code>{"code":404,"message":"接口不存在","data":null}</code>——岗位列表的路由<b>未被注册</b>，连占位都没做。所以"岗位 CRUD 缺失"这个 P0 缺口，从接口层面看是"不存在"，不是"待实现"。</p>
+    <p>这带来一个实际问题：前端如果照 RESTful 直觉去调 <code>GET /positions</code>，会收到 404 并误以为是 baseURL 配错或网关问题，从而浪费半天排查。<b>交接时请务必口头说明这一点。</b></p>
+  </div>
+
+  <div class="note">
+    <p><b>占位接口的三个用途，别急着删：</b></p>
+    <p>① 前端可以提前把页面路由、菜单指过去，不会 404；② 联调时一调就知道"这块归谁、写在哪个文件"；③ 是给项目管理的可视化缺口清单——一份 OpenAPI 就能看出还剩多少活。</p>
+  </div>
+</section>
+
+<section id="sandbox">
+  <h2><span class="no">10</span>沙箱 8011（11 个）</h2>
+  <p class="lead">沙箱是一份<b>单文件 Mock 后端</b>（<code>sandbox/mock_api.py</code>），复刻了真实服务的核心链路但<b>不连数据库</b>。它的存在意义：让你在不碰真实数据的前提下把流程走熟、把前端联调完。</p>
+
+  <h3>10.1 11 个接口清单</h3>
+  <table>
+    <tr><th>方法</th><th>路径</th><th>与真实服务的差异</th></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/</td><td><b>沙箱独有</b>。"我是谁"说明页，返回沙箱用途与账号</td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/health</td><td><b>永远返回 up</b>，不查任何依赖</td></tr>
+    <tr><td><span class="pill m-post">POST</span></td><td>/api/v1/auth/login</td><td>返回 <code>mock.admin.xxxx</code> 这种短 token，<b>内存态，重启即失效</b></td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/api/v1/positions/{id}/profile</td><td>返回<b>预置画像</b>，不查库；版本号从 mock_data.json 读</td></tr>
+    <tr><td><span class="pill m-post">POST</span></td><td>/api/v1/positions/{id}/jd/parse</td><td>优先复用真实规则解析器，失败则<b>回退到预置画像</b>并提示</td></tr>
+    <tr><td><span class="pill m-post">POST</span></td><td>/api/v1/positions/{id}/profile/confirm</td><td>同样有乐观锁，但版本只在内存里 +1</td></tr>
+    <tr><td><span class="pill m-post">POST</span></td><td>/api/v1/matchings/run</td><td>返回<b>预置的 5 人四态结果</b>，不真的算</td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/api/v1/matchings</td><td>支持 position_id / talent_id / min_score 过滤 + 分页</td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/api/v1/matchings/positions/{id}</td><td>同真实结构（stats / items / excluded）</td></tr>
+    <tr><td><span class="pill m-get">GET</span></td><td>/api/v1/matchings/talents/{id}</td><td>同真实结构（数组 + limit）</td></tr>
+    <tr><td><span class="pill m-post">POST</span></td><td>/api/v1/matchings/explain</td><td>返回预置的 5 份解释</td></tr>
+  </table>
+
+  <h3>10.2 沙箱预置的 5 位候选人（覆盖全部四态）</h3>
+  <table>
+    <tr><th>姓名</th><th>分数</th><th>decision</th><th>设计意图</th></tr>
+    <tr><td>林一</td><td>96.8</td><td><span class="tag ok">PASS</span></td><td>完美匹配，用来看"正常通过"</td></tr>
+    <tr><td>周珂</td><td>87.4</td><td><span class="tag ok">PASS</span></td><td>次优，用来看排序差异</td></tr>
+    <tr><td>吴敏</td><td>68.2</td><td><span class="tag warn">UNKNOWN</span></td><td>档案缺学历字段，<b>保留不淘汰</b></td></tr>
+    <tr><td>郑昊</td><td>44.5</td><td><span class="tag">NEEDS_REVIEW</span></td><td>数据冲突，需人工看</td></tr>
+    <tr><td>孙楠</td><td>—</td><td><span class="tag bad">FAIL</span></td><td>学历不达标，<b>唯一被淘汰的</b>，进 excluded</td></tr>
+  </table>
+  <p>这套数据是<b>刻意设计</b>的：你用它测前端时，四种颜色状态一次能看全，不需求造数据。</p>
+
+  <h3>10.3 沙箱与真实的 7 个差异（必须记住）</h3>
+  <table>
+    <tr><th>维度</th><th>真实 8010</th><th>沙箱 8011</th></tr>
+    <tr><td>数据源</td><td>MySQL 8.0.27，真实数据</td><td>内存 + <code>mock_data.json</code>，改了就丢</td></tr>
+    <tr><td>token</td><td>JWT，24 小时，<b>重启不失效</b></td><td><code>mock.xxx</code>，<b>重启即失效，要重新登录</b></td></tr>
+    <tr><td>候选人</td><td>张伟 / 李娜 / 王强 / 赵敏 / 陈晨</td><td>林一 / 周珂 / 吴敏 / 郑昊 / 孙楠</td></tr>
+    <tr><td>画像版本</td><td>v11（真实累积）</td><td>v3 左右（内存态）</td></tr>
+    <tr><td>解析通道</td><td><code>rule_fallback</code></td><td><code>rule_fallback</code>，且常带"预置画像兜底"提示</td></tr>
+    <tr><td>召回</td><td><code>sql_fallback</code></td><td>无召回概念，直接返回预置</td></tr>
+    <tr><td>模块数量</td><td>41 个操作（含 8 个 501）</td><td>11 个，只覆盖核心链路</td></tr>
+  </table>
+
+  <div class="note ok">
+    <p><b>好消息：错误契约已经对齐。</b>沙箱的 401/403/404/400 文案现在与真实服务一致（<code>2001 请先登录</code> / <code>2004 权限不足，无法访问该资源</code> / <code>3001 岗位不存在（id=1）</code> / <code>1002 画像版本已变化</code>），所以前端按沙箱写的错误分支，换到真实服务基本不用改。</p>
+  </div>
+
+  <div class="note warn">
+    <p><b>沙箱三件套怎么用：</b>① <code>run_sandbox_flow.py</code> 一键跑 8 步自检；② <code>check_contract.py</code> 用真实 <code>app/schemas</code> 校验 Mock 响应（24/24）；③ Swagger 页面右上角 <b>Authorize</b> 贴 token。<b>沙箱已配 <code>HTTPBearer</code>，不用手填 Authorization 头。</b></p>
+  </div>
+</section>
+
+<section id="schema">
+  <h2><span class="no">11</span>数据结构字典</h2>
+  <p class="lead">接口的"输入输出"说到底就是这几个对象在传递。这节是给要写代码的人看的——<b>字段名和嵌套关系必须精确</b>，错一个字母就是 null。</p>
+
+  <h3>11.1 JobProfileParsed（岗位画像 · 最核心）</h3>
+  <table>
+    <tr><th>字段</th><th>类型</th><th>必填</th><th>说明与读法</th></tr>
+    <tr><td>job_title</td><td>string</td><td><span class="req">是</span></td><td>岗位名称。<b>唯一必填字段</b></td></tr>
+    <tr><td>responsibilities</td><td>string[]</td><td><span class="opt">否</span></td><td>岗位职责原文列表</td></tr>
+    <tr><td>required_conditions</td><td>ConditionItem[]</td><td><span class="opt">否</span></td><td>必要条件<b>条目</b>（text / normalized / source_span / confidence）。<br><b>实测常为空数组</b>，别指望从这里拿判定值</td></tr>
+    <tr><td>preferred_conditions</td><td>ConditionItem[]</td><td><span class="opt">否</span></td><td>优先条件条目，<b>只加分不淘汰</b></td></tr>
+    <tr><td>required_skills</td><td>string[]</td><td><span class="opt">否</span></td><td><b>必备技能（硬性）</b>。这是硬过滤真正用的字段</td></tr>
+    <tr><td>preferred_skills</td><td>string[]</td><td><span class="opt">否</span></td><td>优先技能（软性加分）</td></tr>
+    <tr><td>min_education</td><td>string/null</td><td><span class="opt">否</span></td><td>最低学历。<b>null = JD 未提及，禁止补默认值</b></td></tr>
+    <tr><td>min_work_years</td><td>int/null</td><td><span class="opt">否</span></td><td>最低年限。null 同理，<b>不要当 0 处理</b>——当 0 会让所有没写年限的候选人都 PASS</td></tr>
+    <tr><td>location</td><td>string/null</td><td><span class="opt">否</span></td><td>工作地点</td></tr>
+    <tr><td>salary_range</td><td>string/null</td><td><span class="opt">否</span></td><td>薪资范围原文，如 <code>"25k-35k"</code>，<b>未结构化</b></td></tr>
+    <tr><td>missing_fields</td><td>string[]</td><td><span class="opt">否</span></td><td>缺失字段名，<b>由 Python 计算</b>（不是模型产出）</td></tr>
+    <tr><td>conflicts</td><td>string[]</td><td><span class="opt">否</span></td><td>冲突描述，同样 Python 计算</td></tr>
+    <tr><td>review_required</td><td>boolean</td><td><span class="opt">否</span></td><td>是否需 HR 人工确认。<b>实测恒为 true</b></td></tr>
+    <tr><td>source</td><td>string</td><td><span class="opt">否</span></td><td>产出来源：dify / llm / manual</td></tr>
+    <tr><td>prompt_version</td><td>string</td><td><span class="opt">否</span></td><td>提示词版本，如 <code>rule-v1</code>，用于回溯与 A/B</td></tr>
+  </table>
+  <div class="note danger">
+    <p><b>三条铁律：</b>① <code>null</code> 表示"JD 没写"，<b>不等于 0 或空字符串</b>，判定时对应 UNKNOWN 而不是 FAIL；② 硬条件判定看<b>扁平字段</b>，不是 <code>required_conditions</code>；③ <code>missing_fields</code> / <code>conflicts</code> 是计算结果，<b>不要回传</b>给 confirm（虽然 schema 允许，但会污染数据）。</p>
+  </div>
+
+  <h3>11.2 HardConditionResult（单项四态判定）</h3>
+  <table>
+    <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+    <tr><td>item</td><td>string</td><td>条件名：<code>min_education</code> / <code>min_work_years</code> / <code>required_skills</code></td></tr>
+    <tr><td>required</td><td>any</td><td>岗位要求值（原值，可能是字符串 / 数字 / 数组）</td></tr>
+    <tr><td>actual</td><td>any</td><td>人才实际值，<b>缺失时为 null</b></td></tr>
+    <tr><td>status</td><td>enum</td><td>PASS / FAIL / UNKNOWN / NEEDS_REVIEW</td></tr>
+    <tr><td>reason</td><td>string</td><td><b>必填</b>，中文判定原因，可直接展示给 HR</td></tr>
+    <tr><td>evidence_id</td><td>string/null</td><td><code>EVID-{pid}-{tid}-{seq}</code>；<b>UNKNOWN 时可为 null</b></td></tr>
+  </table>
+  <p><b>这一条是整套系统的"审计最小单元"</b>：任何一个分数，都能顺着 <code>hard_results → evidence_id</code> 追回到"哪条 JD 要求、哪份档案的哪个字段、为什么这么判"。这就是"可解释"的落地方式，不是一段 AI 话术。</p>
+
+  <h3>11.3 MatchItem（榜单上的一条）</h3>
+  <p>完整字段见 <b>5.1</b> 的输出表。这里只强调嵌套关系：</p>
+  <pre>MatchItem
+├── talent_id / talent_name        身份
+├── rank                           名次
+├── decision                       整体四态（聚合）
+├── score                          综合分（0-100）
+├── dimension_scores               {skill, quality, education, experience}
+├── defaulted_dimensions[]         用了默认值的维度（可信度警告）
+├── data_completeness              档案完整度 0-1
+├── matched_skills[]               命中技能（事实）
+├── highlights[] / gaps[]          优势 / 差距（解释性文字）
+├── hard_results[]                 逐项四态 ★ 审计核心
+│   └── {item, required, actual, status, reason, evidence_id}
+├── suggestion                     适配建议
+└── explanation_source             dify / llm_fallback / rule_fallback</pre>
+
+  <h3>11.4 MatchRunResponse + MatchStats</h3>
+  <pre>MatchRunResponse
+├── batch_id               本次跑批 ID
+├── position_id / position_title
+├── requirement_version    用的哪版画像
+├── recall_mode            sql_fallback / vector
+├── matched_at
+├── stats                  {candidates, excluded_by_hard, unknown, needs_review, output}
+├── items[]                MatchItem，按分数倒序
+└── excluded[]             {talent_id, talent_name, status, reasons[]}</pre>
+
+  <h3>11.5 MatchExplanation（解释）</h3>
+  <table>
+    <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+    <tr><td>summary</td><td>string</td><td>总评，含四项计数</td></tr>
+    <tr><td>highlights / gaps / risks</td><td>ExplanationClaim[]</td><td>优势 / 差距 / 风险，每条是 <code>{text, evidence_ids[], claim_type}</code></td></tr>
+    <tr><td>interview_suggestions</td><td>string[]</td><td>建议面试问题</td></tr>
+    <tr><td>pending_verification</td><td>string[]</td><td>待核实（含 UNKNOWN 与被剔除项）</td></tr>
+    <tr><td>rejected_claims</td><td>RejectedClaim[]</td><td><code>{text, reason, detail}</code>——被证据校验拦下的结论</td></tr>
+    <tr><td>source / prompt_version</td><td>string</td><td>来源与提示词版本</td></tr>
+  </table>
+  <div class="note ok"><p><b><code>evidence_ids</code> 不允许为空数组</b>：这是 schema 层面的硬约束。任何一条结论没有证据，就会被踢进 <code>rejected_claims</code>。这是这套系统"不说没根据的话"的技术保证。</p></div>
+
+  <h3>11.6 分页容器 PageResult</h3>
+  <pre>{ "items": [...], "total": 67, "page": 1, "page_size": 2, "pages": 34 }</pre>
+  <p>出现在 <code>/users</code>、<code>/organizations</code>、<code>/matchings</code>。<b>注意 <code>/matchings/talents/{id}</code> 和 <code>/organizations/tree</code> 返回的是裸数组</b>，不是这个结构。</p>
+
+  <h3>11.7 字段名易错清单（照着核对，能省两小时）</h3>
+  <table>
+    <tr><th>你可能写的</th><th>实际字段</th><th>错在哪</th></tr>
+    <tr><td><code>total_score</code></td><td><code>score</code></td><td>匹配分就是 score，没有 total_ 前缀</td></tr>
+    <tr><td><code>candidate_id</code></td><td><code>talent_id</code></td><td>这套系统统一叫 talent</td></tr>
+    <tr><td><code>keywords</code></td><td><code>keyword</code></td><td>单数，且传错静默忽略不报错</td></tr>
+    <tr><td><code>data.items</code>（当列表用）</td><td><code>data</code> 直接是数组</td><td><code>/talents/{id}</code> 的 matchings、<code>/organizations/tree</code></td></tr>
+    <tr><td><code>data.total_score</code> / <code>data.excluded</code> 在列表接口里</td><td>列表接口只有 <code>items/total/pages</code></td><td>stats 和 excluded 只在 run / by-position 里有</td></tr>
+    <tr><td><code>roles[0].name</code>（统一按对象取）</td><td><code>/auth/me</code> 里是字符串</td><td>login/me 返回 string[]，users 返回 object[]</td></tr>
+    <tr><td><code>required_conditions[0].status</code></td><td>状态在 <code>hard_results[]</code></td><td>conditions 只是文本条目，没有判定状态</td></tr>
+    <tr><td><code>message === "OK"</code> 判断成功</td><td><code>code === 200</code></td><td>message 有 "OK" / "success" / "登录成功" 多种</td></tr>
+  </table>
+</section>
+
+<section id="flow">
+  <h2><span class="no">12</span>谁调谁：三条链路</h2>
+  <p class="lead">接口按业务串起来才有意义。这三条是系统里真实存在的调用序列，覆盖 90% 的使用场景。</p>
+
+  <h3>12.1 场景 A：新岗位上线（HR 主流程）</h3>
+  <div class="flow">
+    <span class="node">登录</span><span class="arrow">→</span>
+    <span class="node">jd/parse</span><span class="arrow">→</span>
+    <span class="node">HR 修订画像</span><span class="arrow">→</span>
+    <span class="node">profile/confirm</span><span class="arrow">→</span>
+    <span class="node">matchings/run</span><span class="arrow">→</span>
+    <span class="node">positions/{id}</span><span class="arrow">→</span>
+    <span class="node">explain</span>
+  </div>
+  <ol class="steps">
+    <li><b><code>POST /auth/login</code></b> → 拿 token，之后每个请求都带上</li>
+    <li><b><code>POST /positions/1/jd/parse</code></b> → 传 JD 原文，拿回画像草稿（<b>不落库</b>）</li>
+    <li><b>（前端）HR 在页面上修订</b> → 改 <code>min_work_years</code>、加 <code>required_skills</code> 等</li>
+    <li><b><code>GET /positions/1/profile</code></b> → <b>拿当前 version</b>（这步不能省，否则 confirm 会被乐观锁拒）</li>
+    <li><b><code>POST /positions/1/profile/confirm</code></b> → 带 <code>profile</code> + <code>expected_version</code>，画像生效，版本 +1</li>
+    <li><b><code>POST /matchings/run</code></b> → 跑批，拿 <code>batch_id</code> + 榜单 + stats</li>
+    <li><b><code>GET /matchings/positions/1</code></b> → 下次进页面用这个读（不重算）</li>
+    <li><b><code>POST /matchings/explain</code></b> → 点开某个候选人时按需调</li>
+  </ol>
+  <div class="note warn"><p><b>顺序不能颠倒的点：</b>第 4 步在第 5 步之前（乐观锁）；第 5 步在第 6 步之前（未确认画像 run 会 400）。这两条是最常见的"卡住"原因。</p></div>
+
+  <h3>12.2 场景 B：HR 日常看人（高频，不走 run）</h3>
+  <div class="flow">
+    <span class="node">登录</span><span class="arrow">→</span>
+    <span class="node">matchings/positions/{id}</span><span class="arrow">→</span>
+    <span class="node">点候选人 → explain</span>
+  </div>
+  <p>关键：<b>不要每次进页面都调 run</b>。run 会写库、会重算、可能要调模型。日常浏览一律用 <code>by-position</code> 读缓存结果，只有用户明确点"重新匹配"才 run。</p>
+
+  <h3>12.3 场景 C：这个人还适合什么岗位</h3>
+  <div class="flow">
+    <span class="node">matchings/talents/{id}</span><span class="arrow">→</span>
+    <span class="node">前端按 position_id 去重取最高分</span><span class="arrow">→</span>
+    <span class="node">explain（指定 position_id）</span>
+  </div>
+  <p>注意这个接口返回的是<b>历史多条</b>（同一人同一岗位多批会有多条），前端必须自己聚合。</p>
+
+  <h3>12.4 系统内部：一次 run 里发生了什么</h3>
+  <ol class="steps">
+    <li><b>取画像</b>：读最新已确认的 <code>position_requirements</code>，没有就 400</li>
+    <li><b>召回</b>：<code>talent_ids</code> 为空时按岗位条件查 <code>talents</code>；Milvus 未启用 → <code>recall_mode=sql_fallback</code></li>
+    <li><b>硬条件判定</b>：对 <code>min_education</code> / <code>min_work_years</code> / <code>required_skills</code> 逐项判四态，每项生成 <code>evidence_id</code></li>
+    <li><b>淘汰</b>：仅 <code>FAIL</code> 进 <code>excluded</code>，其余全部保留</li>
+    <li><b>打分</b>：四维（skill / quality / education / experience）加权成 <code>score</code></li>
+    <li><b>排序编号</b>：按分数倒序，写 <code>rank</code>（从 1 开始）</li>
+    <li><b>解释</b>：<code>with_explanation=true</code> 时调 Dify → 失败降级 LLM → 再失败走规则；<b>false 时直接规则</b></li>
+    <li><b>落库</b>：写 <code>matching_records</code>，一个批次 ID 串起所有候选人</li>
+  </ol>
+</section>
+
+<section id="checklist">
+  <h2><span class="no">13</span>交接自查清单</h2>
+  <p class="lead">接手第一周，按这个顺序验证一遍，能确认"环境是通的、理解是对的"。每一条我都给了预期结果。</p>
+
+  <table>
+    <tr><th>#</th><th>动作</th><th>预期结果</th><th>不对说明什么</th></tr>
+    <tr><td>1</td><td><code>curl /health</code></td><td><code>code:200</code>, status:up</td><td>服务没起，或端口不对</td></tr>
+    <tr><td>2</td><td><code>curl /health/ready</code></td><td><code>mysql.status=up</code>, elapsed &lt; 100ms</td><td>MySQL 没连上 / 用错解释器（缺 aiomysql）</td></tr>
+    <tr><td>3</td><td><code>POST /auth/login</code> admin</td><td>拿到 JWT + permissions:["*"]</td><td>账号密码错，或数据库没初始化</td></tr>
+    <tr><td>4</td><td><code>GET /auth/me</code></td><td>id=2, roles=[super_admin,admin]</td><td>token 没带对（要 Bearer + 空格）</td></tr>
+    <tr><td>5</td><td><code>GET /positions/1/profile</code></td><td>version 有值, confirmed=true</td><td>岗位 1 不存在，或画像未确认</td></tr>
+    <tr><td>6</td><td><code>GET /matchings/positions/1</code></td><td>batch_id + stats + items</td><td>从没跑过匹配 → 先跑一次 run</td></tr>
+    <tr><td>7</td><td>核对 stats：<code>candidates − excluded_by_hard = output</code></td><td>5 − 2 = 3 ✓</td><td>不成立说明逻辑被改坏了</td></tr>
+    <tr><td>8</td><td>看 items[0].hard_results[].evidence_id</td><td>形如 <code>EVID-1-1-1</code>，非空</td><td>空说明证据链断了，可解释性失效</td></tr>
+    <tr><td>9</td><td><code>POST /matchings/explain</code> 传一个被淘汰的人</td><td>能返回解释（不是 404）</td><td>说明"为什么没出现"这个功能坏了</td></tr>
+    <tr><td>10</td><td><code>GET /talents</code></td><td><code>code:501</code> + module + hint</td><td>返回 200 说明已经实现了（好事，更新文档）</td></tr>
+    <tr><td>11</td><td>沙箱：<code>python sandbox/run_sandbox_flow.py</code></td><td>8/8 步通过</td><td>8011 没起，或 token 失效（重启即失效）</td></tr>
+    <tr><td>12</td><td>沙箱：<code>python sandbox/check_contract.py</code></td><td>24/24 通过</td><td>Mock 与真实 schema 脱节了</td></tr>
+  </table>
+
+  <h3>交接时必须当面问清的 6 个问题</h3>
+  <ol class="steps">
+    <li><b>岗位 / 人才 CRUD 谁做、什么时候做？</b>这是 P0，不做就没有真实数据入口</li>
+    <li><b>Dify 工作流的契约谁定？</b>现在 <code>dify_adapter</code> 已按 <code>POST {base}/workflows/run</code> + <code>jd_text</code>/<code>evidence_pack</code> 写好，但没密钥没联调</li>
+    <li><b>LLM 用哪个？</b>本机 Ollama 在跑，但 <code>qwen3:0.6b</code> 默认思考模式会返回空，需 <code>think:false</code> 或换 <code>qwen2.5:1.5b</code></li>
+    <li><b>Milvus 什么时候上？</b>现在 <code>recall_mode</code> 恒为 <code>sql_fallback</code>，语义召回能力等于没有</li>
+    <li><b>删除用户 / 部门是物理删还是软删？</b>影响外键完整性与审计可追溯（见 6.5 / 7.6）</li>
+    <li><b>人工决策回写谁做？</b>现在 <code>matching_records</code> 没有 <code>review_status</code> / <code>review_note</code> 两列，HR 的"通过/淘汰"意见无处可存</li>
+  </ol>
+
+  <div class="note ok">
+    <p><b>已经可以放心交接的部分：</b>认证、用户、组织、系统探针、岗位画像三件套、匹配五件套——这 33 个接口我全部实测通过，字段与我们这份文档一致。测试证据：匹配链路 183 项测试通过，端到端 22/22，接口巡检 22/22，沙箱契约 24/24。</p>
+  </div>
+</section>
+
+<footer>
+  <p>接口交接手册 · V1.0 · 2026-11-04</p>
+  <p>数据来源：运行中的 8010（真实，MySQL）与 8011（沙箱）的 OpenAPI + 实测响应 · 共 52 个操作</p>
+  <p>配套文档：<code>13_沙箱测试指南.html</code>（怎么点） · <code>14_真实服务测试数据.html</code>（返回什么） · <code>12_对接清单与文件职责.html</code>（谁负责哪块）</p>
+</footer>
+</main>
+</div>
+
+<script>
+document.querySelectorAll('.btn[data-copy]').forEach(function(b){
+  b.addEventListener('click', function(){
+    navigator.clipboard.writeText(b.dataset.copy).then(function(){
+      var t=b.textContent; b.textContent='已复制'; b.classList.add('done');
+      setTimeout(function(){ b.textContent=t; b.classList.remove('done'); }, 1400);
+    });
+  });
+});
+(function(){
+  var links=[].slice.call(document.querySelectorAll('aside a'));
+  var secs=links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
+  function onScroll(){
+    var y=window.scrollY+120, idx=0;
+    secs.forEach(function(s,i){ if(s && s.offsetTop<=y) idx=i; });
+    links.forEach(function(a,i){ a.classList.toggle('active', i===idx); });
+  }
+  window.addEventListener('scroll', onScroll, {passive:true}); onScroll();
+})();
+</script>
+</body>
+</html>

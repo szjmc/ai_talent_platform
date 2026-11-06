@@ -122,6 +122,11 @@ def create_application() -> FastAPI:
 
     app.include_router(api_router, prefix=settings.API_PREFIX)
 
+    # 2.1) 候选人笔试内置考试页（不挂 /api/v1，供邮件链接直接打开）
+    from app.routers.exam_router import exam_page_router
+
+    app.include_router(exam_page_router)
+
     # 3) 系统级路由（不放在 /api/v1 下，方便运维探测）
     @app.get("/", tags=["系统"], summary="服务信息", include_in_schema=False)
     async def root():

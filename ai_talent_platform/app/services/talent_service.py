@@ -1,4 +1,23 @@
-"""人才档案业务服务：校验、事务内写入、响应组装与统计编排。
+"""
+模块：app/services/talent_service.py
+职责：人才档案业务服务层。
+
+标签：[RAG组] [P0]（被 [Agent组] talent_agent / [Vanna组] 分析依赖）
+
+============================ 实现思路与代码要点 ============================
+Service 的定位：把「校验 + 仓库调用 + 外部能力 + 事务」组织成一次完整业务。
+统一写法：
+    class XxxService:
+        def __init__(self, db: AsyncSession, repo: XxxRepository | None = None):
+            self.db = db
+            self.repo = repo or XxxRepository()
+
+        async def create_xxx(self, data: XxxCreate, current_user: User) -> Xxx:
+            # 1) 权限 / 业务规则校验（不满足抛 BusinessException 子类）
+            # 2) Schema -> dict -> ORM
+            # 3) 调用仓库写入
+            # 4) 副作用（审计、缓存、向量化、AI 任务）
+            # 5) 返回 ORM 对象（由 Router 用 Response Schema 序列化）
 
 标签：[RAG组] [P0]
 """

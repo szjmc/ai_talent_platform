@@ -70,10 +70,14 @@ def test_get_skill_unknown_raises_not_found(_registered):
 
 # ------------------------------------------------------------------ 参数校验
 @pytest.mark.asyncio
-async def test_run_fills_defaults_and_drops_unknown_params(_registered):
+async def test_run_fills_defaults_and_drops_unknown_params(_registered, monkeypatch):
+    from unittest.mock import AsyncMock
+    from app.ai.skills.sql_skill import SqlQuerySkill
+    execute = AsyncMock(return_value={"rows": []})
+    monkeypatch.setattr(SqlQuerySkill, "execute", execute)
     result = await get_skill("sql_query").run(question="各部门人才数量", hallucinated=1)
-    # 依赖未实现，但参数解析本身应通过（失败原因是依赖而不是参数）
-    assert result.error is None or "依赖未就绪" in (result.error or "")
+    assert result.ok
+    assert execute.call_args.kwargs == {"question": "各部门人才数量", "max_rows": 200, "with_insight": False}
 
 
 @pytest.mark.asyncio
@@ -175,7 +179,12 @@ async def test_sql_query_blocks_dangerous_input(_registered):
 
 
 @pytest.mark.asyncio
-async def test_sql_query_reports_missing_dependency(_registered):
+async def test_sql_query_reports_missing_dependency(_registered, monkeypatch):
+    from app.ai.skills.base import SkillUnavailableError
+    from app.ai.skills.sql_skill import SqlQuerySkill
+    def unavailable(self):
+        raise SkillUnavailableError("依赖未就绪：Vanna 记忆库")
+    monkeypatch.setattr(SqlQuerySkill, "_load_adapter", unavailable)
     result = await get_skill("sql_query").run(question="上个月新增人才数量")
     assert result.ok is False
     assert "依赖未就绪" in (result.error or "")

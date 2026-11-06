@@ -10,7 +10,7 @@
        （供应商级：LLM_MODEL_<PROVIDER>_<PURPOSE>，例如 LLM_MODEL_DEEPSEEK_CHAT）
     2. LLM_MODEL_MAP 显式映射：'chat=deepseek-chat,talent=deepseek-reasoner'
        也可写供应商限定 'deepseek.chat=deepseek-reasoner'
-    3. 若 LLM_MODEL 与当前供应商匹配且不是目录默认值（视为用户显式指定）→ 全用途使用
+    3. 供应商专属模型；或当前供应商匹配且不是目录默认值的 LLM_MODEL
     4. 供应商目录中的「用途推荐模型」（provider_config.PROVIDER_SPECS）
     5. LLM_MODEL（与供应商匹配时）
     6. 供应商目录默认模型
@@ -38,6 +38,7 @@ from app.adapters.llm.provider_config import (
     provider_configured,
     resolve_embed_model,
     same_provider_models,
+    uses_custom_endpoint,
 )
 from app.config.settings import settings
 
@@ -140,8 +141,11 @@ def select_model(purpose: str | None = None, provider: str | None = None) -> str
         if mapped:
             return mapped
 
-    # 3) LLM_MODEL 显式指定（与供应商匹配、且不是该供应商目录默认值）
-    generic_model = str(settings.LLM_MODEL or "").strip()
+    # 3) 专属模型优先于通用默认；用途映射和进程环境覆盖仍保持更高优先级。
+    provider_model = str(getattr(settings, spec.model_attr, "") or "").strip() if spec and spec.model_attr else ""
+    if provider_model:
+        return provider_model
+    generic_model = str(settings.LLM_MODEL or "").strip() if provider == _provider() else ""
     if (
         spec is not None
         and generic_model
@@ -184,13 +188,22 @@ def fallback_models(model: str) -> list[str]:
     if not model:
         return []
     overrides = parse_fallback_overrides()
-    chain = list(overrides.get(model) or FALLBACK_CHAIN.get(model) or [])
+    if model in overrides:
+        return [item for item in dict.fromkeys(overrides[model]) if item and item != model]
+
+    current = _provider()
+    if uses_custom_endpoint(current) and model not in same_provider_models(current):
+        # 聚合服务完整ID仅按显式配置降级，不能推导为官方厂商别名。
+        return []
+    chain = list(FALLBACK_CHAIN.get(model) or [])
 
     if not chain:
         # 先看当前供应商目录是否含该模型（Ollama 的 qwen2.5:7b 等名称与其他厂商前缀重合），
         # 再按模型名前缀推断，避免跨厂商降级。
-        provider = _provider()
+        provider = current
         if model not in same_provider_models(provider):
+            if "/" in model:
+                return []
             provider = _provider_for_model(model)
         chain = [candidate for candidate in same_provider_models(provider) if candidate != model][:2]
 

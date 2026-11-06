@@ -309,7 +309,10 @@ def test_routers_pass_current_user_for_data_scope():
     """issue 8 接线：用户 / 人才路由把 current_user 传入 Service 做行级数据范围过滤。"""
     for name in ("user_router.py", "talent_router.py"):
         src = (ROOT / "app/routers" / name).read_text(encoding="utf-8")
-        assert "current_user=user" in src, f"{name} 未把 current_user 传给 Service"
+        # 各 Service 构造签名不同：user_router 用 current_user=，人才模块用 user=
+        assert ("current_user=user" in src) or ("user=user" in src), (
+            f"{name} 未把登录用户传给 Service（行级数据范围会失效）"
+        )
 
 
 def test_visible_organization_ids_matrix():
@@ -454,8 +457,16 @@ def test_single_pagination_and_response_contract():
     import app.core.response as response_mod
     import app.schemas.common as schemas_common
 
-    for legacy in ("PageData", "PageQuerySchema", "SuccessResponse"):
+    for legacy in ("PageData", "PageQuerySchema"):
         assert not hasattr(schemas_common, legacy), f"schemas.common 仍残留 {legacy}"
+    # 跨组合并后多个路由按历史名 SuccessResponse 引用：只允许是 ApiResponse 的别名，
+    # 不得重新定义独立结构（否则响应体会再次漂移）。
+    if hasattr(schemas_common, "SuccessResponse"):
+        from app.core.response import ApiResponse
+
+        assert schemas_common.SuccessResponse is ApiResponse, (
+            "SuccessResponse 必须是 ApiResponse 的同一对象别名，不允许独立定义"
+        )
     for current in ("ApiResponse", "PageResult", "success", "error", "api_response"):
         assert hasattr(response_mod, current), f"core.response 缺少 {current}"
 
@@ -503,14 +514,13 @@ def test_get_db_delegates_to_session_scope():
 
 
 # ==================================================================== 15 501 占位统一
+# 说明：resumes / knowledge 已由真实 router 挂载（不再返回 501），
+# 因此骨架一致性只覆盖仍处于占位状态的四个模块。
 _SKELETON_ROUTERS = (
     ("positions", "app.routers.position_router"),
-    ("resumes", "app.routers.resume_router"),
     ("assessments", "app.routers.assessment_router"),
     ("trainings", "app.routers.training_router"),
     ("matchings", "app.routers.matching_router"),
-    ("knowledge", "app.routers.knowledge_router"),
-    ("agents", "app.routers.agent_router"),
 )
 
 
@@ -528,7 +538,7 @@ async def test_mounted_stub_returns_501_contract(client):
 
 @pytest.mark.asyncio
 async def test_skeleton_routers_share_stub_contract(client):
-    """issue 15：8 个骨架路由占位端点与挂载占位同契约（501、结构一致、无权限拦截）。"""
+    """issue 15：7 个骨架路由占位端点与挂载占位同契约（501、结构一致、无权限拦截）。"""
     import importlib
 
     skeleton_app = FastAPI()

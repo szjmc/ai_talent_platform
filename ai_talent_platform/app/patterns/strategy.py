@@ -155,51 +155,180 @@ class MatchStrategy(Strategy):
         }
 
 
+# [岗位匹配接入] 公共策略中的四态过滤；仅FAIL淘汰，软评分仍复用现有算法。
 class HardFilterStrategy(MatchStrategy):
-    """硬性条件过滤：学历 / 工作年限 / 必备技能，不满足直接淘汰。"""
+    """硬性条件过滤：学历 / 工作年限 / 必备技能，**仅 FAIL 淘汰**。"""
 
     name = "hard"
 
+    # *kwq* 新增：最近一次 match 的淘汰名单及原因。
+    # 修改原因：原实现用 `continue` 直接丢弃被淘汰者且不留原因，前端无法回答
+    #          「这个人为什么没出现在结果里」，也无法产出 excluded 汇总。
+    # 影响范围：仅新增实例属性，返回结构仍是 list[dict]，不破坏既有签名。
+    def __init__(
+        self,
+        weights: dict[str, float] | None = None,
+        rule_config: Any = None,
+        **options: Any,
+    ) -> None:
+        super().__init__(weights, **options)
+        self.excluded: list[dict[str, Any]] = []
+        self.rule_config = rule_config
+
     async def match(self, position: Any, candidates: list[Any]) -> list[dict[str, Any]]:
+        """四态判定后过滤候选人。
+
+        *kwq* 修改：原逻辑直接比较 education / work_years / skill_tags 三个字段，
+        缺失值会被算成「0 级学历 / 0 年经验 / 空技能集」，从而把「档案未补全」的人
+        误判为不达标并淘汰（talents 三列均为 nullable，这是真实存在的误淘汰路径）。
+
+        修改后改为调用 app/services/matching_rules.judge_hard_conditions（纯函数四态判定）：
+            FAIL          -> 进 self.excluded 并记录逐条原因（唯一允许淘汰的状态）
+            UNKNOWN       -> 保留，标记待补全，综合分按 B-2 口径降权（默认 15%）
+            NEEDS_REVIEW  -> 保留，标记人工复核
+            PASS          -> 进入后续软评分
+
+        影响范围：返回字典新增 hard_results / hard_status / has_unknown / needs_review /
+                 data_completeness；score 由固定 100 改为复用 compute_match_score 的真实分数
+                 （与 SoftMatchStrategy 口径一致，避免两套分数语义）。
+                 已 grep 确认仓库内暂无其他调用方，不破坏外部接口。
+        """
+        # *kwq* 新增：延迟导入，避免 patterns（基础设施层）在模块加载期反向依赖 services 层，
+        # 同时规避 services -> patterns 的潜在循环导入。
+        from app.services.matching_rules import (
+            HardRuleConfig,
+            aggregate_status,
+            apply_unknown_penalty,
+            compute_data_completeness,
+            has_needs_review,
+            has_unknown,
+            is_excluded,
+            judge_hard_conditions,
+        )
+
+        config = self.rule_config or HardRuleConfig()
         pos = _as_dict(position)
-        min_years = _min_work_years(pos)
-        min_edu = _min_education(pos)
-        required_skills = set(_required_skills(pos))
-        results: list[dict[str, Any]] = []
+        position_id = pos.get("id") or pos.get("position_id")
+        self.excluded = []
+        passed: list[dict[str, Any]] = []
 
         for candidate in candidates or []:
             talent = _as_dict(candidate)
-            talent_skills = {str(item).strip().lower() for item in (talent.get("skill_tags") or [])}
-            reasons: list[str] = []
-            if min_edu and _education_level(talent.get("education")) < _education_level(min_edu):
-                reasons.append(f"学历未达到 {min_edu}")
-            if min_years and float(talent.get("work_years") or 0) < min_years:
-                reasons.append(f"工作年限不足 {min_years} 年")
-            if required_skills and not required_skills.issubset(talent_skills):
-                reasons.append(f"缺少必备技能：{sorted(required_skills - talent_skills)}")
-            if reasons:
+            talent_id = talent.get("id") or talent.get("talent_id")
+
+            hard_results = judge_hard_conditions(
+                talent,
+                pos,
+                config=config,
+                position_id=position_id,
+                talent_id=talent_id,
+            )
+
+            if is_excluded(hard_results):
+                self.excluded.append(
+                    {
+                        "talent_id": talent_id,
+                        "name": talent.get("name"),
+                        "status": "FAIL",
+                        "reasons": [
+                            f"{item.item}：{item.reason}"
+                            for item in hard_results
+                            if item.status.value == "FAIL"
+                        ],
+                    }
+                )
                 continue
-            results.append(
+
+            scored = self.score(talent, pos)
+            score = apply_unknown_penalty(
+                float(scored.get("total_score") or 0), hard_results, config
+            )
+            passed.append(
                 {
-                    "talent_id": talent.get("id"),
+                    "talent_id": talent_id,
                     "name": talent.get("name"),
-                    "score": 100.0,
-                    "dimensions": {},
+                    "score": score,
+                    "dimensions": scored.get("dimensions", {}),
+                    # 注意：这里的 highlights 是「命中的技能名」（事实），
+                    # 与接口解释文本（自然语言）是两个字段，见 schemas/matching.py 的 matched_skills。
+                    "highlights": scored.get("highlights", []),
+                    "gaps": scored.get("gaps", []),
                     "passed": True,
                     "reasons": [],
+                    # *kwq* 新增：四态明细与数据可信度，供 Service 组装 MatchItem 与解释证据
+                    "hard_results": [item.model_dump(mode="json") for item in hard_results],
+                    "hard_status": aggregate_status(hard_results).value,
+                    "has_unknown": has_unknown(hard_results),
+                    "needs_review": has_needs_review(hard_results),
+                    "data_completeness": compute_data_completeness(talent),
                 }
             )
-        return results
+
+        return sorted(passed, key=lambda item: float(item.get("score") or 0), reverse=True)
 
 
 class SoftMatchStrategy(MatchStrategy):
-    """加权软匹配：技能 / 经验 / 学历 / 素质加权打分并排序。"""
+    """加权软匹配：技能 / 经验 / 学历 / 素质加权打分并排序。
+
+    *kwq* 修改（MATCH-019）：软匹配同样产出四态明细，但**不做任何淘汰**。
+    修改原因：原实现只打分、不判定，导致 items 里没有 hard_results，stats 的
+             unknown / needs_review 恒为 0。同一批候选人在 hybrid 下显示「1 人待补全、
+             1 人待复核」，切到 soft 就变成「0」—— 不是变好了，而是根本没算，
+             属于误导性统计，也让「四态判定」这一核心能力在 soft 通道下不可见。
+    影响范围：返回项新增 hard_results / hard_status / has_unknown / needs_review /
+             data_completeness 字段；分数算法与「不淘汰」行为保持不变，
+             excluded 仍为空（soft 的语义就是只排序不筛人）。
+    """
 
     name = "soft"
 
+    def __init__(
+        self,
+        weights: dict[str, float] | None = None,
+        rule_config: Any = None,
+        **options: Any,
+    ) -> None:
+        super().__init__(weights, **options)
+        self.rule_config = rule_config
+
     async def match(self, position: Any, candidates: list[Any]) -> list[dict[str, Any]]:
+        # *kwq* 新增：延迟导入，理由同 HardFilterStrategy —— 避免 patterns 在加载期反向依赖 services。
+        from app.services.matching_rules import (
+            HardRuleConfig,
+            aggregate_status,
+            compute_data_completeness,
+            has_needs_review,
+            has_unknown,
+            judge_hard_conditions,
+        )
+
+        config = self.rule_config or HardRuleConfig()
         pos = _as_dict(position)
-        scored = [self.shape(candidate, self.score(candidate, pos)) for candidate in candidates or []]
+        position_id = pos.get("id") or pos.get("position_id")
+
+        scored: list[dict[str, Any]] = []
+        for candidate in candidates or []:
+            talent = _as_dict(candidate)
+            talent_id = talent.get("id") or talent.get("talent_id")
+            hard_results = judge_hard_conditions(
+                talent,
+                pos,
+                config=config,
+                position_id=position_id,
+                talent_id=talent_id,
+            )
+            item = dict(self.shape(candidate, self.score(candidate, pos)))
+            item.update(
+                {
+                    "hard_results": [raw.model_dump(mode="json") for raw in hard_results],
+                    "hard_status": aggregate_status(hard_results).value,
+                    "has_unknown": has_unknown(hard_results),
+                    "needs_review": has_needs_review(hard_results),
+                    "data_completeness": compute_data_completeness(talent),
+                }
+            )
+            scored.append(item)
+
         return sorted(scored, key=lambda item: float(item.get("score") or 0), reverse=True)
 
 
@@ -208,9 +337,25 @@ class HybridStrategy(MatchStrategy):
 
     name = "hybrid"
 
+    # *kwq* 新增：透传淘汰名单，便于 Service 组装 MatchRunResponse.excluded（原实现无此出口）。
+    def __init__(
+        self,
+        weights: dict[str, float] | None = None,
+        rule_config: Any = None,
+        **options: Any,
+    ) -> None:
+        super().__init__(weights, **options)
+        self.rule_config = rule_config
+        self.excluded: list[dict[str, Any]] = []
+
     async def match(self, position: Any, candidates: list[Any]) -> list[dict[str, Any]]:
-        hard = HardFilterStrategy(weights=self.weights, **self.options)
+        # *kwq* 新增：延迟导入（理由同 HardFilterStrategy：避免 patterns 顶层依赖 services）。
+        from app.services.matching_rules import HardRuleConfig, apply_unknown_penalty_by_flag
+
+        hard = HardFilterStrategy(weights=self.weights, rule_config=self.rule_config, **self.options)
         passed = await hard.match(position, candidates)
+        # *kwq* 新增：把硬过滤淘汰名单上抛给调用方（否则混合策略下淘汰原因彻底丢失）。
+        self.excluded = list(hard.excluded)
         if not passed:
             return []
         passed_ids = {item.get("talent_id") for item in passed}
@@ -221,9 +366,26 @@ class HybridStrategy(MatchStrategy):
         ]
         soft = SoftMatchStrategy(weights=self.weights, **self.options)
         scored = await soft.match(position, pool)
+
+        # *kwq* 新增：把四态明细回填到最终结果，并重新施加 UNKNOWN 降权。
+        # 原因：SoftMatchStrategy 会用 compute_match_score 重算分数，
+        #      若不重新降权，UNKNOWN 候选人在混合策略下会「恢复」满分，降权形同虚设。
+        config = self.rule_config or HardRuleConfig()
+        hard_map = {item.get("talent_id"): item for item in passed}
         for item in scored:
             item["passed"] = True
-        return scored
+            extra = hard_map.get(item.get("talent_id"))
+            if not extra:
+                continue
+            item["score"] = apply_unknown_penalty_by_flag(
+                float(item.get("score") or 0), bool(extra.get("has_unknown")), config
+            )
+            item["hard_results"] = extra.get("hard_results", [])
+            item["hard_status"] = extra.get("hard_status")
+            item["has_unknown"] = extra.get("has_unknown", False)
+            item["needs_review"] = extra.get("needs_review", False)
+            item["data_completeness"] = extra.get("data_completeness", 0.0)
+        return sorted(scored, key=lambda item: float(item.get("score") or 0), reverse=True)
 
 
 class MatchStrategyFactory:

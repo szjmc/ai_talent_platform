@@ -1,0 +1,15 @@
+# gxd-在团队公共依赖已安装的环境中，补充人才档案模块的依赖。
+# 保留原requirements.txt，不将开发机完整pip freeze覆盖团队文件。
+# 说明：人才模块依赖已并入根 requirements.txt；版本以那一份为准，
+#      本文件的 Pillow/PyMuPDF 等区间约束不得与主清单冲突。
+langchain-community==0.3.31
+langgraph==0.2.67
+pymilvus==2.6.9
+pypdf>=5,<7
+python-docx>=1.1,<2
+docx2txt>=0.8,<1
+PyMuPDF>=1.24,<3
+Pillow>=10,<13
+pytesseract>=0.3.13,<1
+python-multipart>=0.0.20
+aiomysql==0.3.2

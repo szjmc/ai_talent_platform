@@ -64,6 +64,12 @@ class User(BaseModel):
     position_title: Mapped[str | None] = mapped_column(
         String(64), nullable=True, comment="岗位名称/职务"
     )
+    talent_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        nullable=True,
+        index=True,
+        comment="关联的人才档案 ID（逻辑外键 -> talents.id）",
+    )
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default=text("1"), comment="是否启用"
     )

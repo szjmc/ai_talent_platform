@@ -140,8 +140,19 @@ class BaseAgent(ABC):
         last_error: str | None = None
         raw = ""
 
-        messages = await self.build_prompt(payload)
-        messages = self._with_system_prompt(messages)
+        # build_prompt 内部会取数据并做参数/权限校验（ParamError / PermissionDeniedError 等），
+        # 这些业务异常必须在 run() 契约内返回结构化错误，而不是裸冒泡成 HTTP 500。
+        # 注意：只捕获 BusinessException，编程类异常（AttributeError/TypeError 等）仍照常抛出，
+        # 避免把代码缺陷伪装成业务错误。
+        try:
+            messages = await self.build_prompt(payload)
+            messages = self._with_system_prompt(messages)
+        except BusinessException as exc:
+            elapsed_ms = (time.perf_counter() - started) * 1000
+            self._publish_ai_call(
+                status="fail", elapsed_ms=elapsed_ms, error_message=exc.message
+            )
+            return self._error_result(exc.message, code=exc.code, elapsed_ms=elapsed_ms)
         # 长外部调用前先归还连接，避免一次 LLM 请求占住池连接几十秒（issue：连接池耗尽）
         await self._release_db_before_llm()
 
@@ -195,13 +206,14 @@ class BaseAgent(ABC):
                 )
                 return self._error_result(exc.message, code=exc.code, elapsed_ms=elapsed_ms)
             except Exception as exc:  # noqa: BLE001 - 模型/解析异常按次数重试
-                last_error = str(exc)
+                # 带异常类型，避免底层异常 str 为空（如部分网络/TLS 故障）时错误信息只剩空串
+                last_error = f"{type(exc).__name__}: {exc}"
                 logger.warning(
                     "Agent %s 第 %s/%s 次执行失败：%s",
                     self.name,
                     attempt,
                     attempts,
-                    exc,
+                    last_error,
                 )
                 if attempt >= attempts:
                     break

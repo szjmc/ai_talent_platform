@@ -71,11 +71,16 @@ def test_every_python_file_has_valid_tag():
 
 
 def test_root_config_files_have_tag_comment():
-    """根目录配置文件前 10 行内必须带「# 标签：」注释。"""
+    """按BOM兼容UTF-16/UTF-8，仍要求配置文件前10行带「# 标签：」注释。"""
     problems: list[str] = []
     for name in CONFIG_FILES:
         path = ROOT / name
-        head = path.read_text(encoding="utf-8").splitlines()[:10]
+        raw = path.read_bytes()
+        encoding = "utf-16" if raw.startswith((b"\xff\xfe", b"\xfe\xff")) else "utf-8-sig"
+        head = raw.decode(encoding).splitlines()[:10]
+        raw = path.read_bytes()
+        content = raw.decode("utf-16") if raw.startswith((b"\xff\xfe", b"\xfe\xff")) else raw.decode("utf-8-sig")
+        head = content.splitlines()[:10]
         if not any(line.startswith("# 标签：") for line in head):
             problems.append(f"{name}: 前 10 行缺少「# 标签：」注释")
     assert not problems, "配置文件标签缺失：\n" + "\n".join(problems)

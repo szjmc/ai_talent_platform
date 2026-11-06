@@ -14,10 +14,8 @@
 - 结果以「列 + 行」形式返回，避免 LLM 二次解析出错；
 - 错误处理：SQL 生成失败 / 校验拒绝 / 执行超时 -> 结构化错误（不抛裸异常）。
 已完成：
-    - [x] query_database 技能 + 入参防护 + 行数/超时约束 + 结果整形
-待实现（依赖方）：
-    - [ ] VannaAdapter.ask（Vanna 组）
-    - [ ] sql_validator.validate_select_sql（Vanna 组）
+    - [x] query_database 技能、入参防护、可信范围、结果整形
+    - [x] Vanna MVP ask / SQLValidator 对接（部署依赖须配置）
 =========================================================================
 """
 
@@ -96,6 +94,12 @@ class SqlQuerySkill(BaseSkill):
         with_insight: bool = False,
         **_: Any,
     ) -> dict[str, Any]:
+        """Agent 的实际问数操作：读可信上下文 → 输入护栏 → 调 Adapter → 整形结果。
+
+        question/max_rows/with_insight 来自工具参数；**_ 丢弃额外参数，
+        不让模型指定 user_id、roles 等身份。对外应经 BaseSkill.run 调用，
+        由 run 统一处理参数、权限、超时与结构化错误。
+        """
         context = load_skill_context()
         question = (question or "").strip()
         if not question:
@@ -120,7 +124,8 @@ class SqlQuerySkill(BaseSkill):
             "organization_id": context.organization_id,
             "data_scope": context.data_scope,
         }
-        result = method(question=question, user_scope=scope, max_rows=max_rows)
+        result = method(question=question, user_scope=scope, max_rows=max_rows, with_insight=with_insight)
+        # 兼容同步替代实现和当前异步 ask，统一拿到结果后再转成工具返回结构。
         if hasattr(result, "__await__"):
             result = await result
         return self._shape(result, question, max_rows, with_insight)
@@ -132,6 +137,7 @@ class SqlQuerySkill(BaseSkill):
             raise ParamError("查询内容包含不被允许的数据库操作语句")
 
     def _load_adapter(self) -> Any:
+        """延迟加载 Vanna 适配器；未就绪时由公共依赖助手返回可识别的技能错误。"""
         adapter_cls = import_dependency(
             "app.adapters.nl2sql.vanna_adapter",
             "VannaAdapter",
@@ -141,7 +147,11 @@ class SqlQuerySkill(BaseSkill):
 
     @staticmethod
     def _shape(result: Any, question: str, max_rows: int, with_insight: bool) -> dict[str, Any]:
-        """把 Vanna 返回值（dict / Pydantic / ORM）收敛成统一结构。"""
+        """把 dict/对象形式结果转换为 Agent 易使用的列名、数据行和附加信息。
+
+        保留图表、耗时、缓存标记及警告；with_insight 控制是否返回解读。
+        行数/单格字符串截断只防止工具结果过大，不替代数据库 LIMIT 或行级权限。
+        """
         if isinstance(result, dict):
             data = dict(result)
         else:
@@ -150,11 +160,17 @@ class SqlQuerySkill(BaseSkill):
                 "columns": getattr(result, "columns", None) or [],
                 "rows": getattr(result, "rows", None) or [],
                 "insight": getattr(result, "insight", None),
-                "chart": getattr(result, "chart", None),
+                "chart": (getattr(result, "chart", None).model_dump(mode="json")
+                          if hasattr(getattr(result, "chart", None), "model_dump")
+                          else getattr(result, "chart", None)),
+                "elapsed_ms": getattr(result, "elapsed_ms", 0),
+                "cached": getattr(result, "cached", False),
+                "warnings": getattr(result, "warnings", []),
             }
 
         columns = list(data.get("columns") or [])
         rows = [list(row) for row in (data.get("rows") or [])]
+        # 只描述整形阶段是否丢弃了行；不代表数据库里符合条件的总行数。
         truncated = len(rows) > max_rows
         rows = rows[:max_rows]
         # 单格截断，避免超大文本挤爆 LLM 上下文
@@ -176,7 +192,10 @@ class SqlQuerySkill(BaseSkill):
             "row_count": len(rows),
             "truncated": truncated,
             "max_rows": max_rows,
-            "database": settings.PGSQL_DB if settings.PGSQL_ENABLED else settings.DB_NAME,
+            "database": settings.PGSQL_DB,
+            "elapsed_ms": data.get("elapsed_ms", 0),
+            "cached": data.get("cached", False),
+            "warnings": data.get("warnings") or [],
         }
         if with_insight:
             payload["insight"] = data.get("insight")
@@ -188,5 +207,15 @@ class SqlQuerySkill(BaseSkill):
 
 # ------------------------------------------------------------------ 函数式入口
 async def query_database(question: str, max_rows: int = 200, with_insight: bool = False) -> dict[str, Any]:
-    """函数式入口：等价于 SqlQuerySkill().execute(...)。"""
-    return await SqlQuerySkill().execute(question=question, max_rows=max_rows, with_insight=with_insight)
+    """供其他 Python 模块调用的便捷入口，与 Agent 一样经 run 做完整检查。
+
+    成功返回结果字典；失败把 SkillResult 中的错误码恢复为业务异常，
+    保留参数错误422、SQL拒绝400、权限403等含义，供上层统一处理。
+    """
+    from app.core.exceptions import BusinessException
+
+    result = await SqlQuerySkill().run(question=question, max_rows=max_rows, with_insight=with_insight)
+    if not result.ok:
+        status = {1001: 422, 1002: 400, 2001: 401, 2004: 403}.get(result.error_code, 502)
+        raise BusinessException(result.error, code=result.error_code, status_code=status)
+    return result.data

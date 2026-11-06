@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>智能培训赋能模块 · 汇报材料</title>
+<style>
+:root{
+  --bg:#F6F6F3; --card:#FFFFFF; --ink:#1C1C1A; --ink2:#55554F; --ink3:#8B8B83;
+  --line:#E5E5DE; --line2:#D2D2C9;
+  --brand:#1B4D6B; --brand-bg:#E8F0F5;
+  --teal:#0F6E56; --teal-bg:#E1F5EE;
+  --amber:#8A5A0B; --amber-bg:#FAEEDA;
+  --red:#9B2C2C; --red-bg:#FCEBEB;
+  --pink:#8C3355; --pink-bg:#FBEAF0;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#191918; --card:#222221; --ink:#ECECE6; --ink2:#B0B0A8; --ink3:#82827A;
+    --line:#32322E; --line2:#42423C;
+    --brand:#8FC2DE; --brand-bg:#17303D;
+    --teal:#5DCAA5; --teal-bg:#122F28;
+    --amber:#EFB75E; --amber-bg:#33280F;
+    --red:#F09595; --red-bg:#33201F;
+    --pink:#ED93B1; --pink-bg:#331E27;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:system-ui,-apple-system,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+  font-size:14px;line-height:1.7;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.page{max-width:1080px;margin:0 auto;padding:0 30px 100px}
+
+/* ---------- hero ---------- */
+.hero{padding:56px 0 34px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.eyebrow{font-size:12px;letter-spacing:.14em;color:var(--ink3);text-transform:uppercase;
+  margin-bottom:14px;font-family:ui-monospace,monospace}
+.hero h1{margin:0 0 14px;font-size:33px;line-height:1.28;font-weight:500;letter-spacing:-.02em}
+.hero h1 em{font-style:normal;color:var(--brand)}
+.tagline{font-size:15.5px;color:var(--ink2);max-width:720px;margin:0 0 26px;line-height:1.75}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:10px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.kpi .v{font-size:23px;font-weight:500;line-height:1.2;letter-spacing:-.02em}
+.kpi .v small{font-size:12.5px;font-weight:400;color:var(--ink2);margin-left:3px}
+.kpi .k{font-size:12px;color:var(--ink3);margin-top:4px}
+
+/* ---------- nav ---------- */
+nav.toc{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);
+  backdrop-filter:blur(8px);border-bottom:1px solid var(--line);margin-bottom:36px;
+  display:flex;gap:2px;overflow-x:auto;padding:9px 0;scrollbar-width:none}
+nav.toc::-webkit-scrollbar{display:none}
+nav.toc a{flex-shrink:0;padding:5px 11px;border-radius:6px;color:var(--ink2);
+  text-decoration:none;font-size:12.5px;white-space:nowrap}
+nav.toc a:hover{background:var(--brand-bg);color:var(--brand)}
+
+/* ---------- section ---------- */
+section{margin-bottom:52px;scroll-margin-top:64px}
+h2{font-size:21px;font-weight:500;margin:0 0 6px;letter-spacing:-.01em;
+  display:flex;align-items:baseline;gap:11px}
+h2 .num{font-family:ui-monospace,monospace;font-size:12.5px;color:var(--brand);
+  background:var(--brand-bg);padding:2px 7px;border-radius:5px;letter-spacing:0}
+.lede{color:var(--ink2);font-size:14px;margin:0 0 20px;max-width:800px}
+h3{font-size:15px;font-weight:500;margin:30px 0 12px;padding-left:11px;
+  border-left:2.5px solid var(--brand)}
+h4{font-size:13.5px;font-weight:500;margin:20px 0 8px;color:var(--ink2)}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+  padding:22px 24px;margin-bottom:16px}
+.card > :first-child{margin-top:0}
+.card > :last-child{margin-bottom:0}
+
+/* ---------- table ---------- */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin:14px 0;
+  background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;padding:10px 14px;background:var(--bg);color:var(--ink2);font-weight:500;
+  border-bottom:1px solid var(--line2);white-space:nowrap}
+td{padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:color-mix(in srgb,var(--brand-bg) 40%,transparent)}
+td.c,th.c{text-align:center}
+td.n{font-family:ui-monospace,monospace;text-align:right;color:var(--ink2)}
+
+/* ---------- atoms ---------- */
+.pill{display:inline-block;font-size:11.5px;padding:1.5px 7px;border-radius:5px;
+  font-family:ui-monospace,monospace;white-space:nowrap}
+.p-brand{background:var(--brand-bg);color:var(--brand)}
+.p-teal{background:var(--teal-bg);color:var(--teal)}
+.p-amber{background:var(--amber-bg);color:var(--amber)}
+.p-red{background:var(--red-bg);color:var(--red)}
+.p-pink{background:var(--pink-bg);color:var(--pink)}
+.p-plain{background:var(--bg);color:var(--ink2);border:1px solid var(--line2)}
+
+.file{font-family:ui-monospace,monospace;font-size:12px;color:var(--brand);
+  background:var(--brand-bg);padding:1.5px 6px;border-radius:4px;white-space:nowrap}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:820px){.grid2,.grid3{grid-template-columns:1fr}}
+
+.note{border-left:3px solid var(--amber);background:var(--amber-bg);
+  padding:12px 16px;border-radius:0 8px 8px 0;font-size:13px;color:var(--ink);margin:14px 0}
+.note b{color:var(--amber)}
+.good{border-left:3px solid var(--teal);background:var(--teal-bg);
+  padding:12px 16px;border-radius:0 8px 8px 0;font-size:13px;margin:14px 0}
+.good b{color:var(--teal)}
+.bad{border-left:3px solid var(--red);background:var(--red-bg);
+  padding:12px 16px;border-radius:0 8px 8px 0;font-size:13px;margin:14px 0}
+.bad b{color:var(--red)}
+
+code{font-family:ui-monospace,monospace;font-size:12.2px;background:var(--bg);
+  border:1px solid var(--line);padding:1px 5px;border-radius:4px}
+pre{margin:12px 0;padding:16px 18px;background:var(--bg);border:1px solid var(--line);
+  border-radius:9px;overflow-x:auto;font-family:ui-monospace,monospace;
+  font-size:12.2px;line-height:1.75}
+pre code{background:none;border:none;padding:0;font-size:inherit}
+
+ul,ol{padding-left:22px;margin:10px 0}
+li{margin:5px 0}
+ul.tight li{margin:3px 0}
+
+/* ---------- node cards ---------- */
+.node-card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+  margin-bottom:14px;overflow:hidden}
+.node-head{display:flex;align-items:center;gap:13px;padding:15px 20px;
+  border-bottom:1px solid var(--line)}
+.node-no{flex-shrink:0;width:29px;height:29px;border-radius:8px;background:var(--brand-bg);
+  color:var(--brand);font-family:ui-monospace,monospace;font-size:13px;
+  display:flex;align-items:center;justify-content:center}
+.node-head h4{margin:0;font-size:14.5px;font-weight:500;color:var(--ink);flex:1}
+.node-head .who{font-size:11.5px;color:var(--ink3);flex-shrink:0}
+.node-body{padding:16px 20px}
+.node-body > :first-child{margin-top:0}
+.node-body > :last-child{margin-bottom:0}
+.io-row{display:grid;grid-template-columns:64px 1fr;gap:6px 14px;font-size:13px;margin:9px 0}
+.io-row .lbl{color:var(--ink3);font-size:12.5px}
+.formula{background:var(--bg);border-radius:7px;padding:11px 14px;margin:10px 0;
+  font-family:ui-monospace,monospace;font-size:12.3px;line-height:1.85;color:var(--ink2);
+  border:1px solid var(--line);overflow-x:auto}
+.formula b{color:var(--ink);font-weight:500}
+
+/* ---------- qa ---------- */
+.qa{border-bottom:1px solid var(--line);padding:15px 0}
+.qa:last-child{border-bottom:none}
+.qa .q{font-weight:500;font-size:13.8px;margin-bottom:6px;display:flex;gap:9px}
+.qa .q .qm{color:var(--brand);font-family:ui-monospace,monospace;flex-shrink:0}
+.qa .a{color:var(--ink2);font-size:13px;padding-left:26px}
+.qa .a strong{color:var(--ink);font-weight:500}
+
+/* ---------- footer ---------- */
+footer{margin-top:60px;padding-top:26px;border-top:1px solid var(--line);
+  color:var(--ink3);font-size:12.5px;display:flex;justify-content:space-between;
+  flex-wrap:wrap;gap:10px}
+
+@media print{
+  body{background:#fff}
+  nav.toc{display:none}
+  .page{max-width:none;padding:0 12mm}
+  section{page-break-inside:avoid;margin-bottom:26px}
+  .card,.node-card{page-break-inside:avoid}
+  .hero{padding:0 0 20px}
+  a{color:inherit;text-decoration:none}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="hero">
+  <div class="eyebrow">AI 数字化人才平台 · 需求 2.4 · 智能培训赋能</div>
+  <h1>拿到能力短板，<em>排出可执行的课表</em>，<br>盯完 4 周，达标回流复测</h1>
+  <p class="tagline">
+    本模块是「测评」与「人才发展」之间的执行环节：消费测评产出的差距数据，
+    输出带真实课程的学习计划，跟踪过程、组织考核，并把结果以事件形式回流测评，
+    形成「测评 → 培训 → 复测」的完整闭环。
+  </p>
+  <div class="kpis">
+    <div class="kpi"><div class="v">6<small>节点</small></div><div class="k">完整业务流程</div></div>
+    <div class="kpi"><div class="v">11<small>条</small></div><div class="k">HTTP 路径 / 13 方法</div></div>
+    <div class="kpi"><div class="v">44<small>条</small></div><div class="k">本模块自动化测试</div></div>
+    <div class="kpi"><div class="v">1.0</div><div class="k">课程来自课程库比例</div></div>
+    <div class="kpi"><div class="v">5.5<small>k 行</small></div><div class="k">新增代码总量</div></div>
+    <div class="kpi"><div class="v">0<small>侵入</small></div><div class="k">未改动他人模块逻辑</div></div>
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#s1">01 定位与边界</a>
+  <a href="#s2">02 业务全景</a>
+  <a href="#s3">03 节点详解</a>
+  <a href="#s4">04 技术架构</a>
+  <a href="#s5">05 智能设计</a>
+  <a href="#s6">06 数据模型</a>
+  <a href="#s7">07 对外契约</a>
+  <a href="#s8">08 质量保障</a>
+  <a href="#s9">09 设计亮点</a>
+  <a href="#s10">10 不足与演进</a>
+  <a href="#s11">11 答辩预案</a>
+  <a href="#s12">12 复现方式</a>
+</nav>
+
+<section id="s1">
+  <h2><span class="num">01</span>模块定位与边界</h2>
+  <p class="lede">
+    一句话：<b>消费测评的差距，产出可执行的学习计划，并把结果送回测评。</b>
+    上游不产出数据，下游不改别人的表——这是本模块最需要说清楚的一件事。
+  </p>
+
+  <div class="card">
+    <svg viewBox="0 0 680 240" width="100%" role="img" aria-label="培训模块上下游关系">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+
+      <rect x="20" y="70" width="150" height="62" rx="9" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+      <text x="95" y="90" text-anchor="middle" font-size="13" font-weight="500" fill="#2C2C2A" font-family="system-ui,sans-serif" dominant-baseline="central">智能测评模块</text>
+      <text x="95" y="108" text-anchor="middle" font-size="11" fill="#5F5E5A" font-family="system-ui,sans-serif" dominant-baseline="central">上游 · 产出 gaps</text>
+      <text x="95" y="122" text-anchor="middle" font-size="10.5" fill="#888780" font-family="ui-monospace,monospace" dominant-baseline="central">他人负责</text>
+
+      <path d="M170 101 L216 101" stroke="#5F5E5A" stroke-width="1.5" fill="none" marker-end="url(#ar)"/>
+      <text x="193" y="88" text-anchor="middle" font-size="10.5" fill="#888780" font-family="ui-monospace,monospace">gaps[]</text>
+
+      <rect x="220" y="52" width="240" height="98" rx="11" fill="#E8F0F5" stroke="#1B4D6B" stroke-width="0.8"/>
+      <text x="340" y="76" text-anchor="middle" font-size="14.5" font-weight="500" fill="#123B52" font-family="system-ui,sans-serif" dominant-baseline="central">智能培训赋能模块</text>
+      <text x="340" y="96" text-anchor="middle" font-size="11.5" fill="#1B4D6B" font-family="system-ui,sans-serif" dominant-baseline="central">六节点 · 计划 / 进度 / 考核</text>
+      <text x="340" y="118" text-anchor="middle" font-size="11" fill="#1B4D6B" font-family="ui-monospace,monospace" dominant-baseline="central">training_plans · plan_courses</text>
+      <text x="340" y="134" text-anchor="middle" font-size="11" fill="#1B4D6B" font-family="ui-monospace,monospace" dominant-baseline="central">learning_records</text>
+
+      <path d="M460 101 L506 101" stroke="#5F5E5A" stroke-width="1.5" fill="none" marker-end="url(#ar)"/>
+      <text x="483" y="88" text-anchor="middle" font-size="10.5" fill="#888780" font-family="ui-monospace,monospace">event</text>
+
+      <rect x="510" y="70" width="150" height="62" rx="9" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+      <text x="585" y="90" text-anchor="middle" font-size="13" font-weight="500" fill="#2C2C2A" font-family="system-ui,sans-serif" dominant-baseline="central">通知 / 人才模块</text>
+      <text x="585" y="108" text-anchor="middle" font-size="11" fill="#5F5E5A" font-family="system-ui,sans-serif" dominant-baseline="central">订阅事件</text>
+      <text x="585" y="122" text-anchor="middle" font-size="10.5" fill="#888780" font-family="ui-monospace,monospace" dominant-baseline="central">他人负责</text>
+
+      <path d="M340 150 L340 186 L95 186 L95 132" stroke="#0F6E56" stroke-width="1.3" fill="none"
+        stroke-dasharray="5 4" marker-end="url(#ar)"/>
+      <text x="215" y="200" text-anchor="middle" font-size="11" fill="#0F6E56" font-family="system-ui,sans-serif">training.retest.required　复测回流 · 闭环</text>
+    </svg>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h4>只读别人的表（不写）</h4>
+      <ul class="tight">
+        <li><span class="file">talents</span> 校验人才存在、读 <code>current_position</code></li>
+        <li><span class="file">positions</span> 岗位标题匹配</li>
+        <li><span class="file">position_requirements</span> 能力模型定标准</li>
+        <li><span class="file">assessments</span> / <code>assessment_results</code> gaps 兜底</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>自己的表（全权）</h4>
+      <ul class="tight">
+        <li><span class="file">courses</span> 课程库</li>
+        <li><span class="file">training_plans</span> 计划主体</li>
+        <li><span class="file">plan_courses</span> 计划-课程关联</li>
+        <li><span class="file">learning_records</span> 学习与考核记录</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>边界声明（答辩常问）：</b>不做测评出题与打分、不做人才建档与简历解析、
+    不做岗位能力模型维护、不做前端页面与推送渠道、不做课程内容生产、
+    不做培训 A/B 实验（单企业样本量不足，统计上不成立）。
+  </div>
+</section>
+
+<section id="s2">
+  <h2><span class="num">02</span>整体业务流程全景</h2>
+  <p class="lede">
+    六个节点串成一条主链路，其中节点 5 是<b>独立的定时任务</b>而不是流程里的一步，
+    节点 6 通过事件回流测评形成闭环。这是本模块在架构上最关键的两个判断。
+  </p>
+
+  <div class="card">
+    <svg viewBox="0 0 680 300" width="100%" role="img" aria-label="六节点业务流程">
+      <defs>
+        <marker id="b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+
+      <rect x="40" y="34" width="170" height="66" rx="9" fill="#E8F0F5" stroke="#1B4D6B" stroke-width="0.5"/>
+      <text x="56" y="55" font-size="11" fill="#1B4D6B" font-family="ui-monospace,monospace">节点 1</text>
+      <text x="56" y="73" font-size="13.5" font-weight="500" fill="#123B52" font-family="system-ui,sans-serif">短板诊断</text>
+      <text x="56" y="89" font-size="10.5" fill="#1B4D6B" font-family="system-ui,sans-serif">剔达标 · 定 P0/P1/P2</text>
+
+      <path d="M210 67 L251 67" stroke="#888780" stroke-width="1.5" fill="none" marker-end="url(#b)"/>
+
+      <rect x="255" y="34" width="170" height="66" rx="9" fill="#E8F0F5" stroke="#1B4D6B" stroke-width="0.5"/>
+      <text x="271" y="55" font-size="11" fill="#1B4D6B" font-family="ui-monospace,monospace">节点 2</text>
+      <text x="271" y="73" font-size="13.5" font-weight="500" fill="#123B52" font-family="system-ui,sans-serif">方案排期</text>
+      <text x="271" y="89" font-size="10.5" fill="#1B4D6B" font-family="system-ui,sans-serif">4 周 · 每周 ≤8 学时</text>
+
+      <path d="M425 67 L466 67" stroke="#888780" stroke-width="1.5" fill="none" marker-end="url(#b)"/>
+
+      <rect x="470" y="34" width="170" height="66" rx="9" fill="#E8F0F5" stroke="#1B4D6B" stroke-width="0.5"/>
+      <text x="486" y="55" font-size="11" fill="#1B4D6B" font-family="ui-monospace,monospace">节点 3</text>
+      <text x="486" y="73" font-size="13.5" font-weight="500" fill="#123B52" font-family="system-ui,sans-serif">课程匹配</text>
+      <text x="486" y="89" font-size="10.5" fill="#1B4D6B" font-family="system-ui,sans-serif">挂真实课程 · 缺课降级</text>
+
+      <path d="M555 100 L555 148" stroke="#888780" stroke-width="1.5" fill="none" marker-end="url(#b)"/>
+
+      <rect x="470" y="152" width="170" height="66" rx="9" fill="#E8F0F5" stroke="#1B4D6B" stroke-width="0.5"/>
+      <text x="486" y="173" font-size="11" fill="#1B4D6B" font-family="ui-monospace,monospace">节点 4</text>
+      <text x="486" y="191" font-size="13.5" font-weight="500" fill="#123B52" font-family="system-ui,sans-serif">推送存档</text>
+      <text x="486" y="207" font-size="10.5" fill="#1B4D6B" font-family="system-ui,sans-serif">落库 + plan_created</text>
+
+      <path d="M470 185 L429 185" stroke="#888780" stroke-width="1.5" fill="none" marker-end="url(#b)"/>
+
+      <rect x="255" y="152" width="170" height="66" rx="9" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+      <text x="271" y="173" font-size="11" fill="#0F6E56" font-family="ui-monospace,monospace">节点 5</text>
+      <text x="271" y="191" font-size="13.5" font-weight="500" fill="#04342C" font-family="system-ui,sans-serif">进度跟踪</text>
+      <text x="271" y="207" font-size="10.5" fill="#0F6E56" font-family="system-ui,sans-serif">定时任务 · 判级发事件</text>
+
+      <path d="M255 185 L214 185" stroke="#888780" stroke-width="1.5" fill="none" marker-end="url(#b)"/>
+
+      <rect x="40" y="152" width="170" height="66" rx="9" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+      <text x="56" y="173" font-size="11" fill="#854F0B" font-family="ui-monospace,monospace">节点 6</text>
+      <text x="56" y="191" font-size="13.5" font-weight="500" fill="#412402" font-family="system-ui,sans-serif">考核复测</text>
+      <text x="56" y="207" font-size="10.5" fill="#854F0B" font-family="system-ui,sans-serif">≥80 分回流测评</text>
+
+      <rect x="40" y="236" width="600" height="44" rx="8" fill="none" stroke="#0F6E56"
+        stroke-width="0.8" stroke-dasharray="5 4"/>
+      <text x="340" y="252" text-anchor="middle" font-size="11" fill="#0F6E56"
+        font-family="ui-monospace,monospace">training.retest.required</text>
+      <text x="340" y="269" text-anchor="middle" font-size="11" fill="#0F6E56"
+        font-family="system-ui,sans-serif">考核通过 → 上游测评复测 → 若仍有缺口则再生成计划　·　闭环</text>
+    </svg>
+  </div>
+
+  <p style="font-size:12.8px;color:var(--ink2);margin:12px 0 0">
+    <b>主链路</b>　<code>POST /trainings/plans/generate</code>　→　节点 1~4 一次完成（秒级）<br>
+    <b>支线</b>　<code>/records</code> · <code>/progress</code> · <code>/lag-scan</code> · <code>/score</code>　→　跨越 4 周持续发生（按需 / 定时）
+  </p>
+
+  <h3>节点契约一览</h3>
+  <div class="tw">
+    <table>
+      <thead><tr>
+        <th style="width:56px">节点</th><th style="width:130px">干什么</th>
+        <th>输入 → 输出</th><th style="width:150px">代码位置</th>
+      </tr></thead>
+      <tbody>
+        <tr><td class="c"><span class="pill p-brand">1</span></td><td>短板诊断</td>
+          <td><code>gaps[]</code> → 带 <code>delta</code> / <code>priority</code> / <code>est_hours</code> 的短板列表</td>
+          <td><span class="file">diagnose_gaps</span></td></tr>
+        <tr><td class="c"><span class="pill p-brand">2</span></td><td>方案排期</td>
+          <td>短板列表 + 周数/学时约束 → 周次 × 维度 × 学时的骨架</td>
+          <td><span class="file">rule_schedule</span></td></tr>
+        <tr><td class="c"><span class="pill p-brand">3</span></td><td>课程匹配</td>
+          <td>骨架 + 课程库 → 带 <code>course_id</code> 的完整课表</td>
+          <td><span class="file">match_courses</span></td></tr>
+        <tr><td class="c"><span class="pill p-brand">4</span></td><td>推送存档</td>
+          <td>课表 → <code>training_plans</code> + <code>plan_courses</code> + 事件</td>
+          <td><span class="file">create_plan</span></td></tr>
+        <tr><td class="c"><span class="pill p-teal">5</span></td><td>进度跟踪</td>
+          <td>时间进度 vs 完成学时 → 正常 / 提醒 / HR 预警</td>
+          <td><span class="file">compute_progress</span></td></tr>
+        <tr><td class="c"><span class="pill p-amber">6</span></td><td>考核复测</td>
+          <td>分数 + 及格线 → 通过则发复测事件，未过发调整事件</td>
+          <td><span class="file">assess</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="s3">
+  <h2><span class="num">03</span>六个节点逐一详解</h2>
+  <p class="lede">
+    每个节点写清四件事：<b>拿什么、算什么、守什么约束、怎么验证</b>。
+    所有阈值集中在 <span class="file">training_logic.py</span> 顶部，
+    改一个数就能做对照实验。
+  </p>
+
+  <div class="node-card">
+    <div class="node-head">
+      <div class="node-no">1</div>
+      <h4>短板诊断 —— 决定「学什么」</h4>
+      <span class="who">规则引擎 · 模型不参与</span>
+    </div>
+    <div class="node-body">
+      <div class="io-row"><span class="lbl">输入</span><span>测评给的 <code>gaps[]</code>，或 <code>position_id</code> + 只带 <code>current</code> 的分数；岗位能力模型自动补 <code>required</code> 与 <code>weight</code></span></div>
+      <div class="io-row"><span class="lbl">输出</span><span>过滤排序后的短板列表，每项带 <code>delta</code>、<code>priority</code>、<code>est_hours</code></span></div>
+      <div class="formula">
+        delta = required − current　　缺口 ≤ 0 <b>直接剔除</b>，不排课<br>
+        delta ≥ <b>20</b> → P0　｜　delta ≥ <b>8</b> → P1　｜　其余 → P2<br>
+        权重 ≥ <b>0.25</b> 的岗位关键维度　→　<b>直接抬到 P0</b><br>
+        est_hours = clamp(round(delta / 4) + 2, <b>3</b>, <b>8</b>)
+      </div>
+      <h4>为什么这么设计</h4>
+      <ul class="tight">
+        <li><b>已达标不排课</b>：缺口 ≤ 0 剔除，避免"考了 85 分还让学 80 分要求的内容"</li>
+        <li><b>权重能越级</b>：缺口只差 5 分但权重 0.3 的维度，直接 P0——岗位最看重的能力，哪怕差一点也要优先补</li>
+        <li><b>标准可溯源</b>：响应带 <code>requirement_source</code>（<code>position_model</code> / <code>explicit</code> / <code>default</code>），用了谁的标准一目了然</li>
+      </ul>
+      <div class="good"><b>实测证据：</b>同一份分数、换岗位标准，排序结果不同——数据分析师把「SQL 与数据库」排第一，
+        AI 产品经理把「需求分析」排第一（后者权重 0.25 命中关键维度阈值）。这就是「千人千面」的实际来源。</div>
+    </div>
+  </div>
+
+  <div class="node-card">
+    <div class="node-head">
+      <div class="node-no">2</div>
+      <h4>方案排期 —— 决定「怎么排」</h4>
+      <span class="who">LLM 编排 · 规则守底线</span>
+    </div>
+    <div class="node-body">
+      <div class="io-row"><span class="lbl">输入</span><span>短板列表 + 周期约束（默认 4 周 / 每周 8 学时）</span></div>
+      <div class="io-row"><span class="lbl">输出</span><span><code>week</code> × <code>dimension</code> × <code>hours</code> 的排期骨架，同周同维度合并</span></div>
+      <div class="formula">
+        总量 = Σ est_hours　｜　容量 = max_weeks × max_hours_per_week<br>
+        总量 &gt; 容量　→　<b>抛 CapacityExceeded</b>，提示「建议延长至 N 周」<br>
+        单个学习单元最长 <b>4 学时</b>，避免一门课压满整周
+      </div>
+      <h4>LLM 在这里做什么、不做什么</h4>
+      <div class="grid2">
+        <div>
+          <p style="margin:8px 0 6px"><span class="pill p-teal">会做</span></p>
+          <ul class="tight">
+            <li>决定每个短板分到第几周</li>
+            <li>为每周写一句人话理由</li>
+            <li>在约束内做更自然的分布</li>
+          </ul>
+        </div>
+        <div>
+          <p style="margin:8px 0 6px"><span class="pill p-red">拿不到</span></p>
+          <ul class="tight">
+            <li>课程库（结构上不给）</li>
+            <li>约束校验权（<code>legal_skeleton</code> 拦截）</li>
+            <li>自由发挥空间（维度必须在短板内）</li>
+          </ul>
+        </div>
+      </div>
+      <div class="note"><b>关键：</b>模型只拿到「短板 + 约束」，<b>拿不到课程池</b>。
+        这是刻意从信息结构上断掉它编造课程的可能——不是靠提示词求它别乱写。</div>
+    </div>
+  </div>
+
+  <div class="node-card">
+    <div class="node-head">
+      <div class="node-no">3</div>
+      <h4>课程匹配 —— 决定「用什么教材」</h4>
+      <span class="who">SQL + 规则 · 模型不参与</span>
+    </div>
+    <div class="node-body">
+      <div class="io-row"><span class="lbl">输入</span><span>排期骨架 + <code>courses</code> 表 + 该学员已学过的课程 ID</span></div>
+      <div class="io-row"><span class="lbl">输出</span><span>每项挂上 <code>course_id</code> / <code>title</code> / <code>level</code>，或降级为外部学习建议</span></div>
+      <div class="formula">
+        匹配条件：category 相同 <b>或</b> skill_tags 命中<br>
+        排除：已学过（learned）、本计划已占用（taken）<br>
+        层级贴合：目标层级 ±1 档内；无贴合则取最接近的一门<br>
+        同层多门时：<b>学时长的优先</b>
+      </div>
+      <h4>缺课怎么办</h4>
+      <p style="margin:8px 0">库里找不到对应课程时，<b>不编造课程名</b>：该项标记 <code>is_platform=false</code>、
+        <code>title=null</code>，另给一条 <code>external_suggestion</code> 外部学习方向建议，
+        并计入 <code>external_count</code>。</p>
+      <div class="good"><b>实测证据：</b>正常链路 <code>library_rate = 1.0</code>（课程 100% 来自课程库）；
+        清空课程库后 <code>external_count &gt; 0</code>、<code>title = null</code>，且不报错。</div>
+    </div>
+  </div>
+
+  <div class="node-card">
+    <div class="node-head">
+      <div class="node-no">4</div>
+      <h4>推送存档 —— 落地 + 写说明</h4>
+      <span class="who">LLM 写文案 · 事实已固定</span>
+    </div>
+    <div class="node-body">
+      <div class="io-row"><span class="lbl">输入</span><span>完整课表 + 学员姓名 + 统计量（周数、总学时、降级项数）</span></div>
+      <div class="io-row"><span class="lbl">输出</span><span><code>training_plans</code> 主记录 + <code>plan_courses</code> 明细 + <code>training.plan_created</code> 事件 + 80–120 字方案说明</span></div>
+      <p style="margin:10px 0">这一步模型<b>只做一件事</b>：把已经算好的数字讲成人话。
+        排期、总量、课程、及格线全部是既定事实，模型改不动。</p>
+      <div class="formula">
+        created_by_ai = (generated_by == "llm")　→　前端显示「AI 生成」标识<br>
+        summary_source = "llm" | "rule"　→　说明文案的来源，可追溯
+      </div>
+      <div class="note"><b>容错：</b>事件发布失败不影响主流程（计划已落库就算成功），
+        避免通知模块抖动导致培训计划创建失败。</div>
+    </div>
+  </div>
+
+  <div class="node-card">
+    <div class="node-head">
+      <div class="node-no" style="background:var(--teal-bg);color:var(--teal)">5</div>
+      <h4>进度跟踪 —— 决定「谁掉队了」</h4>
+      <span class="who">独立定时任务 · 规则</span>
+    </div>
+    <div class="node-body">
+      <div class="io-row"><span class="lbl">输入</span><span>计划总学时、时间流逝比例、已完成学时</span></div>
+      <div class="io-row"><span class="lbl">输出</span><span>预期学时、落后比例、完成率、四级判定 + 对应事件</span></div>
+      <div class="formula">
+        expected = total × elapsed<br>
+        lag = (expected − done) / total<br>
+        落后 ≥ <b>40%</b> → HR 预警（training.lag.alert）<br>
+        落后 ≥ <b>20%</b> → 提醒（training.lag.remind）<br>
+        完成 ≥ 总量 → 已按期完成
+      </div>
+      <h4>为什么不做成流程里的循环</h4>
+      <p style="margin:8px 0">进度跟踪跨越 4 周、持续发生，与"生成计划"不是同一个时间尺度。
+        做成流程节点会导致长事务挂起、无法单独重跑。
+        因此拆成 <code>POST /trainings/lag-scan</code> 独立入口，由调度器定时调用，
+        <b>可重入、可单测、可手工补扫</b>。</p>
+    </div>
+  </div>
+
+  <div class="node-card">
+    <div class="node-head">
+      <div class="node-no" style="background:var(--amber-bg);color:var(--amber)">6</div>
+      <h4>考核复测 —— 闭环回测评</h4>
+      <span class="who">规则 + 事件</span>
+    </div>
+    <div class="node-body">
+      <div class="io-row"><span class="lbl">输入</span><span>考核分数、及格线（默认 80）、是否允许自动复测</span></div>
+      <div class="io-row"><span class="lbl">输出</span><span>判定结果 + <code>training.retest.required</code>（通过）或 <code>training.plan.adjust</code>（未过）</span></div>
+      <div class="formula">
+        score ≥ 80　→　通过，发复测事件，<b>回流上游测评安排重考</b><br>
+        score &lt; 80　→　发调整事件，HR 人工介入修改计划<br>
+        auto_retest = false　→　只记录，不发事件（HR 可关）
+      </div>
+      <div class="good"><b>闭环意义：</b>培训不是终点。达标 → 触发复测 → 测评重新出分 →
+        若仍有差距则再生成计划。这条事件就是与上游测评模块的<b>唯一耦合点</b>，双方不用互相调用。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s4">
+  <h2><span class="num">04</span>技术架构与文件清单</h2>
+  <p class="lede">
+    五层单向依赖：<b>路由 → 服务 → 智能/规则双轨 → 仓储 → 数据库</b>。
+    核心设计是「业务算法下沉到零依赖的纯函数层」，因此规则引擎可以完全脱离数据库单测。
+  </p>
+
+  <div class="card">
+    <div class="tw" style="margin:0">
+      <table>
+        <thead><tr><th style="width:110px">层</th><th style="width:240px">文件</th><th>职责</th><th style="width:64px" class="c">行数</th></tr></thead>
+        <tbody>
+          <tr><td><b>接口层</b></td><td><span class="file">routers/training_router.py</span></td>
+            <td>11 条路径 / 13 个方法，鉴权与出入参校验</td><td class="n">271</td></tr>
+          <tr><td><b>契约层</b></td><td><span class="file">schemas/training.py</span></td>
+            <td>Pydantic 模型，含宽松校验（current 必填、required 可缺）</td><td class="n">399</td></tr>
+          <tr><td><b>编排层</b></td><td><span class="file">services/training_service.py</span></td>
+            <td>总调度：查数据 → 调算法 → 决定走 AI 还是规则 → 落库 → 发事件</td><td class="n">926</td></tr>
+          <tr><td><b>智能层</b></td><td><span class="file">ai/agents/training_agent.py</span></td>
+            <td>唯一的模型出口，含自定义端点识别与兜底</td><td class="n">300</td></tr>
+          <tr><td><b>算法层</b></td><td><span class="file">ai/agents/training_logic.py</span></td>
+            <td>六节点确定性内核，<b>零第三方依赖、零 IO</b></td><td class="n">630</td></tr>
+          <tr><td><b>组件层</b></td><td><span class="file">ai/skills/training_skill.py</span></td>
+            <td>两个可编排技能，注册进技能框架</td><td class="n">293</td></tr>
+          <tr><td><b>数据层</b></td><td><span class="file">repositories/training_repository.py</span></td>
+            <td>6 个 Reader，全模块唯一的 SQL 出口</td><td class="n">543</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin:14px 0 0;font-size:12.5px;color:var(--ink3)">
+      核心业务代码合计 3 362 行；另有测试 1 019 行、脚本 1 113 行，总量约 5 500 行。
+    </p>
+  </div>
+
+  <h3>分层为什么要这样切</h3>
+  <div class="grid3">
+    <div class="card" style="margin:0">
+      <h4 style="margin-top:0">算法层零依赖</h4>
+      <p style="margin:0;font-size:12.8px;color:var(--ink2)">
+        <span class="file">training_logic.py</span> 不 import sqlalchemy / pydantic / fastapi。
+        21 条纯算法测试因此能在 0.3 秒内跑完，不需要数据库。
+      </p>
+    </div>
+    <div class="card" style="margin:0">
+      <h4 style="margin-top:0">SQL 只有一个出口</h4>
+      <p style="margin:0;font-size:12.8px;color:var(--ink2)">
+        所有查询集中在 <span class="file">training_repository.py</span> 的 6 个 Reader。
+        换库、加缓存、加审计都只需改这一处。
+      </p>
+    </div>
+    <div class="card" style="margin:0">
+      <h4 style="margin-top:0">模型只有一个出口</h4>
+      <p style="margin:0;font-size:12.8px;color:var(--ink2)">
+        只有 <span class="file">training_agent.py</span> 碰 LLM。
+        换模型、加开关、做降级，影响面被锁在一个文件里。
+      </p>
+    </div>
+  </div>
+
+  <h3>改动范围（对其他模块的影响面）</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th style="width:96px">类型</th><th style="width:64px" class="c">数量</th><th>文件</th></tr></thead>
+      <tbody>
+        <tr><td><b>新增</b></td><td class="c n">17</td>
+          <td style="color:var(--ink2)">
+            <span class="file">training_logic.py</span>
+            <span class="file">training_skill.py</span>
+            6 个脚本（seed ×2 / demo / run_scan / selfcheck / export_db_doc）·
+            3 个测试文件 · 5 份文档 · <span class="file">一键自检.bat</span>
+          </td></tr>
+        <tr><td><b>修改</b></td><td class="c n">5</td>
+          <td style="color:var(--ink2)">
+            本模块文件的能力扩充：
+            <span class="file">training_agent.py</span>
+            <span class="file">training_service.py</span>
+            <span class="file">training_repository.py</span>
+            <span class="file">training_router.py</span>
+            <span class="file">schemas/training.py</span>
+          </td></tr>
+        <tr><td><b>登记</b></td><td class="c n">4</td>
+          <td style="color:var(--ink2)">
+            追加式接入点，<b>不改任何既有逻辑分支</b>：
+            <span class="file">routers/router.py</span>（第 42 行挂载）·
+            <span class="file">skills/__init__.py</span> 与
+            <span class="file">registry_bootstrap.py</span>（注册技能）·
+            <span class="file">config/prompt_config.py</span>（提示词）
+          </td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink3);margin:8px 0 0">
+    新增文件全部为本模块自有；修改的 5 个也是本模块文件；真正触及其他目录的只有 4 处登记，
+    且均为「加一行注册」性质。全项目 71 条回归测试通过。
+  </p>
+</section>
+
+<section id="s5">
+  <h2><span class="num">05</span>智能在哪里 —— 双轨设计</h2>
+  <p class="lede">
+    这是评审最容易追问的一点：「你这个模块到底有没有智能？还是把阈值写死了？」
+    答案要诚实：<b>六个节点里，两个用到模型，四个是确定性算法</b>——
+    这是经过权衡的选择，不是能力不足。
+  </p>
+
+  <div class="tw">
+    <table>
+      <thead><tr>
+        <th style="width:56px" class="c">节点</th><th style="width:150px">谁做决策</th>
+        <th>模型参与方式</th><th style="width:90px" class="c">可复算</th>
+      </tr></thead>
+      <tbody>
+        <tr><td class="c"><span class="pill p-brand">1</span></td><td>规则引擎</td>
+          <td>不参与。保证可解释、可复算、可测试</td><td class="c"><span class="pill p-teal">是</span></td></tr>
+        <tr><td class="c"><span class="pill p-brand">2</span></td><td><b>LLM 编排 + 规则守底线</b></td>
+          <td>只拿短板与约束，输出周次/维度/学时 + 每周理由；不碰课程</td><td class="c"><span class="pill p-amber">部分</span></td></tr>
+        <tr><td class="c"><span class="pill p-brand">3</span></td><td>SQL + 规则</td>
+          <td>不参与。课程必须是库里真实存在的实体</td><td class="c"><span class="pill p-teal">是</span></td></tr>
+        <tr><td class="c"><span class="pill p-brand">4</span></td><td><b>LLM 写说明</b></td>
+          <td>基于已确定的事实，写 80–120 字方案说明</td><td class="c"><span class="pill p-amber">部分</span></td></tr>
+        <tr><td class="c"><span class="pill p-teal">5</span></td><td>规则</td>
+          <td>不参与</td><td class="c"><span class="pill p-teal">是</span></td></tr>
+        <tr><td class="c"><span class="pill p-amber">6</span></td><td>规则 + 事件</td>
+          <td>不参与</td><td class="c"><span class="pill p-teal">是</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>为什么不全交给模型</h3>
+  <div class="card">
+    <p style="margin:0">
+      培训排期是<b>强约束优化问题</b>：学时不能超上限、周数不能超、课程必须真实存在、
+      学过的不能重排。让模型自由生成，编造课程几乎是必然事件——
+      它会写出「《高级需求分析实战》8 学时」，而这本书根本不存在。
+    </p>
+    <p style="margin:12px 0 0">
+      所以采用「<b>模型编排 + 规则守底线</b>」：模型负责它擅长的（排期理由、方案解释、
+      自然语言表达），规则负责它擅长的（约束校验、实体挂载、可复算）。
+      这也是 <code>library_rate</code> 能稳定为 1.0 的原因——
+      <b>不是模型乖巧，是它从结构上拿不到编造的机会。</b>
+    </p>
+  </div>
+
+  <h3>防幻觉的三道结构性闸门</h3>
+  <div class="grid3">
+    <div class="card" style="margin:0;border-left:3px solid var(--brand)">
+      <h4 style="margin-top:0">闸门 1 · 信息隔离</h4>
+      <p style="margin:0;font-size:12.8px;color:var(--ink2)">
+        排期节点的 prompt 里<b>不含课程库</b>。模型想编课程，得先知道有哪些课，而它看不到。
+      </p>
+    </div>
+    <div class="card" style="margin:0;border-left:3px solid var(--brand)">
+      <h4 style="margin-top:0">闸门 2 · 结构校验</h4>
+      <p style="margin:0;font-size:12.8px;color:var(--ink2)">
+        <code>legal_skeleton()</code> 逐项校验：维度必须在短板内、周次在范围内、学时为正且不超上限。
+        不合法直接回退，不做"尽量修补"。
+      </p>
+    </div>
+    <div class="card" style="margin:0;border-left:3px solid var(--brand)">
+      <h4 style="margin-top:0">闸门 3 · 实体强绑定</h4>
+      <p style="margin:0;font-size:12.8px;color:var(--ink2)">
+        课程只能由 <code>match_courses()</code> 从数据库里选出来，
+        模型输出里<b>根本没有课程字段</b>可填。
+      </p>
+    </div>
+  </div>
+
+  <h3>回退阶梯 —— 任何一步失败都不中断主流程</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th style="width:56px" class="c">层级</th><th style="width:210px">触发条件</th><th>行为</th><th style="width:130px">标记</th></tr></thead>
+      <tbody>
+        <tr><td class="c">1</td><td>未配 API Key</td><td>不发请求，直接规则排期（避免 5–8 秒重试与一屏 401）</td>
+          <td><code>generated_by=rule</code></td></tr>
+        <tr><td class="c">2</td><td>模型超时 / 报错</td><td>回退规则排期，记录 warning 日志</td>
+          <td><code>generated_by=rule</code></td></tr>
+        <tr><td class="c">3</td><td>输出结构不合法</td><td><code>legal_skeleton</code> 拦截后回退</td>
+          <td><code>generated_by=rule</code></td></tr>
+        <tr><td class="c">4</td><td>说明文案失败或过短</td><td>回退模板文案</td>
+          <td><code>summary_source=rule</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="good"><b>零 Key 也能跑通六节点全流程</b>——这是刻意保留的能力，用于离网演示与答辩兜底。
+    实测：清空 <code>LLM_API_KEY</code> 后重新生成，返回 <code>generated_by=rule</code>，
+    流程不中断、不报错、不卡顿。</div>
+
+  <h3>模型接入方式</h3>
+  <div class="card">
+    <p style="margin:0 0 10px">内置的 <code>qwen</code> / <code>openai</code> 适配器把官方地址写死在类属性里，
+      只改 <code>.env</code> 的 <code>LLM_BASE_URL</code> 对它们<b>完全无效</b>。
+      <code>TrainingAgent._use_custom_endpoint()</code> 会检测「配置地址 ≠ 内置地址」，
+      自动改用模块内自建的 OpenAI 兼容客户端，<b>不需要修改公共层任何文件</b>。</p>
+    <pre><code># .env（已被 .gitignore 忽略，不会进仓库）
+LLM_MODEL=deepseek-chat
+LLM_API_KEY=sk-****
+LLM_BASE_URL=https://api.deepseek.com/v1</code></pre>
+    <p style="margin:10px 0 0;font-size:13px;color:var(--ink2)">
+      切回通义：把三行改回 <code>qwen-plus</code> / DashScope 的 key 与地址即可，代码不用动。
+      这就是选择「OpenAI 兼容协议」而不是绑定单一厂商的价值。
+    </p>
+  </div>
+</section>
+
+<section id="s6">
+  <h2><span class="num">06</span>数据模型与流转</h2>
+  <p class="lede">
+    四张自有表 + 三组只读表。数据流向是单向的：标准 → 计划 → 明细 → 过程记录，
+    每一层都能反查到上一层，不存在环形依赖。
+  </p>
+
+  <div class="card">
+    <svg viewBox="0 0 680 210" width="100%" role="img" aria-label="培训模块数据表关系">
+      <defs>
+        <marker id="c" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="#888780" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+
+      <rect x="24" y="34" width="148" height="54" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+      <text x="98" y="53" text-anchor="middle" font-size="12" font-weight="500" fill="#2C2C2A" font-family="system-ui,sans-serif" dominant-baseline="central">position_requirements</text>
+      <text x="98" y="71" text-anchor="middle" font-size="10.5" fill="#5F5E5A" font-family="system-ui,sans-serif" dominant-baseline="central">3 行 · 只读 · 标准</text>
+
+      <path d="M172 61 L212 61" stroke="#888780" stroke-width="1.5" fill="none" marker-end="url(#c)"/>
+
+      <rect x="216" y="34" width="148" height="54" rx="8" fill="#E8F0F5" stroke="#1B4D6B" stroke-width="0.6"/>
+      <text x="290" y="53" text-anchor="middle" font-size="12" font-weight="500" fill="#123B52" font-family="system-ui,sans-serif" dominant-baseline="central">training_plans</text>
+      <text x="290" y="71" text-anchor="middle" font-size="10.5" fill="#1B4D6B" font-family="system-ui,sans-serif" dominant-baseline="central">4 行 · 主体</text>
+
+      <path d="M364 61 L404 61" stroke="#888780" stroke-width="1.5" fill="none" marker-end="url(#c)"/>
+
+      <rect x="408" y="34" width="148" height="54" rx="8" fill="#E8F0F5" stroke="#1B4D6B" stroke-width="0.6"/>
+      <text x="482" y="53" text-anchor="middle" font-size="12" font-weight="500" fill="#123B52" font-family="system-ui,sans-serif" dominant-baseline="central">plan_courses</text>
+      <text x="482" y="71" text-anchor="middle" font-size="10.5" fill="#1B4D6B" font-family="system-ui,sans-serif" dominant-baseline="central">13 行 · 明细</text>
+
+      <path d="M482 88 L482 122" stroke="#888780" stroke-width="1.5" fill="none" marker-end="url(#c)"/>
+
+      <rect x="408" y="126" width="148" height="54" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+      <text x="482" y="145" text-anchor="middle" font-size="12" font-weight="500" fill="#04342C" font-family="system-ui,sans-serif" dominant-baseline="central">courses</text>
+      <text x="482" y="163" text-anchor="middle" font-size="10.5" fill="#0F6E56" font-family="system-ui,sans-serif" dominant-baseline="central">19 行 · 教材</text>
+
+      <path d="M290 88 L290 122" stroke="#888780" stroke-width="1.5" fill="none" marker-end="url(#c)"/>
+
+      <rect x="216" y="126" width="148" height="54" rx="8" fill="#FBEAF0" stroke="#8C3355" stroke-width="0.5"/>
+      <text x="290" y="145" text-anchor="middle" font-size="12" font-weight="500" fill="#4B1528" font-family="system-ui,sans-serif" dominant-baseline="central">learning_records</text>
+      <text x="290" y="163" text-anchor="middle" font-size="10.5" fill="#8C3355" font-family="system-ui,sans-serif" dominant-baseline="central">39 行 · 过程</text>
+
+      <path d="M364 153 L404 153" stroke="#888780" stroke-width="1.5" fill="none" marker-end="url(#c)"/>
+    </svg>
+  </div>
+
+  <div class="tw">
+    <table>
+      <thead><tr>
+        <th style="width:190px">表</th><th style="width:60px" class="c">行数</th>
+        <th>作用</th><th style="width:170px">写入方</th>
+      </tr></thead>
+      <tbody>
+        <tr><td><span class="file">position_requirements</span></td><td class="c n">3</td>
+          <td>岗位能力模型：各维度要求分 + 权重，权重强制合计 1.0</td>
+          <td>seed 脚本（HR / 岗位模块维护）</td></tr>
+        <tr><td><span class="file">courses</span></td><td class="c n">19</td>
+          <td>课程库，8 个能力维度，L1–L4 分级</td>
+          <td>seed 脚本 / 管理接口</td></tr>
+        <tr><td><span class="file">training_plans</span></td><td class="c n">4</td>
+          <td>计划主体，含 <code>created_by_ai</code> 标识</td>
+          <td><code>/plans/generate</code></td></tr>
+        <tr><td><span class="file">plan_courses</span></td><td class="c n">13</td>
+          <td>计划-课程关联，含学习顺序与是否必须通过</td>
+          <td>计划创建时批量写</td></tr>
+        <tr><td><span class="file">learning_records</span></td><td class="c n">39</td>
+          <td>学习进度与考核成绩，通过率的分母来源</td>
+          <td><code>/records</code>、<code>/score</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <b>设计要点：</b><code>learning_records.plan_id</code> 允许为空，表示「先有学习行为、后归入计划」。
+    因此统计通过率时<b>不能用 plan_id 做内连接</b>，否则这批数据会被静默漏掉。
+    这个坑在自检里加了断言。
+  </div>
+
+  <h3>一个容易被忽略的表设计</h3>
+  <div class="card">
+    <p style="margin:0">
+      <span class="file">learning_records</span> 上有 <code>suspicious</code> 字段——刷课标记。
+      判定规则：进度 100% 但学习时长少于阈值 → 标记可疑，不计入有效统计。
+      这是培训场景里很实际的需求（挂机刷学时），也让数据可信度有了兜底。
+    </p>
+  </div>
+</section>
+
+<section id="s7">
+  <h2><span class="num">07</span>对外契约</h2>
+  <p class="lede">
+    三个契约面：<b>HTTP 接口</b>给前端、<b>gaps 结构</b>给上游测评、<b>事件</b>给下游通知与人才模块。
+  </p>
+
+  <h3>7.1 接口清单（11 条路径 / 13 个方法）</h3>
+  <div class="tw">
+    <table>
+      <thead><tr>
+        <th style="width:56px" class="c">方法</th><th style="width:290px">路径（前缀 /api/v1/trainings）</th>
+        <th>说明</th><th style="width:110px">权限</th>
+      </tr></thead>
+      <tbody>
+        <tr><td class="c"><span class="pill p-brand">POST</span></td><td><code>/plans/generate</code></td>
+          <td><b>主入口</b>：节点 1~4 一次完成</td><td><code>training:manage</code></td></tr>
+        <tr><td class="c"><span class="pill p-teal">GET</span></td><td><code>/plans</code></td><td>计划列表（含完成率）</td><td><code>training:read</code></td></tr>
+        <tr><td class="c"><span class="pill p-teal">GET</span></td><td><code>/plans/{id}</code></td><td>计划详情（课表 + 方案说明）</td><td><code>training:read</code></td></tr>
+        <tr><td class="c"><span class="pill p-teal">GET</span></td><td><code>/plans/{id}/progress</code></td><td>进度统计（节点 5）</td><td><code>training:read</code></td></tr>
+        <tr><td class="c"><span class="pill p-brand">POST</span></td><td><code>/plans/{id}/score</code></td><td>提交考核（节点 6）</td><td><code>training:manage</code></td></tr>
+        <tr><td class="c"><span class="pill p-teal">GET</span></td><td><code>/stats/pass-rate</code></td><td><b>考核通过率统计</b>（整体 + 按课程）</td><td><code>training:read</code></td></tr>
+        <tr><td class="c"><span class="pill p-brand">POST</span></td><td><code>/records</code></td><td>写回学习进度</td><td><code>training:read</code></td></tr>
+        <tr><td class="c"><span class="pill p-brand">POST</span></td><td><code>/lag-scan</code></td><td>滞后扫描（定时任务入口）</td><td><code>training:manage</code></td></tr>
+        <tr><td class="c"><span class="pill p-teal">GET</span></td><td><code>/courses</code></td><td>课程列表</td><td><code>training:read</code></td></tr>
+        <tr><td class="c"><span class="pill p-brand">POST</span></td><td><code>/courses</code></td><td>新建课程</td><td><code>training:manage</code></td></tr>
+        <tr><td class="c"><span class="pill p-amber">PUT</span></td><td><code>/courses/{id}</code></td><td>更新课程</td><td><code>training:manage</code></td></tr>
+        <tr><td class="c"><span class="pill p-red">DELETE</span></td><td><code>/courses/{id}</code></td><td>删除课程（软删）</td><td><code>training:manage</code></td></tr>
+        <tr><td class="c"><span class="pill p-brand">POST</span></td><td><code>/recommend</code></td><td>按短板推荐课程</td><td><code>training:read</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>7.2 上游契约：gaps 结构</h3>
+  <div class="grid2">
+    <div class="card">
+      <h4 style="margin-top:0">推荐写法（只给分数）</h4>
+<pre style="margin:10px 0 0"><code>{
+  "talent_id": 2,
+  "position_id": 1,
+  "gaps": [
+    {"dimension": "需求分析", "current": 62},
+    {"dimension": "数据分析", "current": 55}
+  ]
+}</code></pre>
+      <p style="margin:10px 0 0;font-size:12.5px;color:var(--ink2)">
+        目标分和权重由岗位模型补。测评侧只管「考了多少分」，标准归岗位模块维护，
+        两边职责不混。
+      </p>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">完整写法（自带标准）</h4>
+<pre style="margin:10px 0 0"><code>{"dimension": "需求分析",
+ "current": 62,
+ "required": 85,
+ "weight": 0.30}</code></pre>
+      <p style="margin:10px 0 0;font-size:12.5px;color:var(--ink2)">
+        <code>required</code> / <code>weight</code> 可不传，不传则依次取
+        岗位模型 → 默认值（80 分 / 0.2 权重）。<code>delta</code> 由本模块计算。
+      </p>
+    </div>
+  </div>
+
+  <div class="bad">
+    <b>最隐蔽的坑：</b>维度名必须与 <code>courses.category</code> <b>一字不差</b>。
+    多两个字不会报错，只会让该维度静默降级为「无课可推」。
+    已在自检里加了交叉校验，避免这类沉默失败。
+  </div>
+
+  <h3>7.3 下游契约：四个事件</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th style="width:210px">事件</th><th style="width:150px">时机</th><th>载荷要点</th></tr></thead>
+      <tbody>
+        <tr><td><code>training.plan_created</code></td><td>方案落库后</td>
+          <td><code>plan_id / talent_id / total_hours / channels</code></td></tr>
+        <tr><td><code>training.lag.alert</code></td><td>落后 ≥ 40%</td>
+          <td><code>plan_id / talent_id / lag_ratio / level</code></td></tr>
+        <tr><td><code>training.lag.remind</code></td><td>落后 ≥ 20%</td>
+          <td>同上，级别为提醒</td></tr>
+        <tr><td><code>training.retest.required</code></td><td>考核通过</td>
+          <td><code>plan_id / talent_id / dimensions / assessment</code></td></tr>
+        <tr><td><code>training.plan.adjust</code></td><td>考核未通过</td>
+          <td><code>plan_id / talent_id / score</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:12.8px;color:var(--ink2);margin:10px 0 0">
+    <b>现状说明：</b>本模块只负责<b>发布</b>事件。接住它们需要公共层注册订阅者，
+    而当前全项目还没有任何 <code>subscribe</code> 调用——这是全项目级的待办，不由本模块决定。
+    在订阅者补齐之前，「测评 → 培训」的自动触发需要外部显式调用 <code>/plans/generate</code>。
+  </p>
+</section>
+
+<section id="s8">
+  <h2><span class="num">08</span>质量保障</h2>
+  <p class="lede">
+    四层测试，一条命令跑完，约 34 秒。设计原则是<b>能测纯函数就绝不测接口</b>——
+    算法层零依赖，因此最快的测试只要 0.3 秒。
+  </p>
+
+  <div class="tw">
+    <table>
+      <thead><tr>
+        <th style="width:56px" class="c">层</th><th style="width:130px">测什么</th>
+        <th style="width:80px" class="c">数量</th><th style="width:80px" class="c">耗时</th>
+        <th>覆盖点</th>
+      </tr></thead>
+      <tbody>
+        <tr><td class="c"><span class="pill p-teal">L1</span></td><td>纯算法单元</td>
+          <td class="c n">21</td><td class="c n">0.3s</td>
+          <td>诊断 / 排期 / 匹配 / 进度 / 考核五组边界条件，无数据库</td></tr>
+        <tr><td class="c"><span class="pill p-brand">L2</span></td><td>真库集成</td>
+          <td class="c n">23</td><td class="c n">~8s</td>
+          <td>走真实 MySQL，含岗位模型与通过率共 9 条；库不可用则自动 skip</td></tr>
+        <tr><td class="c"><span class="pill p-amber">L3</span></td><td>全项目回归</td>
+          <td class="c n">71</td><td class="c n">~20s</td>
+          <td>架构分层、ORM 映射、公共层契约，确认没碰坏别人</td></tr>
+        <tr><td class="c"><span class="pill p-pink">L4</span></td><td>接口探针</td>
+          <td class="c n">4</td><td class="c n">~5s</td>
+          <td>ASGI 直连不占端口，验路由注册与鉴权生效</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:12.5px;color:var(--ink3);margin:8px 0 0">
+    本模块自有测试 44 条（L1 21 + L2 23），L3 为全项目公共回归。
+    运行方式：<code>python scripts/selfcheck.py</code> 或双击 <code>一键自检.bat</code>。
+  </p>
+
+  <h3>关键验收项与实测证据</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th style="width:230px">验收项</th><th>怎么看 / 实测结果</th></tr></thead>
+      <tbody>
+        <tr><td>已达标维度不排课</td><td>张伟「沟通表达 82 / 要求 80」不出现在计划里 <span class="pill p-teal">通过</span></td></tr>
+        <tr><td>课程 100% 来自课程库</td><td><code>library_rate == 1.0</code>，每项都有 <code>course_id</code> <span class="pill p-teal">通过</span></td></tr>
+        <tr><td>缺课不编造</td><td>清空课程库 → <code>external_count &gt; 0</code>、<code>title=null</code>、给外部建议 <span class="pill p-teal">通过</span></td></tr>
+        <tr><td>学时不满溢</td><td><code>total_hours ≤ max_weeks × max_hours_per_week</code> <span class="pill p-teal">通过</span></td></tr>
+        <tr><td>容量不足明确报错</td><td><code>max_hours_per_week=2</code> → 提示「建议延长至 N 周」，不偷塞 <span class="pill p-teal">通过</span></td></tr>
+        <tr><td>进度不可回退</td><td>提交更小的 progress → <code>ParamError</code> <span class="pill p-teal">通过</span></td></tr>
+        <tr><td>刷课可识别</td><td>100% 进度只学 1 分钟 → <code>suspicious=true</code> <span class="pill p-teal">通过</span></td></tr>
+        <tr><td>滞后分级发事件</td><td>落后 ≥ 40% → <code>training.lag.alert</code>；≥ 20% → <code>remind</code> <span class="pill p-teal">通过</span></td></tr>
+        <tr><td>达标回流复测</td><td>88 分 → <code>training.retest.required</code>；<code>auto_retest=false</code> 不发 <span class="pill p-teal">通过</span></td></tr>
+        <tr><td>全达标不报错</td><td>五项全过 → 返回「无需培训」，不是异常 <span class="pill p-teal">通过</span></td></tr>
+        <tr><td>岗位模型生效</td><td>只传 <code>current</code> + <code>position_id=1</code> → <code>requirement_source=position_model</code> <span class="pill p-teal">通过</span></td></tr>
+        <tr><td>同分数换岗位结果不同</td><td>数据分析师 SQL 排第一；AI 产品经理需求分析排第一 <span class="pill p-teal">通过</span></td></tr>
+        <tr><td>无模型时明确降级</td><td><code>requirement_source=default</code>，目标分 80，不报错也不假装 <span class="pill p-teal">通过</span></td></tr>
+        <tr><td>通过率可统计</td><td>返回整体与按课程拆分，未考核的不进分母 <span class="pill p-teal">通过</span></td></tr>
+        <tr><td>整计划考核能落库</td><td>不传 <code>course_id</code> 提交 88 分 → 该计划下每门课都有考核记录 <span class="pill p-teal">通过</span></td></tr>
+        <tr><td>AI 排期真的生效</td><td><code>generated_by=llm</code>、<code>model_name=deepseek-flash</code>、每项 reason 是模型写的人话 <span class="pill p-teal">通过</span></td></tr>
+        <tr><td>AI 说明可用</td><td><code>summary_source=llm</code>；文中出现的课程名都能在 <code>courses</code> 查到 <span class="pill p-teal">通过</span></td></tr>
+        <tr><td>模型不可用静默回退</td><td>清空 Key → <code>generated_by=rule</code>，流程不中断 <span class="pill p-teal">通过</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>一次真实调用的返回（可现场复现）</h3>
+  <div class="card">
+<pre style="margin:0"><code>POST /api/v1/trainings/plans/generate
+{ "talent_id": 2, "position_id": 1, "use_ai": true }
+
+→ generated_by      : "llm"
+  model_name        : "deepseek-flash"
+  summary_source    : "llm"
+  library_rate      : 1.0
+  total_hours       : 22.0
+  total_weeks       : 4
+  requirement_source: "position_model"
+  external_count    : 0
+
+方案说明（模型生成，节选）：
+  「针对张伟的 3 项能力短板，围绕数据分析、SQL 与数据库、需求分析
+   制定 4 周方案，共 22 学时，第 4 周结课考核（≥80 分）……」</code></pre>
+  </div>
+</section>
+
+<section id="s9">
+  <h2><span class="num">09</span>六个设计决策</h2>
+  <p class="lede">
+    这部分回答「为什么这么做」。每一条都对应一个可被追问的取舍。
+  </p>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th style="width:170px">决策</th><th>理由</th></tr></thead>
+      <tbody>
+        <tr><td><b>算法层零依赖</b></td>
+          <td>业务算法不 import sqlalchemy / pydantic / fastapi，因此能脱离框架秒级单测。
+            代价是要多写一层数据传参，收益是 21 条测试 0.3 秒跑完、改阈值敢改。</td></tr>
+        <tr><td><b>模型拿不到课程库</b></td>
+          <td>防幻觉不能靠提示词。把课程从模型可见信息里删掉，它就<b>没法</b>编造。
+            这是结构约束，不是道德约束。</td></tr>
+        <tr><td><b>进度跟踪独立成任务</b></td>
+          <td>跨越 4 周的事不该挂在一次请求里。拆成独立入口后，
+            调度器可重试、可补扫、可单独测试。</td></tr>
+        <tr><td><b>闭环靠事件不靠调用</b></td>
+          <td>培训要通知测评复测，但直接调测评服务会造成双向依赖。
+            改成发事件，双方只依赖事件名。</td></tr>
+        <tr><td><b>降级必须可见</b></td>
+          <td>课不够、标准缺失、模型挂掉——一律在响应里标记（<code>library_rate</code> /
+            <code>requirement_source</code> / <code>generated_by</code>），
+            <b>绝不静默用默认值假装成功</b>。</td></tr>
+        <tr><td><b>AI 能力可开关</b></td>
+          <td>按 <code>use_ai</code> 参数与 Key 是否配置双重判断。
+            离线演示、成本控制、故障降级三种场景用同一套代码。</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="s10">
+  <h2><span class="num">10</span>已知不足与演进路线</h2>
+  <p class="lede">
+    主动说明短板，比被问出来更好。以下四项都已在代码或文档中留下明确标记，不是隐性风险。
+  </p>
+
+  <div class="tw">
+    <table>
+      <thead><tr>
+        <th style="width:190px">不足</th><th>影响</th><th style="width:230px">计划</th><th style="width:80px" class="c">优先级</th>
+      </tr></thead>
+      <tbody>
+        <tr><td><b>课程库仅 19 门</b></td>
+          <td>需求要求 60–80 门。当前每个能力维度平均只摊到 3 门，
+            导致匹配结果重复度高、可选空间小</td>
+          <td>按 8 个维度 × 每维度 8 门扩充，保持 L1–L4 梯度完整</td>
+          <td class="c"><span class="pill p-red">高</span></td></tr>
+        <tr><td><b>成长轨迹趋势接口未做</b></td>
+          <td>需求 102 要求展示能力变化曲线，当前只有单次计划视角</td>
+          <td>基于 <code>learning_records</code> + 测评历史做时间序列聚合</td>
+          <td class="c"><span class="pill p-red">高</span></td></tr>
+        <tr><td><b>事件无订阅者</b></td>
+          <td>四个事件已发布但全项目无 <code>subscribe</code>，
+            闭环需外部显式调用触发</td>
+          <td>公共层注册订阅者（跨模块，需协调）</td>
+          <td class="c"><span class="pill p-amber">中</span></td></tr>
+        <tr><td><b>无 AI 出题 / 批改</b></td>
+          <td>考核目前只录分数，题库与自动评分未实现</td>
+          <td>基于课程知识点让模型出题，需人工审核环节</td>
+          <td class="c"><span class="pill p-amber">中</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <b>关于 Dify 等模型中台的选型结论：</b>培训模块当前<b>不依赖</b>。
+    本模块只有两处单轮文本生成（排期骨架、方案说明），用不上工作流编排、
+    知识库 RAG、Prompt 后台可视化配置——这些是中台的核心价值，不是本模块的诉求。
+    <br><br>
+    需要说明的是：Dify 在本项目里<b>由 Dify 组在其它模块接入</b>（适配器与路由在 develop 上已实现），
+    与本模块是<b>并行能力而非替代关系</b>。本模块只依赖「OpenAI 兼容协议」这一层抽象，
+    换直连或换中台都不用改业务代码。
+    <br><br>
+    真正该补的是<b>数据</b>（课程库 19 → 60~80 门）和<b>功能</b>（成长趋势、AI 出题），
+    这两件事上不上中台都得做。
+  </div>
+</section>
+
+<section id="s11">
+  <h2><span class="num">11</span>答辩预案</h2>
+  <p class="lede">十个最可能被问到的问题，按「先给结论、再给依据」组织。</p>
+
+  <div class="card">
+    <div class="qa">
+      <div class="q"><span class="qm">Q1</span><span>这个模块到底哪里"智能"？阈值不是写死的吗？</span></div>
+      <div class="a">六个节点里两个用模型：排期编排和方案说明。
+        四个用规则是<b>刻意的</b>——培训排期是强约束优化，模型自由生成必然编造课程。
+        我的选择是「模型做它擅长的表达与编排，规则守约束底线」。
+        智能体现在<b>因岗而异的标准合并</b>与<b>约束内的自然排期</b>，
+        不是体现在"让模型什么都干"。</div>
+    </div>
+    <div class="qa">
+      <div class="q"><span class="qm">Q2</span><span>凭什么说课程不是模型编的？</span></div>
+      <div class="a">三重结构性保证：① 排期的 prompt 里<b>不含课程库</b>，模型看不到有哪些课；
+        ② 模型输出的结构里<b>没有课程字段</b>，想填也没位置；
+        ③ 课程只能由 <code>match_courses()</code> 从数据库选出。
+        所以 <code>library_rate</code> 稳定为 1.0 是结构决定的，不是模型表现好。</div>
+    </div>
+    <div class="qa">
+      <div class="q"><span class="qm">Q3</span><span>模型挂了怎么办？演示现场没网怎么办？</span></div>
+      <div class="a">四级回退：无 Key 不发请求 → 超时报错回退 → 结构不合法拦截回退 → 文案失败用模板。
+        全程 <code>generated_by=rule</code> 标记，流程不中断。
+        <b>零 Key 也能跑通六节点</b>，可以现在拔掉网线演示。</div>
+    </div>
+    <div class="qa">
+      <div class="q"><span class="qm">Q4</span><span>为什么不做成端到端的 Agent，一次对话出结果？</span></div>
+      <div class="a">因为要可审计。培训计划涉及学时、预算、考核标准，
+        出了问题必须能回答"这 22 学时是怎么算的"。
+        纯 Agent 给不出可复算的中间量。<b>可解释性优先于自动化程度。</b></div>
+    </div>
+    <div class="qa">
+      <div class="q"><span class="qm">Q5</span><span>"千人千面"具体差在哪？</span></div>
+      <div class="a">同一份分数，换岗位标准结果就不同。数据分析师权重最高的是
+        「SQL 与数据库」0.30，AI 产品经理是「需求分析」0.25——
+        权重 ≥ 0.25 会直接抬到 P0，所以两人拿到的课表顺序、重点完全不同。
+        可以现场跑 <code>demo_training.py</code> 看两段输出对比。</div>
+    </div>
+    <div class="qa">
+      <div class="q"><span class="qm">Q6</span><span>课不够的时候会怎样？</span></div>
+      <div class="a">不编造。该项标 <code>is_platform=false</code>、<code>title=null</code>，
+        另给外部学习方向建议，并计入 <code>external_count</code> 在响应里明示。
+        当前课程库只有 19 门，这个降级路径是会被实际触发的——我把它当特性测过。</div>
+    </div>
+    <div class="qa">
+      <div class="q"><span class="qm">Q7</span><span>怎么证明没影响别人的模块？</span></div>
+      <div class="a">17 个新文件全是本模块自有；5 个修改也都是本模块文件的能力扩充，
+        真正触及其他目录的只有 4 处追加式登记（挂路由、注册技能、加提示词），
+        没有改动任何既有逻辑分支。
+        全项目 71 条回归测试通过，架构分层测试也在其中。</div>
+    </div>
+    <div class="qa">
+      <div class="q"><span class="qm">Q8</span><span>事件发出去没人接，算完成了吗？</span></div>
+      <div class="a">本模块的职责到"发布"为止，订阅者属于公共层，全项目目前都没有。
+        我不越界去改别人的模块，但在文档里明确标注了这个断点。
+        短期靠外部调用 <code>/plans/generate</code> 触发，长期由公共层补订阅。</div>
+    </div>
+    <div class="qa">
+      <div class="q"><span class="qm">Q9</span><span>为什么培训模块不接 Dify？</span></div>
+      <div class="a">因为本模块对模型的诉求只有两件事：排周次、写一段说明，都是单轮无状态生成。
+        编排、RAG、Prompt 后台这些中台能力一个都用不上。
+        Dify 由 Dify 组在其它模块接入，<b>与本模块并行而非替代</b>。
+        本模块只依赖 OpenAI 兼容协议，将来真要接中台也只是换一个客户端，业务代码不用动。
+        <b>选型按需求，不按热度。</b></div>
+    </div>
+    <div class="qa">
+      <div class="q"><span class="qm">Q10</span><span>代码提交了吗？怎么复现？</span></div>
+      <div class="a">见下一节，六条命令从零到端到端演示。
+        测试一条命令跑完四层，约 34 秒出全部结论。</div>
+    </div>
+  </div>
+</section>
+
+<section id="s12">
+  <h2><span class="num">12</span>复现方式</h2>
+  <p class="lede">从零到跑通，六条命令。答辩现场可直接投屏。</p>
+
+  <div class="card">
+<pre style="margin:0"><code># 1) 依赖
+pip install -r requirements.txt
+
+# 2) 环境（.env 已被 .gitignore 忽略，不会进仓库）
+cp .env.example .env        # 填本机 MySQL 密码
+
+# 3) 建库建表（25 张表）
+python scripts/init_db.py
+
+# 4) 课程库（19 门 / 8 维度）—— 不跑这步，节点 3 会全部静默降级
+python scripts/seed_training_courses.py
+
+# 5) 岗位能力模型（3 个岗位）—— 不跑这步，千人千面退化为默认标准
+python scripts/seed_position_requirements.py --bind
+
+# 6) 端到端演示（六节点一次跑完）
+python scripts/demo_training.py</code></pre>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h4 style="margin-top:0">一键自检</h4>
+      <p style="margin:0 0 10px;font-size:13px;color:var(--ink2)">四层全跑，纯 ASCII 输出，不占端口。</p>
+<pre style="margin:0"><code>双击 一键自检.bat
+# 或
+python scripts/selfcheck.py</code></pre>
+    </div>
+    <div class="card">
+      <h4 style="margin-top:0">接口文档</h4>
+      <p style="margin:0 0 10px;font-size:13px;color:var(--ink2)">起服务后看在线文档，挑「培训管理」标签。</p>
+<pre style="margin:0"><code>python main.py
+→ http://127.0.0.1:8000/docs</code></pre>
+    </div>
+  </div>
+
+  <h3>配套文档</h3>
+  <div class="tw">
+    <table>
+      <thead><tr><th style="width:280px">文件</th><th>内容</th></tr></thead>
+      <tbody>
+        <tr><td><span class="file">docs/培训模块交付说明.md</span></td>
+          <td>完整技术交付文档：六节点、契约、事件、验收清单、常见问题</td></tr>
+        <tr><td><span class="file">docs/测试手册.md</span></td><td>四层测试的操作手册与排障</td></tr>
+        <tr><td><span class="file">docs/测试操作台.html</span></td><td>命令一键复制的可视化测试台</td></tr>
+        <tr><td><span class="file">docs/数据库结构与数据速查.html</span></td>
+          <td>5 张表的结构、数据与 DDL，可重新生成</td></tr>
+        <tr><td><span class="file">docs/培训模块汇报.html</span></td><td>本文件</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer>
+  <span>智能培训赋能模块 · 汇报材料</span>
+  <span>需求 2.4 ｜ 分支 develop ｜ 2026-11-04</span>
+</footer>
+
+</div>
+</body>
+</html>

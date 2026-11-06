@@ -164,7 +164,15 @@ class PlanCourse(Base, TimestampMixin):
 
 
 class LearningRecord(BaseModel):
-    """学习记录（进度、学时、考核、反作弊标记）。"""
+    """学习记录（进度、学时、考核、反作弊标记）。
+
+    plan_id / course_id 为什么必须是 NOT NULL + CASCADE（曾经是 SET NULL）：
+    MySQL 唯一索引对 NULL 不生效（NULL != NULL）。原设计里计划或课程一旦被删，
+    SET NULL 会把记录变成孤儿，此时 `uq_learning_records_plan_course_talent`
+    完全失效，可以无限插入重复行；`get_record` 用 scalar_one_or_none 取多行
+    还会抛 MultipleResultsFound（500）。学习记录脱离计划本就没有业务含义，
+    所以计划删了就一起删（CASCADE），课程软删不影响（软删不触发外键）。
+    """
 
     __tablename__ = "learning_records"
     __table_args__ = (
@@ -173,17 +181,17 @@ class LearningRecord(BaseModel):
         {"comment": "学习记录表"},
     )
 
-    plan_id: Mapped[int | None] = mapped_column(
+    plan_id: Mapped[int] = mapped_column(
         BigInteger,
-        ForeignKey("training_plans.id", ondelete="SET NULL"),
-        nullable=True,
-        comment="计划 ID（FK -> training_plans.id，SET NULL）",
+        ForeignKey("training_plans.id", ondelete="CASCADE"),
+        nullable=False,
+        comment="计划 ID（FK -> training_plans.id，CASCADE）",
     )
-    course_id: Mapped[int | None] = mapped_column(
+    course_id: Mapped[int] = mapped_column(
         BigInteger,
-        ForeignKey("courses.id", ondelete="SET NULL"),
-        nullable=True,
-        comment="课程 ID（FK -> courses.id，SET NULL）",
+        ForeignKey("courses.id", ondelete="CASCADE"),
+        nullable=False,
+        comment="课程 ID（FK -> courses.id，CASCADE）",
     )
     talent_id: Mapped[int] = mapped_column(
         BigInteger,
@@ -209,6 +217,11 @@ class LearningRecord(BaseModel):
     )
     score: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True, comment="考核分数")
     passed: Mapped[bool | None] = mapped_column(Boolean, nullable=True, comment="是否通过")
+    examined_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True,
+        comment="最近一次考核时间（通过率按此字段做时间筛选；为空表示从未考核）",
+    )
     suspicious: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
@@ -223,3 +236,58 @@ class LearningRecord(BaseModel):
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<LearningRecord id={self.id} talent_id={self.talent_id} progress={self.progress}>"
+
+
+class TrainingNotification(BaseModel):
+    """培训站内信（节点 4/5/6 事件的实际落地点）。
+
+    为什么要有这张表：事件总线在「无订阅者」时静默丢弃（只打一条 debug 日志），
+    于是「把计划推送给员工」「落后提醒 HR」这些承诺此前都只是发了个没人接的事件。
+    新增订阅者把事件落成站内信之后，推送才是可查、可已读、可追溯的。
+
+    幂等键 `(plan_id, type, notify_date)`：同一计划同一天同类通知只落一条。
+    没有它的话，滞后扫描重跑、页面轮询、手工补扫都会重复轰炸收件人。
+    """
+
+    __tablename__ = "training_notifications"
+    __table_args__ = (
+        UniqueConstraint(
+            "plan_id", "type", "notify_date", name="uq_training_notifications_dedup"
+        ),
+        Index("ix_training_notifications_talent_type", "talent_id", "type"),
+        {"comment": "培训站内信表"},
+    )
+
+    plan_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("training_plans.id", ondelete="CASCADE"),
+        nullable=False,
+        comment="计划 ID（FK -> training_plans.id，CASCADE）",
+    )
+    talent_id: Mapped[int | None] = mapped_column(
+        BigInteger, nullable=True, comment="接收人才 ID（收件人）"
+    )
+    type: Mapped[str] = mapped_column(
+        String(48), nullable=False, comment="事件类型（training.*）"
+    )
+    level: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="正常",
+        server_default=text("'正常'"),
+        comment="级别：正常 / 提醒 / HR预警",
+    )
+    title: Mapped[str] = mapped_column(String(128), nullable=False, comment="标题")
+    content: Mapped[str] = mapped_column(String(512), nullable=False, comment="正文")
+    notify_date: Mapped[date] = mapped_column(
+        Date, nullable=False, comment="通知日期（与 type 组成幂等键，避免重复推送）"
+    )
+    is_read: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("0"), comment="是否已读"
+    )
+    read_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True, comment="已读时间"
+    )
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<TrainingNotification id={self.id} type={self.type} plan_id={self.plan_id}>"

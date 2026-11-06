@@ -221,7 +221,8 @@ def resolve_base_url(provider: str, explicit: str | None = None) -> str:
         return provider_base.rstrip("/")
 
     generic_base = _setting("LLM_BASE_URL")
-    if generic_base and not _is_other_provider_default(provider, generic_base):
+    is_current = str(settings.LLM_PROVIDER or "").strip().lower() == str(provider).strip().lower()
+    if is_current and generic_base and not _is_other_provider_default(provider, generic_base):
         return generic_base.rstrip("/")
     return (spec.default_base_url if spec else generic_base).rstrip("/")
 
@@ -239,7 +240,7 @@ def model_matches_provider(provider: str, model: str | None) -> bool:
     """判断模型名是否属于该供应商。
 
     - 自定义供应商（目录未登记）一律视为匹配；
-    - 有前缀特征的供应商（qwen / deepseek / openai）按前缀判断；
+    - 原生供应商按前缀判断；OpenAI兼容自定义端点允许完整ID，但排除残留的其他目录默认模型；
     - 无前缀特征的供应商（Ollama 本地模型名）需排除「明显属于其他供应商」的模型名，
       避免 provider=ollama 时误用残留的 qwen-plus / gpt-4o 默认值。
     """
@@ -249,6 +250,13 @@ def model_matches_provider(provider: str, model: str | None) -> bool:
     lowered = str(model).strip().lower()
     if spec is None:
         return True
+    # openai也是兼容协议适配器：私有网关/聚合服务的显式模型ID不遵循GPT命名。
+    # 原生OpenAI与其他厂商仍保留前缀检查，避免切换供应商时误用旧模型。
+    if spec.name == "openai" and uses_custom_endpoint(provider):
+        # 保留切换厂商时忽略旧目录默认模型的行为；确需该别名可用专属配置/用途映射明确指定。
+        return lowered not in {
+            other.default_model.lower() for name, other in PROVIDER_SPECS.items() if name != spec.name
+        }
     if spec.model_prefixes:
         return any(lowered.startswith(prefix.lower()) for prefix in spec.model_prefixes)
     for name, other in PROVIDER_SPECS.items():
@@ -257,6 +265,12 @@ def model_matches_provider(provider: str, model: str | None) -> bool:
         if any(lowered.startswith(prefix.lower()) for prefix in other.model_prefixes):
             return False
     return True
+
+
+def uses_custom_endpoint(provider: str) -> bool:
+    """是否配置了目录默认地址之外的服务；不根据模型品牌猜测服务端能力。"""
+    spec = get_provider_spec(provider)
+    return spec is not None and resolve_base_url(provider) != spec.default_base_url.rstrip("/")
 
 
 def resolve_model(provider: str, explicit: str | None = None) -> str:
@@ -268,7 +282,8 @@ def resolve_model(provider: str, explicit: str | None = None) -> str:
     if provider_model:
         return provider_model
     generic = _setting("LLM_MODEL")
-    if generic and model_matches_provider(provider, generic):
+    is_current = str(settings.LLM_PROVIDER or "").strip().lower() == str(provider).strip().lower()
+    if is_current and generic and model_matches_provider(provider, generic):
         return generic
     if spec:
         return spec.default_model
@@ -342,19 +357,46 @@ def parse_fallback_overrides(raw: str | None = None) -> dict[str, list[str]]:
     """解析模型降级链追加配置，例如：
 
         LLM_FALLBACK_MODELS='deepseek-reasoner=deepseek-chat,deepseek-chat=deepseek-reasoner'
-        LLM_FALLBACK_MODELS='qwen-max=qwen-plus/qwen-turbo'    # 多个备选用 / 或 | 分隔
+        LLM_FALLBACK_MODELS='qwen-max=qwen-plus/qwen-turbo'    # 兼容旧厂商别名分隔
+        LLM_FALLBACK_MODELS='org/main=org/backup|other/backup' # 完整ID使用 | 分隔
+        LLM_FALLBACK_MODELS='{"org/main": ["org/backup"]}'   # JSON数组无歧义
 
     注意：键值统一用 `=` 分隔（模型名本身可能含 `:`，如 ollama 的 qwen2.5:7b）。
     """
     text = (settings.LLM_FALLBACK_MODELS if raw is None else raw) or ""
+    text = text.strip()
     result: dict[str, list[str]] = {}
+    if text.startswith("{"):
+        try:
+            parsed = json.loads(text)
+        except ValueError:
+            logger.warning("LLM_FALLBACK_MODELS 不是合法JSON，已忽略")
+            return {}
+        for key, value in parsed.items():
+            if isinstance(value, list) and all(isinstance(item, str) for item in value):
+                result[str(key).strip()] = [item.strip() for item in value if item.strip()]
+        return result
+
     for item in text.replace(";", ",").split(","):
         chunk = item.strip()
         if not chunk or "=" not in chunk:
             continue
         key, value = chunk.split("=", 1)
-        models = [part.strip() for part in value.replace("|", "/").split("/") if part.strip()]
-        if key.strip() and models:
+        # 只拆分已知原生别名的旧斜杠写法；未知namespace/model必须完整保留。
+        models = []
+        for part in value.split("|"):
+            pieces = [piece.strip() for piece in part.split("/")]
+            legacy_aliases = len(pieces) > 1 and all(
+                piece and any(
+                    piece in same_provider_models(name)
+                    or (name == "ollama" and ":" in piece)
+                    for name, spec in PROVIDER_SPECS.items()
+                ) for piece in pieces
+            )
+            models.extend(pieces if legacy_aliases else [part.strip()])
+        if key.strip():
+            # 空列表明确关闭该模型的降级，不能再回落内置链。
+            models = [model for model in models if model]
             result[key.strip()] = models
     return result
 
@@ -392,4 +434,5 @@ __all__ = [
     "resolve_embed_model",
     "resolve_model",
     "same_provider_models",
+    "uses_custom_endpoint",
 ]

@@ -199,7 +199,11 @@ class NL2SQLResponse:
     insight: str | None
     elapsed_ms: int
     cached: bool
+    query_id: str | None                     # 方案A结果快照；未保存则为空
+    expires_at: datetime | None              # 快照过期时间，导出不续期
 ```
+
+Vanna结果快照补充契约（2026-11-04，方案A）：问数保持原有字段，成功写入公共Redis才附加query_id/expires_at；仅具备analytics:read/export且data_scope=all的用户可用。POST /analytics/report接收query_id时复用本人未过期结果，不重新问数；question旧模式保留，两种来源互斥。TTL复用settings.REDIS_DEFAULT_TTL（默认300秒），Redis不可用不影响问数，但不能生成可复用ID。部门范围暂不启用快照，待统一实际授权范围接口确认后扩展。该契约不代表“同问自动复用缓存”或历史报告权限策略已经完成。
 
 **SSE 统一格式**（2 组 / 4 组 / 1 组流式问答共用）：
 

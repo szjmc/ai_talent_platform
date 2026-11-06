@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.config.settings import settings
 
@@ -28,7 +29,23 @@ logger = logging.getLogger(__name__)
 
 
 def create_async_engine_from_settings() -> AsyncEngine:
-    """按配置创建 MySQL 异步引擎。"""
+    """按配置创建 MySQL 异步引擎。
+
+    测试环境（APP_ENV=test）使用 NullPool，避免连接跨 pytest-asyncio 的
+    函数级事件循环被复用（复用会撞上已关闭的 transport，Windows 下表现为
+    `AttributeError: 'NoneType' object has no attribute 'send'`）。
+    """
+    if settings.is_test:
+        engine = create_async_engine(
+            settings.DATABASE_URL,
+            echo=settings.DB_ECHO,
+            future=True,
+            poolclass=NullPool,
+            connect_args={"charset": settings.DB_CHARSET, "autocommit": False},
+        )
+        logger.info("MySQL 引擎已创建（测试环境，NullPool）%s/%s", settings.DB_HOST, settings.DB_NAME)
+        return engine
+
     engine = create_async_engine(
         settings.DATABASE_URL,
         echo=settings.DB_ECHO,

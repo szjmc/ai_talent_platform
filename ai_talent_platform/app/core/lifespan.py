@@ -90,13 +90,24 @@ async def _startup() -> None:
             pgsql_report["message"],
         )
 
-    # 4) 事件总线 -> 审计链路（幂等注册；订阅者用独立 session_scope 落库）
+    # 4) 业务事件订阅者（进程内事件总线的消费端）
+    #    没有订阅者时 publish 是静默丢弃的，业务承诺（推送 / 预警 / 复测回流 / 审计）
+    #    就只剩一句空话。注册在启动阶段，保证「进程起来 = 有人在听」。
+    #    两段各自 try：审计挂不上不该拖垮培训推送，反之亦然。
     try:
         from app.services.audit_service import register_audit_handlers
 
         register_audit_handlers()
     except Exception:  # noqa: BLE001
         logger.exception("审计事件订阅注册失败（主流程继续，审计可能缺失）")
+    try:
+        from app.services.notification_service import (
+            register_training_notification_subscribers,
+        )
+
+        register_training_notification_subscribers()
+    except Exception:  # noqa: BLE001 - 订阅失败不应阻塞服务启动
+        logger.exception("培训站内信订阅注册失败（不影响服务启动，推送将只发事件不落库）")
 
     # 5) 可选基础设施（默认关闭，需要时打开）
     if settings.REDIS_ENABLED:

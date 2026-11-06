@@ -53,9 +53,11 @@ class ObjectStorageAdapter(BaseStorage):
         return {}
 
     # ---------------------------------------------------------------- 接口实现
-    async def save(self, data: bytes, filename: str, subdir: str = "") -> str:
+    async def save(self, data: bytes, filename: str, subdir: str = "", *, before_write=None) -> str:
         payload = validate_payload(data)
         key = build_object_key(filename, subdir)
+        if before_write is not None:
+            await before_write(key)
         content_type = guess_content_type(filename)
         result = await self.client.put_object(key, payload, content_type)
         logger.info(

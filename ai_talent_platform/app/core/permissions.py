@@ -28,7 +28,16 @@ Service 层在查询时把范围条件交给 Repository 落地，禁止在 Route
 
 from __future__ import annotations
 
-from enum import StrEnum
+try:  # Python 3.11+
+    from enum import StrEnum
+except ImportError:  # Python 3.10 兼容垫片：本地 .venv 为 3.10 时保持行为一致
+    from enum import Enum
+
+    class StrEnum(str, Enum):  # type: ignore[no-redef]
+        """与 3.11+ StrEnum 等价：枚举值即字符串，str() 返回值本身。"""
+
+        def __str__(self) -> str:
+            return str(self.value)
 
 from app.core.exceptions import PermissionDeniedError
 
@@ -66,9 +75,19 @@ class PermissionEnum(StrEnum):
     ASSESSMENT_READ = "assessment:read"
     ASSESSMENT_MANAGE = "assessment:manage"
     TRAINING_READ = "training:read"
+    # 自助上报：只允许操作「本人」的学习记录（Service 用 users.talent_id 校验归属）。
+    # 与 MANAGE 分开的意义：MANAGER / EMPLOYEE 需要推进自己的培训，
+    # 但绝不能改别人的人才档案进度；此前只有 MANAGE 一个粒度，
+    # 结果全公司只有 HR 能操作，培训的执行主体反而被挡在门外。
+    TRAINING_REPORT = "training:report"
     TRAINING_MANAGE = "training:manage"
+    # [岗位匹配接入] 匹配读/执行权限；角色授权见下方权限表。
     MATCHING_READ = "matching:read"
     MATCHING_RUN = "matching:run"
+    # *kwq* 新增（HR 复核）：复核是「写决策」，不能复用 matching:read。
+    # 理由：只读与写决策的授权边界不同——部门管理者（MANAGER）可以看匹配结果，
+    #       但不应有权决定某人是淘汰还是录用。
+    MATCHING_REVIEW = "matching:review"
     # 知识库 / 分析 / AI
     KNOWLEDGE_READ = "knowledge:read"
     KNOWLEDGE_MANAGE = "knowledge:manage"
@@ -104,6 +123,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         PermissionEnum.ASSESSMENT_READ, PermissionEnum.ASSESSMENT_MANAGE,
         PermissionEnum.TRAINING_READ, PermissionEnum.TRAINING_MANAGE,
         PermissionEnum.MATCHING_READ, PermissionEnum.MATCHING_RUN,
+        PermissionEnum.MATCHING_REVIEW,
         PermissionEnum.KNOWLEDGE_READ, PermissionEnum.KNOWLEDGE_MANAGE,
         PermissionEnum.ANALYTICS_READ, PermissionEnum.ANALYTICS_EXPORT,
         PermissionEnum.AGENT_USE,
@@ -120,6 +140,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         PermissionEnum.ASSESSMENT_READ, PermissionEnum.ASSESSMENT_MANAGE,
         PermissionEnum.TRAINING_READ, PermissionEnum.TRAINING_MANAGE,
         PermissionEnum.MATCHING_READ, PermissionEnum.MATCHING_RUN,
+        PermissionEnum.MATCHING_REVIEW,
         PermissionEnum.KNOWLEDGE_READ,
         PermissionEnum.ANALYTICS_READ,
         PermissionEnum.AGENT_USE,
@@ -132,6 +153,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         PermissionEnum.POSITION_READ,
         PermissionEnum.ASSESSMENT_READ,
         PermissionEnum.TRAINING_READ,
+        PermissionEnum.TRAINING_REPORT,
         PermissionEnum.MATCHING_READ,
         PermissionEnum.KNOWLEDGE_READ,
         PermissionEnum.ANALYTICS_READ,
@@ -141,6 +163,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         PermissionEnum.ORG_READ,
         PermissionEnum.POSITION_READ,
         PermissionEnum.TRAINING_READ,
+        PermissionEnum.TRAINING_REPORT,
         PermissionEnum.KNOWLEDGE_READ,
         PermissionEnum.AGENT_USE,
     },

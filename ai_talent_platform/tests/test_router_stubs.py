@@ -59,8 +59,15 @@ def test_stub_modules_declare_valid_owner_group():
     problems: list[str] = []
     stubs = _stub_modules()
     prefixes = {p for p, _, _ in stubs}
-    implemented_modules = {"talents", "analytics"}
-    missing = set(EXPECTED_OWNER) - prefixes - implemented_modules
+    # 已有真实路由的模块不应重新注册为501占位；从实际装配结果确认而非删掉归属要求。
+    from app.core.application import create_application
+    from app.config.settings import settings
+    # 检查最终对外契约，兼容FastAPI延迟展开include_router的内部对象。
+    # 仅生成OpenAPI，不执行lifespan，不连接数据库或自动建表。
+    paths = create_application().openapi()['paths']
+    implemented = {path.removeprefix(settings.API_PREFIX).strip('/').split('/')[0]
+                   for path in paths if path.startswith(settings.API_PREFIX + '/')} - prefixes
+    missing = set(EXPECTED_OWNER) - prefixes - implemented
     if missing:
         problems.append(f"router.py 缺少占位模块注册：{sorted(missing)}")
 

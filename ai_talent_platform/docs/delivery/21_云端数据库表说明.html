@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>云端数据库 29 张表说明（大白话版）</title>
+<style>
+  body { font-family: "Microsoft YaHei", sans-serif; background: #f4f6f9; color: #2c3e50; margin: 0; padding: 40px 20px; }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  h1 { font-size: 26px; border-left: 5px solid #1a2f5a; padding-left: 14px; }
+  h2 { font-size: 20px; margin-top: 44px; padding: 10px 14px; background: #1a2f5a; color: #fff; border-radius: 6px; }
+  .meta { color: #7f8c8d; font-size: 13px; margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.08); margin: 14px 0 30px; font-size: 14px; }
+  th, td { border: 1px solid #dfe6ee; padding: 9px 12px; text-align: left; vertical-align: top; line-height: 1.6; }
+  th { background: #eef2f7; color: #1a2f5a; white-space: nowrap; }
+  tr:hover td { background: #f8fafc; }
+  .tag { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 12px; white-space: nowrap; }
+  .my-write { background: #1a2f5a; color: #fff; }
+  .my-read  { background: #d6e4ff; color: #1a2f5a; }
+  .other    { background: #e8e8e8; color: #666; }
+  .warn     { background: #ffe9c8; color: #a15c00; }
+  .card { background: #fff; border-left: 4px solid #1a2f5a; padding: 14px 18px; margin: 16px 0; box-shadow: 0 1px 4px rgba(0,0,0,.08); border-radius: 4px; }
+  .card h3 { margin: 0 0 8px; font-size: 16px; }
+  .card p { margin: 6px 0; font-size: 14px; line-height: 1.7; }
+  .flow { background: #fff; padding: 18px 22px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,.08); font-size: 14px; line-height: 2; }
+  .flow b { color: #1a2f5a; }
+  code { background: #eef2f7; padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+  .tip { background: #fff8e6; border: 1px solid #f0d48a; border-radius: 6px; padding: 12px 16px; font-size: 14px; line-height: 1.8; margin: 20px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>云端数据库 29 张表说明（大白话版）</h1>
+  <p class="meta">库：ai_talent_platform @ 121.43.198.251（MySQL 8.0.27，共享库） · 整理日期：2026-11-05 · 全部表结构经真实连接核验</p>
+
+  <div class="tip"><b>先记住一句话：</b>这个库是全平台共用的，29 张表分属不同小组。<b>你的岗位人才匹配 Agent 只写 3 张表（matching_batches、matching_records、reserve_warnings）+ Milvus 向量库</b>，其余表要么只读、要么完全不用。</div>
+
+  <h2>一、我的模块（岗位人才匹配 Agent）——核心中的核心</h2>
+  <table>
+    <tr><th>表名</th><th>与我关系</th><th>大白话说明</th><th>存什么</th></tr>
+    <tr>
+      <td><b>matching_batches</b><br><span style="color:#999">跑批快照表</span></td>
+      <td><span class="tag my-write">我写入 ✔</span></td>
+      <td>每次正式跑一次"岗位找人"，在这里<b>记一本总账</b>：哪天跑的、给哪个岗位跑的、当时的完整结果。哪怕一个人都没匹配上也要记一行——表示"我认真跑过这次"，不造假。</td>
+      <td>batch_id（批次号）、position_id、matched_at（时间）、response（完整结果 JSON）、request_scope（当时的筛选条件和权重，供以后"重放"复盘）</td>
+    </tr>
+    <tr>
+      <td><b>matching_records</b><br><span style="color:#999">人岗明细表</span></td>
+      <td><span class="tag my-write">我写入 ✔</span></td>
+      <td>总账里的<b>每一笔明细</b>：某个岗位这次跑批，每个候选人得了多少分、为什么。一个候选人一行。这是 HR 最终看的数据。</td>
+      <td>score（0-100 总分）、dimension_scores（技能/经验/学历/素质四个分项）、highlights/gaps/suggestion（亮点/差距/建议）、hard_results（硬性条件四态判定）、explanation（AI 解释）、requirement_version（用的哪版岗位画像）、recall_mode（召回方式：vector 或 sql_fallback）、stats（统计计数）</td>
+    </tr>
+    <tr>
+      <td><b>reserve_warnings</b><br><span style="color:#999">储备预警表</span></td>
+      <td><span class="tag my-write">我写入 ✔</span></td>
+      <td><b>报警记录本</b>：扫描发现某岗位"招不到人/储备不够/空缺太久"就记一条，HR 处理完标记关闭。同一个岗位同类问题只留一条未处理的，不刷屏。</td>
+      <td>warning_type（三类：零产出/储备不足/长期空缺）、risk_level（high/medium）、message/detail（人话描述和数字）、resolved/resolved_at/resolved_by（处理留痕）</td>
+    </tr>
+  </table>
+
+  <h2>二、我"只读"的表——数据是别人家的，我借来用</h2>
+  <table>
+    <tr><th>表名</th><th>与我关系</th><th>大白话说明</th><th>我用它的哪些字段</th></tr>
+    <tr>
+      <td><b>talents</b><br><span style="color:#999">人才档案表（52 人）</span></td>
+      <td><span class="tag my-read">我读取 ✔</span></td>
+      <td><b>全公司的人才花名册</b>：每个人一份档案。简历解析组负责往里写人，我负责从这里"挑人"。</td>
+      <td>skills / skill_tags（技能，评分和匹配的核心）、education + school + major（学历三件套，硬性判定用）、work_years（工作年限，硬性判定）、current_position、<b>status（在职状态——离职的人绝不能被推荐出来，MATCH-008 的教训）</b>、potential_level（A/B/C/D 潜力评级，我"素质分"的依据，目前是人才决策组该提供的）</td>
+    </tr>
+    <tr>
+      <td><b>positions</b><br><span style="color:#999">岗位表（0 行）</span></td>
+      <td><span class="tag my-read">我读取 ✔</span></td>
+      <td><b>招聘岗位的登记簿</b>。岗位组负责录入。⚠️ 目前是空的——这是我跑批的最大阻塞点，没有岗位就没法"岗位找人"。</td>
+      <td>岗位名、部门、城市、状态（开放/关闭）、关联的画像</td>
+    </tr>
+    <tr>
+      <td><b>position_requirements</b><br><span style="color:#999">岗位能力模型表（0 行，多版本）</span></td>
+      <td><span class="tag my-read">我读取 ✔</span></td>
+      <td><b>岗位的"招聘标准说明书"</b>：这个岗位要什么技能、几年经验、什么学历，技能各占多少权重。改一次标准就存一个新版本，我打分时认版本号，保证"当时按哪版标准打的分"说得清。</td>
+      <td>必备/加分技能清单、min_education、min_work_years、专业要求、技能权重、<b>version（我落库时记进 matching_records.requirement_version）</b></td>
+    </tr>
+    <tr>
+      <td><b>resumes</b><br><span style="color:#999">简历表（1 行）</span></td>
+      <td><span class="tag my-read">间接读</span></td>
+      <td>简历原文和解析结果的家。人才是从简历"长"出来的，简历是源头。我一般不直接查它，但要解释"这个人技能哪来的"时可以追溯到简历。</td>
+      <td>简历文件地址、解析状态、解析后的结构化内容</td>
+    </tr>
+    <tr>
+      <td><b>resume_experiences</b><br><span style="color:#999">简历工作经历表（0 行）</span></td>
+      <td><span class="tag other">暂不用</span></td>
+      <td>简历里拆出来的"工作经历明细"：在哪家公司、干过什么、多久。给证据链做底料的，等简历解析组把它填上，我的证据会更扎实。</td>
+      <td>公司、职位、起止时间、职责描述</td>
+    </tr>
+    <tr>
+      <td><b>talent_portraits</b><br><span style="color:#999">人才画像表（4 行，版本化）</span></td>
+      <td><span class="tag warn">谨慎对待 ⚠</span></td>
+      <td>人才决策组用 AI 生成的人才画像（优势/短板/建议岗位）。<b>铁律：AI 生成的画像不能进我的证据包</b>——防止"AI 引用 AI"循环污染，我的证据只认数据库事实。潜在_level 是否回写 talents 表需要和对方对齐。</td>
+      <td>dimensions（四维画像，现在 4 条全是空的 { }）、strengths/weaknesses、suggested_positions、potential_level</td>
+    </tr>
+  </table>
+
+  <h2>三、认证权限组——所有人共用的"门禁系统"</h2>
+  <table>
+    <tr><th>表名</th><th>大白话说明</th><th>与我关系</th></tr>
+    <tr><td><b>users</b>（7 行）</td><td>登录账号表：superadmin + 4 个各组 admin（xaod/lladmin/lbadmin/sbjadmin）+ 1 个普通员工。登录发 token 靠它。</td><td><span class="tag my-read">我读取</span>——跑批留痕 matched_by 记的是登录用户</td></tr>
+    <tr><td><b>roles</b>（5 行）</td><td>角色定义：超级管理员/系统管理员/普通员工等"身份牌子"。</td><td><span class="tag other">间接相关</span>——我的接口受 MATCHING_READ 权限控制</td></tr>
+    <tr><td><b>user_roles</b>（7 行）</td><td>人和角色的"谁是什么身份"对照表。</td><td><span class="tag other">间接相关</span></td></tr>
+    <tr><td><b>organizations</b>（1 行）</td><td>组织架构/部门树。</td><td><span class="tag other">不直接用</span></td></tr>
+    <tr><td><b>audit_logs</b>（0 行）</td><td>操作审计日志：谁在什么时候干了什么，平台统一记账。</td><td><span class="tag other">不直接用</span></td></tr>
+  </table>
+
+  <h2>四、知识库组——别的组的"资料图书馆"</h2>
+  <table>
+    <tr><th>表名</th><th>大白话说明</th><th>与我关系</th></tr>
+    <tr><td><b>knowledge_docs</b>（13 行）</td><td>知识文档的目录：传上来的文档一条记录，含发布状态。</td><td rowspan="4"><span class="tag other">完全不用</span>——是知识库 Agent 的地盘。注意：他们的"知识向量"存 Milvus，和我的"岗位画像向量"在同一个向量库里但集合（collection）不同，互不干扰。</td></tr>
+    <tr><td><b>knowledge_chunks</b>（31 行）</td><td>文档被切碎后的"段落卡片"，检索就是拿问题去比对这些小卡片。</td></tr>
+    <tr><td><b>knowledge_revisions</b>（0 行）</td><td>文档的草稿和历史版本，改错了能回退。</td></tr>
+    <tr><td><b>files</b>（14 行）</td><td>所有上传文件的登记处（文件本体在 MinIO，这里只记元数据）。</td></tr>
+  </table>
+
+  <h2>五、测评组——"在线考试系统"</h2>
+  <table>
+    <tr><th>表名</th><th>大白话说明</th><th>与我关系</th></tr>
+    <tr><td><b>assessments</b>（2 行）</td><td>测评任务：给谁安排了一场什么考试。</td><td rowspan="4"><span class="tag other">目前不用</span>——测评组的地盘。<b>但有个远期交集</b>：测评结果将来可能作为"素质分"的数据源，替掉现在拍脑袋的 quality 维打分，到时候要谈接口。</td></tr>
+    <tr><td><b>assessment_questions</b>（10 行）</td><td>题库：考试的题目。</td></tr>
+    <tr><td><b>assessment_answers</b>（0 行）</td><td>答题记录：每道题答了什么。</td></tr>
+    <tr><td><b>assessment_results</b>（0 行）</td><td>出分：考了多少、哪个维度强。</td></tr>
+  </table>
+
+  <h2>六、培训组与 AI 会话组——目前和你无关的两组</h2>
+  <table>
+    <tr><th>表名</th><th>大白话说明</th><th>与我关系</th></tr>
+    <tr><td><b>training_plans</b>（0 行）</td><td>培训计划：给谁安排什么培训。</td><td rowspan="4"><span class="tag other">完全不用</span></td></tr>
+    <tr><td><b>plan_courses</b>（0 行）</td><td>计划和课程的"配菜关系"：这场培训包含哪些课。</td></tr>
+    <tr><td><b>courses</b>（0 行）</td><td>课程库本身。</td></tr>
+    <tr><td><b>learning_records</b>（0 行）</td><td>学习打卡记录。</td></tr>
+    <tr><td><b>conversations</b>（0 行）</td><td>AI 对话的"一个个会话"。</td><td rowspan="2"><span class="tag other">完全不用</span>——对话 Agent 的地盘</td></tr>
+    <tr><td><b>chat_messages</b>（0 行）</td><td>会话里的每一条消息。</td></tr>
+    <tr><td><b>workflow_info</b>（0 行）</td><td>Dify 工作流的登记表：记录有哪些 Dify 工作流可用。</td><td><span class="tag my-read">远期相关</span>——Dify 组联调时会用</td></tr>
+  </table>
+
+  <h2>七、我模块的信息存储地图（一张图记住）</h2>
+  <div class="flow">
+    <b>跑批一次，数据流是这样的：</b><br><br>
+    ① 读：talents（挑人+技能/学历/状态）+ positions + position_requirements（岗位标准和权重）<br>
+    ② 召回：优先 Milvus 向量召回（recall_mode=vector）；Milvus 挂了自动降级 SQL 召回（如实记 sql_fallback）<br>
+    ③ 写 MySQL：<b>matching_batches</b> 记 1 行总账 → <b>matching_records</b> 每个候选人 1 行明细（含四态判定、四维分、AI 解释、5 个追溯字段）<br>
+    ④ 预警扫描：<b>reserve_warnings</b> 记录零产出/储备不足/长期空缺三类警报<br><br>
+    <b>Milvus 向量库里我存什么：</b>岗位画像文本的向量（bge-m3 模型，1024 维），用于"语义找相似人才"。<b>不存</b>人才向量（那是简历组的活）。<br><br>
+    <b>明确不落库的（只读试算）：</b>POST /matchings/reverse（人才找岗位）和 POST /matchings/explain（解释）——代码注释写明不写表，别让别的组误以为有留痕。
+  </div>
+
+  <div class="tip">
+    <b>当前数据现状速览（2026-11-05）：</b>talents 52 人数据质量好（零缺失、技能 JSON 规整）；positions 和 position_requirements <b>0 行</b>——你跑批前必须先有岗位数据（催岗位组，或自插 [test] 测试岗位）；matching 三表全 0 等待首跑；1 条脏数据：某人才 education 字段填了字面量 "string"；talent_portraits 4 条 dimensions 全空，需反馈人才决策组。
+  </div>
+
+  <h2>八、给你的三条使用纪律（共享库）</h2>
+  <div class="card">
+    <p><b>1. 只写自己的三张表</b>——其他 26 张表谁的都不碰，尤其别 drop 别人的表；talents/positions 那是人家组的资产。</p>
+    <p><b>2. 测试数据带标识</b>——matching_records 全组可见，测试岗位名带 "[test]" 前缀、测完可清理；别在库里放敏感或编造的内容。</p>
+    <p><b>3. 每次结构变更留 SQL 迁移脚本</b>——你的 matching 三张表就是靠 docs/sql/ 下三个脚本在云端建出来的，以后加字段也照这个规矩，脚本进 git、云端执行、验证留痕。</p>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>岗位人才匹配 Agent · 缺口与对接清单</title>
+<style>
+  :root{
+    --ink:#1b2430; --ink2:#4a5766; --ink3:#7b8794;
+    --line:#e3e8ef; --bg:#f7f9fc; --card:#ffffff;
+    --blue:#2f6fed; --blue-bg:#eef4ff;
+    --green:#1f8a5b; --green-bg:#e8f6ef;
+    --amber:#b8770a; --amber-bg:#fdf4e3;
+    --red:#c0392b; --red-bg:#fdeeec;
+    --purple:#6b4fd8; --purple-bg:#f1edfe;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px; line-height:1.75; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px; margin:0 auto; padding:40px 28px 80px}
+  header.hero{
+    background:linear-gradient(135deg,#3a2417 0%,#7a4a1e 100%);
+    color:#fff; border-radius:16px; padding:34px 36px; margin-bottom:26px;
+  }
+  header.hero .kicker{font-size:12px; letter-spacing:.18em; opacity:.72; text-transform:uppercase}
+  header.hero h1{margin:8px 0 6px; font-size:26px; font-weight:650; letter-spacing:-.01em}
+  header.hero p{margin:0; color:#ecd9c3; font-size:13.5px}
+  header.hero .meta{margin-top:16px; display:flex; gap:22px; flex-wrap:wrap; font-size:12.5px; color:#d9b98f}
+  header.hero .meta b{color:#fdf1de; font-weight:600}
+
+  .verdict{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:34px}
+  .verdict .v{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 20px}
+  .verdict .v .n{font-size:26px; font-weight:680; letter-spacing:-.02em; line-height:1.2}
+  .verdict .v .t{font-size:12.5px; color:var(--ink3); margin-top:2px}
+  .verdict .v .d{font-size:12.5px; color:var(--ink2); margin-top:8px}
+  .v.g .n{color:var(--green)} .v.a .n{color:var(--amber)} .v.r .n{color:var(--red)}
+
+  section{margin-bottom:40px}
+  h2{font-size:18px; font-weight:660; margin:0 0 6px; letter-spacing:-.01em; display:flex; align-items:center; gap:10px}
+  h2 .num{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:24px; height:24px; border-radius:7px; background:var(--ink); color:#fff;
+    font-size:12.5px; font-weight:600; flex:none;
+  }
+  .sub{color:var(--ink3); font-size:13px; margin:0 0 16px; padding-left:34px}
+
+  table{width:100%; border-collapse:separate; border-spacing:0; background:var(--card);
+    border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-bottom:12px}
+  th{background:#f2f5fa; text-align:left; font-weight:640; font-size:12.5px; color:var(--ink2);
+    padding:11px 14px; border-bottom:1px solid var(--line); white-space:nowrap}
+  td{padding:12px 14px; border-bottom:1px solid #eef2f7; vertical-align:top; font-size:13px}
+  tr:last-child td{border-bottom:none}
+  tbody tr:hover{background:#fbfcfe}
+  code{font-family:"JetBrains Mono",Consolas,monospace; font-size:11.8px;
+    background:#f1f4f9; padding:1px 5px; border-radius:4px; color:#33475e; word-break:break-all}
+  .pill{display:inline-block; padding:1px 8px; border-radius:20px; font-size:11.5px; font-weight:600;
+    white-space:nowrap; line-height:1.7}
+  .p-ok{background:var(--green-bg); color:var(--green)}
+  .p-mid{background:var(--amber-bg); color:var(--amber)}
+  .p-no{background:var(--red-bg); color:var(--red)}
+  .p-p0{background:var(--red-bg); color:var(--red)}
+  .p-p1{background:var(--amber-bg); color:var(--amber)}
+  .p-p2{background:var(--blue-bg); color:var(--blue)}
+  .p-p3{background:var(--purple-bg); color:var(--purple)}
+
+  .flow{display:grid; grid-template-columns:repeat(8,1fr); gap:0; margin-bottom:16px}
+  .step{position:relative; text-align:center; padding:0 4px}
+  .step .dot{
+    width:34px; height:34px; margin:0 auto 8px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:12px; font-weight:700;
+  }
+  .step .dot.ok{background:var(--green)} .step .dot.deg{background:var(--amber)} .step .dot.no{background:var(--red)}
+  .step .lb{font-size:12px; color:var(--ink2); line-height:1.4}
+  .step .md{font-size:10.5px; color:var(--ink3); margin-top:3px}
+  .step:not(:last-child)::after{
+    content:""; position:absolute; top:17px; right:calc(-50% + 21px);
+    width:calc(100% - 10px); height:2px; background:#d7dfeb; z-index:-0;
+  }
+
+  .note{background:var(--blue-bg); border-left:3px solid var(--blue); border-radius:0 8px 8px 0;
+    padding:12px 16px; font-size:13px; color:#274b8f; margin:14px 0 0}
+  .warn{background:var(--red-bg); border-left:3px solid var(--red); border-radius:0 8px 8px 0;
+    padding:12px 16px; font-size:13px; color:#8f2c22; margin:14px 0 0}
+
+  .phase{display:grid; grid-template-columns:1fr; gap:12px}
+  .ph{background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:16px 20px; display:grid; grid-template-columns:120px 1fr; gap:18px}
+  .ph .tag{font-size:12px; font-weight:700; color:var(--blue); letter-spacing:.02em; padding-top:2px}
+  .ph .tag small{display:block; color:var(--ink3); font-weight:500; letter-spacing:0; margin-top:2px}
+  .ph h3{margin:0 0 6px; font-size:14.5px; font-weight:650}
+  .ph ul{margin:0; padding-left:18px; color:var(--ink2); font-size:13px}
+  .ph li{margin:2px 0}
+  .ph .why{font-size:12.5px; color:var(--ink3); margin-top:6px}
+
+  ol.q{margin:0; padding-left:20px; color:var(--ink2); font-size:13.2px}
+  ol.q li{margin:7px 0}
+  ol.q b{color:var(--ink)}
+
+  footer{margin-top:44px; padding-top:18px; border-top:1px solid var(--line); color:var(--ink3); font-size:12.5px}
+  @media print{body{background:#fff} .ph,table,.verdict .v{break-inside:avoid}}
+  @media (max-width:900px){.flow{grid-template-columns:repeat(4,1fr); row-gap:20px} .step:nth-child(4)::after{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="kicker">岗位人才匹配 Agent · lz_agent 版本体检</div>
+  <h1>匹配链路缺什么 · 要对接什么 · 按什么顺序接</h1>
+  <p>只针对你的 Agent 本体（JD 解析 → 画像 → 召回 → 判定 → 打分 → 证据 → 解释 → 落库），逐文件核对降级标注与真实通道。</p>
+  <div class="meta">
+    <span>盘点时间 <b>2026-11-04</b></span>
+    <span>分支 <b>lz_agent</b></span>
+    <span>链路 8 环节 <b>全部可跑（规则通道）</b></span>
+    <span>外部通道 <b>4 条未接</b> · Agent 外壳 <b>1 个骨架</b></span>
+  </div>
+</header>
+
+<div class="verdict">
+  <div class="v g">
+    <div class="n">8 / 8</div>
+    <div class="t">链路环节全部可执行</div>
+    <div class="d">183 条测试 100% 通过（报告口径）；每一步降级都如实标注 source / recall_mode / channel，没有一处伪装。</div>
+  </div>
+  <div class="v a">
+    <div class="n">4 条</div>
+    <div class="t">AI 通道未接通</div>
+    <div class="d">Dify×2、LLM、Milvus+Embedding。接通前你永远只能说「规则版能跑」，说不出「AI 版准确率比规则高多少」。</div>
+  </div>
+  <div class="v r">
+    <div class="n">0 行</div>
+    <div class="t">Agent 外壳实现</div>
+    <div class="d"><code>matching_agent.py</code> 是 TODO 骨架 —— 调度器找得到类型，但注册表里没有实例，<code>/agents/tasks</code> 调不到你的匹配能力。</div>
+  </div>
+</div>
+
+<!-- ============ 1 ============ -->
+<section>
+  <h2><span class="num">1</span>匹配链路逐环节现状</h2>
+  <p class="sub">你的 14 项需求里，代码全部写完；卡的不是逻辑，是下面标注了「降级」的四个环节没有真实通道。</p>
+  <div class="flow">
+    <div class="step"><div class="dot deg">降</div><div class="lb">JD 解析</div><div class="md">source=manual<br>规则提取</div></div>
+    <div class="step"><div class="dot ok">通</div><div class="lb">画像确认</div><div class="md">v3→v4 版本化<br>已闭环</div></div>
+    <div class="step"><div class="dot deg">降</div><div class="lb">候选召回</div><div class="md">recall_mode=<br>sql_fallback</div></div>
+    <div class="step"><div class="dot ok">通</div><div class="lb">四态判定</div><div class="md">PASS/FAIL/<br>UNKNOWN/REVIEW</div></div>
+    <div class="step"><div class="dot ok">通</div><div class="lb">四维打分</div><div class="md">权重归一化<br>UNKNOWN 降权</div></div>
+    <div class="step"><div class="dot ok">通</div><div class="lb">证据构建</div><div class="md">fact/derived/<br>missing + 五层校验</div></div>
+    <div class="step"><div class="dot deg">降</div><div class="lb">匹配解释</div><div class="md">channel=<br>rule_fallback</div></div>
+    <div class="step"><div class="dot ok">通</div><div class="lb">落库回读</div><div class="md">批次+明细+统计<br>可复算</div></div>
+  </div>
+  <table>
+    <thead><tr><th style="width:170px">环节</th><th style="width:190px">代码位置</th><th>真实状态</th><th style="width:110px">待接通道</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>① JD 智能解析</td>
+        <td><code>app/services/jd_parser.py</code><br><small>（603 行，主入口 <code>parse_job_description()</code>）</small></td>
+        <td>规则提取可用（本科/年限/技能白名单，薪资与职责词不污染技能）。<b>Dify 通道代码已就绪</b>，只差契约确认</td>
+        <td><span class="pill p-mid">Dify #1</span> <span class="pill p-mid">LLM</span></td>
+      </tr>
+      <tr>
+        <td>② 画像确认与版本化</td>
+        <td><code>app/services/position_profile_service.py</code><br><code>app/routers/position_router.py</code>（3 接口）</td>
+        <td><span class="pill p-ok">完整</span> 旧版本号确认被 400 拦截；未确认画像禁止匹配</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>③ 候选召回</td>
+        <td><code>app/services/matching_pipeline.py</code> <code>recall()</code><br><code>app/repositories/talent_repository.py</code></td>
+        <td>SQL 结构化召回 + 状态过滤（active/reserve，排除 left）。<b>Milvus 适配器是 32 行骨架，无向量召回</b></td>
+        <td><span class="pill p-mid">Milvus</span> <span class="pill p-mid">Embedding</span></td>
+      </tr>
+      <tr>
+        <td>④ 四态硬条件判定</td>
+        <td><code>app/services/matching_rules.py</code><br><code>app/patterns/strategy.py</code></td>
+        <td><span class="pill p-ok">完整</span> 仅 FAIL 淘汰；档案缺失保留（UNKNOWN）</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>⑤ 四维加权打分</td>
+        <td><code>app/patterns/strategy.py</code>（<code>MATCH_DEFAULT_WEIGHTS</code>）</td>
+        <td><span class="pill p-ok">完整</span> 可复算；但<b>权重是常量，请求参数里不能调</b>（<code>MatchRunRequest</code> 无 weights 字段）</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>⑥ 证据构建与校验</td>
+        <td><code>app/services/evidence_builder.py</code>（726 行）<br><code>app/services/evidence_verifier.py</code>（715 行）</td>
+        <td><span class="pill p-ok">完整</span> EVID 编号、五层校验（编造/跨人/矛盾/缺失滥用剔除）</td>
+        <td>—</td>
+      </tr>
+      <tr>
+        <td>⑦ 匹配解释</td>
+        <td><code>app/services/explanation_service.py</code><br><code>app/adapters/dify/dify_adapter.py</code></td>
+        <td>降级链 Dify→LLM→规则<b>编排逻辑完整</b>；因无 key，Dify/LLM 两通道从未真实走通过，只有规则兜底在出力</td>
+        <td><span class="pill p-mid">Dify #2</span> <span class="pill p-mid">LLM</span></td>
+      </tr>
+      <tr>
+        <td>⑧ 落库与回读</td>
+        <td><code>app/services/matching_service.py</code>（531 行）<br><code>app/repositories/matching_repository.py</code></td>
+        <td><span class="pill p-ok">完整</span> 批次/明细/统计/权重/解释/淘汰原因均可回读一致；<b>但 5 个新列的 DDL 只在开发库执行</b></td>
+        <td><span class="pill p-mid">DDL 审批</span></td>
+      </tr>
+      <tr>
+        <td>Agent 外壳（额外）</td>
+        <td><code>app/ai/agents/matching_agent.py</code><br><code>app/ai/prompts/matching_prompt.py</code></td>
+        <td><span class="pill p-no">TODO 骨架</span> 调度器 <code>AGENT_MODULES["matching"]</code> 延迟导入会静默跳过；<code>/agents/tasks</code> 调不到匹配能力</td>
+        <td><span class="pill p-mid">Agent 框架</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="note">
+    你的 <code>matching_skill.py</code>（422 行，3 个技能：打分 / 岗位搜索 / 候选清单）<b>已经是实现好的</b>——这正好是 matching_agent 的现成工具箱，补 Agent 外壳时不要重写，直接挂上去。
+  </div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section>
+  <h2><span class="num">2</span>要对接的接口（你的 Agent 自己的 4 + 1 条）</h2>
+  <p class="sub">每条写明：找谁要什么、代码改哪里、怎么算「接通」（验收判据）。</p>
+  <table>
+    <thead>
+      <tr><th style="width:52px">编号</th><th style="width:140px">对接对象</th><th style="width:185px">要拿到的</th>
+      <th>对接位置</th><th style="width:250px">验收判据（怎么算通）</th><th style="width:70px">优先级</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><b>INT-1</b></td>
+        <td>Dify 工作流<br><small style="color:var(--ink3)">job_profile_extraction<br>（JD→结构化画像）</small></td>
+        <td>① <code>DIFY_BASE_URL</code>（含 /v1）② <code>DIFY_API_KEY</code> ③ app-id ④ inputs 变量名（暂定 <code>jd_text</code>）⑤ outputs 结构（单字段 <code>result</code> 还是多字段）</td>
+        <td>适配器：<code>dify_adapter.py</code> 的 <code>DEFAULT_WORKFLOWS</code> + <code>run_job_profile_extraction()</code><br>调用侧：<code>jd_parser.py</code>（已按「Dify 优先、规则兜底」写好）</td>
+        <td>POST <code>/positions/{id}/parse</code> 返回 <code>source="dify"</code>；同一 JD 跑规则版 vs Dify 版对比字段命中率</td>
+        <td><span class="pill p-p0">P0</span></td>
+      </tr>
+      <tr>
+        <td><b>INT-2</b></td>
+        <td>Dify 工作流<br><small style="color:var(--ink3)">match_explanation<br>（证据包→自然语言）</small></td>
+        <td>同上 + <code>evidence_pack</code> 入参类型（暂定 JSON 字符串）与返回字段</td>
+        <td>适配器：<code>run_match_explanation()</code><br>调用侧：<code>explanation_service.py</code> <code>_via_dify()</code></td>
+        <td>POST <code>/matchings/explain</code> 返回 <code>channel="dify"</code>，且所有句子挂的 <code>evidence_ids</code> 通过五层校验（不出现编造）</td>
+        <td><span class="pill p-p0">P0</span></td>
+      </tr>
+      <tr>
+        <td><b>INT-3</b></td>
+        <td>LLM（qwen-plus）</td>
+        <td><code>LLM_API_KEY</code>（或改 <code>LLM_PROVIDER=ollama</code> 走本地模型）</td>
+        <td><code>settings.py</code> 的 <code>LLM_*</code>；出口 <code>ai/core/llm_manager.py</code><br>调用侧：<code>explanation_service.py</code> <code>_via_llm()</code></td>
+        <td>解释出现 <code>channel="llm_fallback"</code> 且文案可读；日志含 prompt/completion tokens（配额埋点生效）</td>
+        <td><span class="pill p-p0">P0</span></td>
+      </tr>
+      <tr>
+        <td><b>INT-4</b></td>
+        <td>Milvus + Embedding</td>
+        <td>Milvus 地址与 token；embedding 定型（<code>text-embedding-v3</code>，<b>dim=1024 一次定死</b>）</td>
+        <td>实现 <code>adapters/vector_store/milvus_adapter.py</code>（32 行骨架）<br>实现 <code>ai/rag/embedding_service.py</code>（19 行骨架）<br>召回切换点：<code>matching_pipeline.recall()</code><br>建集合：<code>scripts/init_milvus.py</code></td>
+        <td>执行匹配返回 <code>recall_mode="vector"</code>；同一岗位对比 SQL 召回与向量召回的 top_k 重合率；<code>/talents/search/semantic</code>（上游接口）可用</td>
+        <td><span class="pill p-p1">P1</span></td>
+      </tr>
+      <tr>
+        <td><b>INT-5</b></td>
+        <td>Agent 框架（自己补）</td>
+        <td>无外部依赖，纯开发</td>
+        <td>实现 <code>ai/agents/matching_agent.py</code>（继承 BaseAgent：build_prompt / parse_output / persist）<br>补 <code>ai/prompts/matching_prompt.py</code>（版本化）</td>
+        <td>POST <code>/agents/tasks</code> <code>type="matching"</code> 返回 200 并落库；<code>GET /system/skills</code> 能看到 3 个 matching 技能</td>
+        <td><span class="pill p-p1">P1</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="warn">
+    <b>Dify 契约是当前最大的「假接通」风险。</b>适配器能跑、单测（MockTransport）全绿，但 <code>required_inputs</code> 和 outputs 结构都标着「暂定·待联调确认」。向 Dify 组索取时一次问齐 5 样，少问一样联调就返工一轮。另外接通后记得删掉/收敛规则通道里的 Dify 键名映射猜测逻辑（<code>jd_parser.py</code> 的「兼容常见命名差异」段）。
+  </div>
+</section>
+
+<!-- ============ 3 ============ -->
+<section>
+  <h2><span class="num">3</span>要等别人的上游接口（不归你写，但不通你就瘸）</h2>
+  <table>
+    <thead><tr><th style="width:150px">上游模块</th><th style="width:70px">缺接口</th><th>你被卡住的部分</th><th style="width:110px">可先做的替代</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>人才档案</b><br><code>/talents</code></td><td><b>9</b></td>
+        <td>匹配现在直接读 <code>Talent</code> 表所以能跑，但<b>没有任何界面/接口能新建和维护人才</b>——演示只能靠 <code>scripts/seed_data.py</code> 造数；语义检索、画像刷新两个接口依赖 Milvus</td>
+        <td>seed_data 造数 + 直改库（演示够用）</td>
+      </tr>
+      <tr>
+        <td><b>简历管理</b><br><code>/resumes</code></td><td><b>6</b></td>
+        <td>简历→人才档案的自动建档链路不通；「解析结果绑定人才」依赖的 <code>ResumeService</code> 是 53 行骨架</td>
+        <td>人工录入人才档案</td>
+      </tr>
+      <tr>
+        <td><b>文件管理</b><br><code>/files</code></td><td><b>3</b></td>
+        <td>简历文件上传/下载无着落（<code>file_router.py</code> 文件根本不存在）；你的 JD 解析若要支持「上传 JD 文档」也被卡</td>
+        <td>JD 用纯文本粘贴输入</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============ 4 ============ -->
+<section>
+  <h2><span class="num">4</span>你 Agent 范围内的功能缺口（需求有、代码无）</h2>
+  <table>
+    <thead><tr><th style="width:170px">缺口</th><th>需求原文 / 现状</th><th>建议落点</th><th style="width:70px">优先级</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>双向匹配</b>（人才找岗位）</td>
+        <td>需求模块五明确要求；现状 <code>matching_router</code> 只有单向 5 接口，全代码无反向查询入口</td>
+        <td>新增 <code>POST /matchings/reverse</code>（或 <code>GET /talents/{id}/positions</code>）；打分内核复用 <code>MatchingPipeline</code>，硬条件方向反转（岗位满足人才期望薪资/城市）</td>
+        <td><span class="pill p-p1">P1</span></td>
+      </tr>
+      <tr>
+        <td><b>岗位储备预警</b></td>
+        <td>需求模块五：人才离职/储备不足/长期空缺三类预警 + 预警记录表；现状 <code>Talent.status</code> 已有 <code>reserve</code> 值但无扫描逻辑、无表</td>
+        <td>新预警表 + 定时任务（或手动触发接口），数据源直接用你的匹配批次结果</td>
+        <td><span class="pill p-p2">P2</span></td>
+      </tr>
+      <tr>
+        <td>匹配权重可配置</td>
+        <td>需求「权重可配」；现状 <code>MATCH_DEFAULT_WEIGHTS</code> 是常量，<code>MatchRunRequest</code> 没有 weights 字段</td>
+        <td><code>MatchRunRequest</code> 加可选 <code>weights</code>（校验归一化），随批次落库（批次表已有权重字段）</td>
+        <td><span class="pill p-p2">P2</span></td>
+      </tr>
+      <tr>
+        <td>全淘汰批次不落库</td>
+        <td>已知 P2：无批次记录表时，全员 FAIL 的批次查不到历史</td>
+        <td>随 DDL 一起补批次表</td>
+        <td><span class="pill p-p2">P2</span></td>
+      </tr>
+      <tr>
+        <td>证据 ID 无批次/版本</td>
+        <td>已知 P2：<code>EVID-{pid}-{tid}-{seq}</code> 跨批次可能重号</td>
+        <td>编号加入 batch_id 短哈希或画像版本号</td>
+        <td><span class="pill p-p3">P3</span></td>
+      </tr>
+      <tr>
+        <td>画像异步刷新</td>
+        <td>人才画像应随简历/测评更新刷新；现状无任务队列</td>
+        <td>先做手动触发接口，后续再引入后台 worker</td>
+        <td><span class="pill p-p3">P3</span></td>
+      </tr>
+      <tr>
+        <td>并发压测</td>
+        <td>只验证了解释阶段信号量限流；1000 人批量耗时不详</td>
+        <td>演示前用真实库跑一次 100 人批次记录耗时</td>
+        <td><span class="pill p-p2">P2</span></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============ 5 ============ -->
+<section>
+  <h2><span class="num">5</span>工程事项（你的分支自己的）</h2>
+  <table>
+    <thead><tr><th style="width:170px">事项</th><th>现状</th><th style="width:78px">优先级</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>27 项未提交</b></td>
+        <td>13 个新文件（<code>matching_pipeline</code> / <code>matching_rules</code> / <code>jd_parser</code> / <code>evidence_builder</code> / <code>evidence_verifier</code> / <code>explanation_service</code> / <code>position_profile_service</code> / <code>docs/delivery/</code> / <code>tests/unit/</code> / <code>tests/integration/</code> / 2 个脚本）+ 14 个修改文件。远程 <code>origin/lz_agent</code> 停在基线 <code>f29ac08</code></td>
+        <td><span class="pill p-p0">P0</span></td>
+      </tr>
+      <tr>
+        <td>DDL 审批</td>
+        <td><code>docs/sql/2026-11-04_matching_records_trace.sql</code>（5 个可空列）开发库已执行，测试/生产未执行——<b>生产落库会直接失败</b></td>
+        <td><span class="pill p-p0">P0</span></td>
+      </tr>
+      <tr>
+        <td>3 条既有测试失败</td>
+        <td><code>tests/test_common_layer.py</code>，基线同样失败（非你引入）；开 CI 前要有人认领修掉</td>
+        <td><span class="pill p-p1">P1</span></td>
+      </tr>
+      <tr>
+        <td>向匹配记录加「触发人」审计</td>
+        <td>谁发起的 run 目前只靠日志 trace_id，表里没有触发人字段（属 DDL 范围，可与上面合并审批）</td>
+        <td><span class="pill p-p3">P3</span></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============ 6 ============ -->
+<section>
+  <h2><span class="num">6</span>建议的推进顺序</h2>
+  <div class="phase">
+    <div class="ph">
+      <div class="tag">第 1 批<small>本周 · 零开发量</small></div>
+      <div>
+        <h3>提交 + DDL + 两把钥匙</h3>
+        <ul>
+          <li>27 项提交 → 推 <code>lz_agent</code> → MR 到 <code>develop</code>（描述里写清「改了什么 / 表结构有无变更 / 如何验证」）</li>
+          <li>DBA 审批 DDL，测试库同步执行</li>
+          <li>拿 <code>LLM_API_KEY</code>（最快见效：插上即通 llm_fallback）</li>
+        </ul>
+        <div class="why">不做这批，后面每一条都是空中楼阁。</div>
+      </div>
+    </div>
+    <div class="ph">
+      <div class="tag">第 2 批<small>3–5 天</small></div>
+      <div>
+        <h3>Dify 两条工作流联调</h3>
+        <ul>
+          <li>向 Dify 组要齐 5 样，冻结契约（inputs / outputs / 错误码 / 超时）</li>
+          <li>联调 <code>job_profile_extraction</code> → JD 解析出 <code>source=dify</code></li>
+          <li>联调 <code>match_explanation</code> → 解释出 <code>channel=dify</code> 且过证据校验</li>
+          <li>各准备一份「规则 vs Dify」对比记录，交付时能说清 AI 带来的差异</li>
+        </ul>
+        <div class="why">这是你 Agent 的核心 AI 价值所在，也是验收报告里 BLOCKED-1 的解除条件。</div>
+      </div>
+    </div>
+    <div class="ph">
+      <div class="tag">第 3 批<small>1–2 周</small></div>
+      <div>
+        <h3>Agent 外壳 + 双向匹配</h3>
+        <ul>
+          <li>实现 <code>matching_agent.py</code>：工具直接挂现成的 3 个 matching_skill，prompt 版本化</li>
+          <li>新增 <code>POST /matchings/reverse</code>（人才找岗位），复用打分内核</li>
+          <li>顺手给 <code>MatchRunRequest</code> 加可选 weights</li>
+        </ul>
+        <div class="why">外壳不依赖外部服务，可并行推进；双向匹配补齐需求模块五的前半部分。</div>
+      </div>
+    </div>
+    <div class="ph">
+      <div class="tag">第 4 批<small>等人到位</small></div>
+      <div>
+        <h3>向量召回 + 储备预警</h3>
+        <ul>
+          <li>Milvus 部署 → init_milvus 建集合（dim 与 embedding 定死一致）→ 实现 adapter → 召回切 vector</li>
+          <li>预警表 + 扫描逻辑，数据源复用匹配批次</li>
+          <li>上游 talents/resumes 由对应负责人实现后做端到端回归</li>
+        </ul>
+        <div class="why">向量召回质量收益在人才库上规模后才明显，5 人演示库收益为零，不必抢早。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section>
+  <h2><span class="num">7</span>联调时当面问清的 5 件事（岗位 Agent 版）</h2>
+  <ol class="q">
+    <li><b>Dify 两个工作流</b>的 app-id、inputs 变量名与类型、outputs 是单字段 <code>result</code> 还是多字段、超时与错误码怎么区分？</li>
+    <li><b>JD 解析的输入边界</b>：Dify 只做语义提取，判定与补值留在你这边——对方的工作流里有没有偷偷做判定？</li>
+    <li><b>Embedding 维度</b>：dim 定 1024 还是 768？必须与 Milvus collection 一次定死，改一次重建全库。</li>
+    <li><b>召回的权限边界</b>：向量召回按部门还是全库？跨部门人才是否允许进入候选池？</li>
+    <li><b>双向匹配的规则归属</b>：岗位满足人才期望（薪资/城市）的硬条件判定，是复用你的四态引擎还是人才组自己写？要提前签字，避免两套口径。</li>
+  </ol>
+</section>
+
+<footer>
+  盘点依据：<code>matching_router/position_router</code> 实际 endpoint · <code>matching_pipeline.recall()</code> 的 <code>recall_mode=sql_fallback</code> · <code>explanation_service</code> 降级链与 <code>channel</code> 取值 · <code>dify_adapter</code> 的「待联调」标注 · <code>matching_agent.py</code> TODO 骨架 · <code>MATCH_DEFAULT_WEIGHTS</code> 常量与 <code>MatchRunRequest</code> 字段 · <code>git status</code> 27 项未提交 · <code>docs/delivery/09_最终交付验收报告.md</code> 实测记录。
+</footer>
+
+</div>
+</body>
+</html>

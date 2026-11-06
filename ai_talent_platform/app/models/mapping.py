@@ -23,7 +23,6 @@ from __future__ import annotations
 from typing import Any
 
 from sqlalchemy.orm import Mapper, registry as registry_type
-from sqlalchemy.orm import registry as registry_type
 from sqlalchemy.sql.schema import Table
 
 from app.config.settings import settings

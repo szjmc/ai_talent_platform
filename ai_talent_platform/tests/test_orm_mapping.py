@@ -28,29 +28,45 @@ EXPECTED_MYSQL_TABLES = {
     "conversations",
     "courses",
     "files",
+    # [合并 origin/develop] 测评 Agent 上线后新增的三张面试表
+    "interview_sessions",
+    "interview_answers",
+    "interview_record_sheets",
     "knowledge_chunks",
     "knowledge_docs",
+    "knowledge_revisions",
+    "question_bank_questions",
     "learning_records",
     "matching_records",
+    "matching_batches",
+    "matching_reviews",
+    "matching_review_events",
     "organizations",
     "plan_courses",
     "position_requirements",
     "positions",
+    "reserve_warnings",
     "resume_experiences",
     "resumes",
     "roles",
+    "workflow_info",
     "talent_portraits",
     "talents",
     "training_plans",
+    "training_notifications",
     "user_roles",
+    "workflow_info",
     "users",
+    "workflow_info",
 }
 
 
-def test_all_25_business_tables_are_mapped():
+# 表数不再硬编码：随合并频繁变动（lz 线 + develop 线 + 测评 Agent 各自加表），
+# 由 EXPECTED_MYSQL_TABLES 与 Base.metadata 双向比对，避免「改了表忘了改数字」的假失败。
+def test_all_business_tables_are_mapped():
     assert set(Base.metadata.tables) == EXPECTED_MYSQL_TABLES
     mapping = build_orm_mapping()
-    assert mapping["mysql"]["table_count"] == 25
+    assert mapping["mysql"]["table_count"] == len(EXPECTED_MYSQL_TABLES)
     assert mapping["mysql"]["table_count"] == len(table_model_map("mysql"))
 
 

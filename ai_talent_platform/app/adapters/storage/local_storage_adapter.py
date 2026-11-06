@@ -38,7 +38,7 @@ class LocalStorageAdapter(BaseStorage):
 
     name = "local"
 
-    async def save(self, data: bytes, filename: str, subdir: str = "") -> str:
+    async def save(self, data: bytes, filename: str, subdir: str = "", *, before_write=None) -> str:
         """写入文件，返回相对存储根目录的路径。"""
         if not isinstance(data, (bytes, bytearray)):
             from app.core.exceptions import ParamError
@@ -51,8 +51,10 @@ class LocalStorageAdapter(BaseStorage):
             raise ParamError(f"文件超过大小上限（{settings.MAX_UPLOAD_SIZE_MB}MB）")
 
         target = file_storage.build_path(subdir or "common", filename)
-        file_storage.write_bytes(target, bytes(data))
         relative = file_storage.relative_path(target)
+        if before_write is not None:
+            await before_write(relative)
+        file_storage.write_bytes(target, bytes(data))
         logger.info("文件保存成功：%s（%s 字节）", relative, len(data))
         return relative
 

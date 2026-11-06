@@ -95,12 +95,22 @@ async def close_redis() -> None:
 
 # ---------------------------------------------------------------- 常用封装
 async def get_json(key: str) -> Any | None:
-    """读取并反序列化 JSON 缓存。"""
+    """读取并反序列化 JSON 缓存；坏值（非合法 JSON）按未命中降级返回 None。
+
+    降级原因：缓存条目可能被手工改动或序列化格式升级后残留旧值，
+    抛 JSONDecodeError 会炸掉业务请求，而缓存职责应可降级。
+    """
     client = _client_holder.get()
     if not client:
         return None
     raw = await client.get(key)
-    return json.loads(raw) if raw else None
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (ValueError, TypeError):
+        logger.warning("缓存值非合法 JSON，按未命中处理：%s", key)
+        return None
 
 
 async def set_json(key: str, value: Any, ttl: int | None = None) -> None:

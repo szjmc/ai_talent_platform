@@ -34,6 +34,8 @@ EXPECTED_SKILLS: tuple[str, ...] = (
     "resume_parse",
     "resume_skill_extract",
     "sql_query",
+    "training_lag_scan",
+    "training_plan_generate",
 )
 
 
@@ -48,6 +50,7 @@ def bootstrap_skills() -> list[str]:
     import app.ai.skills.matching_skill  # noqa: F401
     import app.ai.skills.resume_skill  # noqa: F401
     import app.ai.skills.sql_skill  # noqa: F401
+    import app.ai.skills.training_skill  # noqa: F401
 
     _BOOTSTRAPPED = True
     names = skill_registry.keys()
