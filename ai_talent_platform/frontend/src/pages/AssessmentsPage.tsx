@@ -1,42 +1,68 @@
-import { useState } from 'react';
-import { App, Button, Col, DatePicker, Drawer, Form, Input, InputNumber, Modal, Row, Select, Table, Tag } from 'antd';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, App, Button, Col, Drawer, Form, Input, InputNumber, Modal, Row, Select, Spin, Table, Tag, Upload } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { BarChartOutlined, ClockCircleOutlined, EyeOutlined, FileAddOutlined, PlusOutlined, RobotOutlined, SafetyCertificateOutlined, SendOutlined } from '@ant-design/icons';
+import { BarChartOutlined, ClockCircleOutlined, CloudUploadOutlined, EyeOutlined, FileAddOutlined, PlusOutlined, RobotOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import { Chart, PageHeader, PersonAvatar, StatusBadge } from '../components/Common';
-import { demoAssessments, demoPositions, demoTalents } from '../services/mockData';
-import { useAuth } from '../store/AuthContext';
-import { formatApiError, request } from '../services/api';
-import { sleep } from '../utils';
-import type { Assessment } from '../types';
+import { analyticsApi, assessmentsApi, resumesApi } from '../services/platform';
+import { formatApiError } from '../services/api';
+import { downloadText, formatDate } from '../utils';
+import type { Assessment, AssessmentReport, AssessmentSummary } from '../types';
 
 export default function AssessmentsPage() {
-  const [data, setData] = useState(demoAssessments); const [open, setOpen] = useState(false); const [selected, setSelected] = useState<Assessment | null>(null); const [saving, setSaving] = useState(false);
-  const { demo } = useAuth(); const { message } = App.useApp(); const [form] = Form.useForm();
-  const create = async () => { const values = await form.validateFields(); setSaving(true); try {
-    const payload = { ...values, deadline: values.deadline?.format('YYYY-MM-DD HH:mm:ss') };
-    if (!demo) await request({ method: 'POST', url: '/assessments', data: payload }); else await sleep(600);
-    const talent = demoTalents.find((t) => t.id === values.talent_id); const position = demoPositions.find((p) => p.id === values.position_id);
-    setData((old) => [{ id: Date.now(), title: values.title, talent_id: values.talent_id, talent_name: talent?.name || '', position_title: position?.title || '', question_count: values.question_count, deadline: payload.deadline, status: 'pending' }, ...old]);
-    message.success('测评创建成功，AI 已按岗位能力模型完成智能组卷'); setOpen(false); form.resetFields();
-  } catch (e) { message.error(formatApiError(e)); } finally { setSaving(false); } };
+  const [data, setData] = useState<Assessment[]>([]); const [total, setTotal] = useState(0); const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(''); const [open, setOpen] = useState(false); const [selected, setSelected] = useState<Assessment | null>(null);
+  const [report, setReport] = useState<AssessmentReport | null>(null); const [reportLoading, setReportLoading] = useState(false);
+  const [saving, setSaving] = useState(false); const [status, setStatus] = useState<string>(); const [summary, setSummary] = useState<AssessmentSummary | null>(null);
+  const [resumeFile, setResumeFile] = useState<File | null>(null); const { message } = App.useApp(); const [form] = Form.useForm();
+
+  const load = useCallback(async () => {
+    setLoading(true); setLoadError('');
+    try { const res = await assessmentsApi.list({ page: 1, page_size: 50, status }); setData(res.items || []); setTotal(res.total || 0); }
+    catch (error) { setLoadError(formatApiError(error)); setData([]); setTotal(0); }
+    finally { setLoading(false); }
+  }, [status]);
+  useEffect(() => { void load(); analyticsApi.assessmentSummary().then(setSummary).catch(() => setSummary(null)); }, [load]);
+
+  const create = async () => {
+    const values = await form.validateFields();
+    if (!resumeFile) { message.warning('请上传候选人简历文件，后端将基于简历自动解析并组卷'); return; }
+    setSaving(true);
+    try {
+      const uploaded = await resumesApi.upload(resumeFile);
+      if (!uploaded.file_id) throw new Error('简历上传成功但未返回文件 ID，无法创建测评');
+      const created = await assessmentsApi.create({ file_id: uploaded.file_id, title: values.title, question_count: values.question_count });
+      message.success(`测评创建成功，共 ${created.question_count} 题${created.email && (created.email as { ok?: boolean }).ok ? '，邮件已发送' : '，邮件发送结果请查看详情'}`);
+      setOpen(false); form.resetFields(); setResumeFile(null); await load();
+    } catch (error) { message.error(formatApiError(error)); } finally { setSaving(false); }
+  };
+  const openReport = async (record: Assessment) => {
+    setSelected(record); setReport(null); setReportLoading(true);
+    try { setReport(await assessmentsApi.report(record.id)); } catch (error) { message.error(formatApiError(error)); }
+    finally { setReportLoading(false); }
+  };
+  const enterExam = async (record: Assessment) => {
+    try { const detail = await assessmentsApi.detail(record.id); if (detail.exam_url) window.open(detail.exam_url, '_blank', 'noopener'); else message.warning('后端未返回考试链接'); }
+    catch (error) { message.error(formatApiError(error)); }
+  };
   const columns: ColumnsType<Assessment> = [
-    { title: '测评任务', dataIndex: 'title', width: 260, render: (v, r) => <div><div className="talent-cell-name">{v}</div><div className="talent-cell-role">目标岗位：{r.position_title}</div></div> },
-    { title: '测评对象', dataIndex: 'talent_name', width: 150, render: (v) => <div className="talent-cell"><PersonAvatar name={v} size={30}/><span>{v}</span></div> },
+    { title: '测评任务', dataIndex: 'title', width: 260, render: (v, r) => <div><div className="talent-cell-name">{v}</div><div className="talent-cell-role">测评 ID：{r.id}</div></div> },
+    { title: '测评对象', dataIndex: 'talent_id', width: 150, render: (v, r) => <div className="talent-cell"><PersonAvatar name={r.talent_name || `人才${v}`} size={30}/><span>{r.talent_name || `人才 #${v}`}</span></div> },
     { title: '题量', dataIndex: 'question_count', width: 75, render: (v) => `${v} 题` },
-    { title: '截止时间', dataIndex: 'deadline', width: 155, render: (v) => <span><ClockCircleOutlined style={{ marginRight: 5, color: '#98a2b3' }}/>{v.slice(0,16)}</span> },
+    { title: '截止时间', dataIndex: 'deadline', width: 155, render: (v) => <span><ClockCircleOutlined style={{ marginRight: 5, color: '#98a2b3' }}/>{formatDate(v, true)}</span> },
     { title: '状态', dataIndex: 'status', width: 95, render: (v) => <StatusBadge status={v}/> },
-    { title: '综合得分', dataIndex: 'total_score', width: 120, render: (v, r) => v ? <span><b className="score-text">{v}</b><Tag color={v >= 90 ? 'green' : 'blue'} style={{ marginLeft: 7 }}>{r.level}</Tag></span> : '—' },
-    { title: '操作', width: 180, render: (_, r) => <><Button type="link" size="small" icon={<EyeOutlined/>} disabled={r.status !== 'scored'} onClick={() => setSelected(r)}>能力报告</Button>{r.status === 'pending' && <Button type="link" size="small" icon={<SendOutlined/>} onClick={() => message.success('测评通知已发送')}>提醒</Button>}{r.status === 'in_progress' && <Button type="link" size="small" onClick={() => message.info('已安全打开作答页面，标准答案不会下发')}>进入测评</Button>}</> },
+    { title: '综合得分', dataIndex: 'total_score', width: 120, render: (v, r) => v != null ? <span><b className="score-text">{v}</b>{r.level && <Tag color={v >= 90 ? 'green' : 'blue'} style={{ marginLeft: 7 }}>{r.level}</Tag>}</span> : '—' },
+    { title: '操作', width: 180, render: (_, r) => <><Button type="link" size="small" icon={<EyeOutlined/>} disabled={r.status !== 'scored'} onClick={() => openReport(r)}>能力报告</Button>{r.status === 'in_progress' && <Button type="link" size="small" onClick={() => enterExam(r)}>进入测评</Button>}</> },
   ];
+  const radarEntries = report ? Object.entries(report.radar).filter(([, v]) => v != null) as [string, number][] : [];
   return <>
-    <PageHeader title="AI 智能测评" description="千人千卷、自适应测评与 AI 深度研判，科学量化人才能力" demo={demo} actions={<><Button icon={<FileAddOutlined/>}>题库管理</Button><Button type="primary" icon={<PlusOutlined/>} onClick={() => setOpen(true)}>创建测评</Button></>}/>
-    <div className="metric-strip"><div className="metric-strip-item"><div className="metric-strip-label">累计测评</div><div className="metric-strip-value">2,460<span className="metric-strip-extra">人次</span></div></div><div className="metric-strip-item"><div className="metric-strip-label">进行中</div><div className="metric-strip-value">36<span className="metric-strip-extra text-primary">项测评</span></div></div><div className="metric-strip-item"><div className="metric-strip-label">平均得分</div><div className="metric-strip-value">81.4<span className="metric-strip-extra text-success">↑ 1.8 分</span></div></div><div className="metric-strip-item"><div className="metric-strip-label">优秀率</div><div className="metric-strip-value">26.8<span className="metric-strip-extra">%</span></div></div></div>
-    <div className="insight-strip"><div className="insight-icon"><RobotOutlined/></div><div className="insight-content"><div className="insight-title">AI 测评洞察</div><div className="insight-text">本季度技术序列人才的 <b>工程实践能力</b> 平均提升 6.2 分，但 <b>系统架构设计</b> 仍是普遍短板。建议为高级技术人才定向推送架构设计课程。</div></div><Button type="link" onClick={() => message.success('已生成 12 份个性化培训建议')}>生成培养建议</Button></div>
-    <div className="card filter-card"><div className="filter-row"><Input.Search placeholder="搜索测评任务或人才" style={{ width: 280 }}/><Select placeholder="测评状态" style={{ width: 130 }} options={[{ value: 'pending', label: '待开始' },{ value: 'in_progress', label: '作答中' },{ value: 'scored', label: '已评分' }]}/><Select placeholder="目标岗位" style={{ width: 170 }} options={demoPositions.map((p) => ({ value: p.id, label: p.title }))}/><div className="filter-spacer"/><span className="muted" style={{ fontSize: 11 }}><SafetyCertificateOutlined className="text-success"/> 防泄密作答 · 异常行为监控</span></div></div>
-    <div className="card content-card"><div className="table-toolbar"><div className="table-title">测评任务列表<span className="table-count">共 2,460 条</span></div></div><Table rowKey="id" columns={columns} dataSource={data} pagination={{ pageSize: 10, showTotal: (n) => `共 ${n} 条` }} scroll={{ x: 1150 }}/></div>
-    <Modal open={open} onCancel={() => setOpen(false)} title="创建 AI 智能测评" onOk={create} confirmLoading={saving} okText="智能组卷并创建" width={620}><Form form={form} layout="vertical" initialValues={{ question_count: 20 }}><Form.Item name="title" label="测评名称" rules={[{ required: true, message: '请输入测评名称' }]}><Input placeholder="例如：2026 年技术序列高级人才能力测评"/></Form.Item><Row gutter={16}><Col span={12}><Form.Item name="talent_id" label="测评对象" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={demoTalents.map((t) => ({ value: t.id, label: `${t.name} · ${t.current_position}` }))}/></Form.Item></Col><Col span={12}><Form.Item name="position_id" label="目标岗位" rules={[{ required: true }]}><Select options={demoPositions.map((p) => ({ value: p.id, label: p.title }))}/></Form.Item></Col><Col span={12}><Form.Item name="question_count" label="题目数量"><InputNumber min={5} max={100} style={{ width: '100%' }}/></Form.Item></Col><Col span={12}><Form.Item name="deadline" label="截止时间" rules={[{ required: true }]}><DatePicker showTime style={{ width: '100%' }}/></Form.Item></Col></Row><div className="portrait-summary"><RobotOutlined/> AI 将根据目标岗位能力模型，自动抽取客观题并生成主观分析题，实现差异化组卷。答题阶段不会下发标准答案。</div></Form></Modal>
-    <Drawer width={620} open={!!selected} onClose={() => setSelected(null)} title="AI 能力评估报告" extra={<Button size="small" icon={<BarChartOutlined/>}>导出报告</Button>}>
-      {selected && <><div className="detail-hero"><PersonAvatar name={selected.talent_name} size={62}/><div style={{ flex: 1 }}><div className="detail-name" style={{ fontSize: 19 }}>{selected.talent_name}</div><div className="detail-meta">{selected.title}</div></div><div style={{ textAlign: 'right' }}><div className="score-text" style={{ fontSize: 30 }}>{selected.total_score}</div><Tag color="green">{selected.level}</Tag></div></div><div className="drawer-section-title">能力维度得分</div><Chart height={280} option={{ radar: { indicator: [{ name: '专业知识', max: 100 },{ name: '工程能力', max: 100 },{ name: '创新思维', max: 100 },{ name: '沟通协作', max: 100 },{ name: '学习能力', max: 100 },{ name: '架构设计', max: 100 }], axisName: { color: '#6c788b', fontSize: 11 } }, series: [{ type: 'radar', data: [{ value: [94,92,88,85,96,82], areaStyle: { color: 'rgba(72,108,227,.25)' }, lineStyle: { color: '#496ce0' } }] }] }}/><div className="drawer-section-title">AI 综合研判</div><div className="portrait-summary">该人才专业知识扎实，工程实践与学习能力表现突出，能够独立解决复杂技术问题。在系统架构的全局权衡和跨团队技术协同方面仍有提升空间，整体达到高级技术人才优秀水平。</div><div className="drawer-section-title">核心优势</div><Row gutter={12}><Col span={12}><div style={{ background: '#f0faf6', padding: 14, borderRadius: 8, color: '#347d68', fontSize: 12 }}>专业知识掌握全面，能够将新理论快速转化为工程实践。</div></Col><Col span={12}><div style={{ background: '#f0faf6', padding: 14, borderRadius: 8, color: '#347d68', fontSize: 12 }}>学习敏锐度高，对 AI 前沿技术具有持续探索意识。</div></Col></Row><div className="drawer-section-title">发展建议</div><div style={{ fontSize: 13, lineHeight: 25, color: '#59667a' }}>1. 推荐参加《分布式系统架构设计》进阶课程<br/>2. 安排跨部门大型项目架构评审实践<br/>3. 建议 3 个月后进行架构能力专项复测</div></>}
+    <PageHeader title="AI 智能测评" description="千人千卷、自适应测评与 AI 深度研判，科学量化人才能力" actions={<><Button icon={<FileAddOutlined/>} onClick={() => message.info('题库管理请使用后端 /knowledge/questions 接口')}>题库管理</Button><Button type="primary" icon={<PlusOutlined/>} onClick={() => setOpen(true)}>创建测评</Button></>}/>
+    {loadError && <Alert type="warning" showIcon message="测评列表加载失败" description={loadError} style={{ marginBottom: 16 }}/>}
+    <div className="metric-strip"><div className="metric-strip-item"><div className="metric-strip-label">累计测评</div><div className="metric-strip-value">{summary?.record_count ?? total}<span className="metric-strip-extra">条记录</span></div></div><div className="metric-strip-item"><div className="metric-strip-label">已评分</div><div className="metric-strip-value">{summary?.scored_count ?? data.filter((d) => d.status === 'scored').length}<span className="metric-strip-extra">条</span></div></div><div className="metric-strip-item"><div className="metric-strip-label">平均得分</div><div className="metric-strip-value">{summary?.average_score ?? '—'}<span className="metric-strip-extra">分</span></div></div><div className="metric-strip-item"><div className="metric-strip-label">参与人才</div><div className="metric-strip-value">{summary?.talent_count ?? '—'}<span className="metric-strip-extra">人</span></div></div></div>
+    <div className="card filter-card"><div className="filter-row"><Select placeholder="测评状态" allowClear style={{ width: 130 }} value={status} onChange={setStatus} options={[{ value: 'pending', label: '待开始' },{ value: 'in_progress', label: '作答中' },{ value: 'submitted', label: '已提交' },{ value: 'scored', label: '已评分' }]}/><Button onClick={() => void load()}>刷新</Button><div className="filter-spacer"/><span className="muted" style={{ fontSize: 11 }}><SafetyCertificateOutlined className="text-success"/> 防泄密作答 · 标准答案不下发</span></div></div>
+    <div className="card content-card"><div className="table-toolbar"><div className="table-title">测评任务列表<span className="table-count">共 {total} 条</span></div></div><Table rowKey="id" columns={columns} dataSource={data} loading={loading} pagination={{ pageSize: 10, total: data.length, showTotal: (n) => `共 ${n} 条` }} scroll={{ x: 1150 }}/></div>
+    <Modal open={open} onCancel={() => setOpen(false)} title="创建 AI 智能测评" onOk={create} confirmLoading={saving} okText="智能组卷并创建" width={620}><Form form={form} layout="vertical" initialValues={{ question_count: 5 }}><Form.Item name="title" label="测评名称"><Input placeholder="例如：技术序列高级人才能力测评"/></Form.Item><Row gutter={16}><Col span={12}><Form.Item name="question_count" label="题目数量"><InputNumber min={1} max={100} style={{ width: '100%' }}/></Form.Item></Col><Col span={12}><Form.Item label="候选人简历" required><Upload maxCount={1} beforeUpload={(file) => { setResumeFile(file); return false; }} onRemove={() => setResumeFile(null)} fileList={resumeFile ? [{ uid: '1', name: resumeFile.name }] : []}><Button icon={<CloudUploadOutlined/>}>选择简历文件</Button></Upload></Form.Item></Col></Row><div className="portrait-summary"><RobotOutlined/> 后端将解析简历关键字，从授权题库智能组卷，并按简历邮箱推送笔试链接。</div></Form></Modal>
+    <Drawer width={620} open={!!selected} onClose={() => setSelected(null)} title="AI 能力评估报告" extra={report && <Button size="small" icon={<BarChartOutlined/>} onClick={() => downloadText(`测评报告-${selected?.id}.json`, JSON.stringify(report, null, 2))}>导出报告</Button>}>
+      {selected && <Spin spinning={reportLoading}>{report ? <><div className="detail-hero"><PersonAvatar name={selected.talent_name || `人才${selected.talent_id}`} size={62}/><div style={{ flex: 1 }}><div className="detail-name" style={{ fontSize: 19 }}>{selected.talent_name || `人才 #${selected.talent_id}`}</div><div className="detail-meta">{selected.title}</div></div><div style={{ textAlign: 'right' }}><div className="score-text" style={{ fontSize: 30 }}>{report.total_score}</div><Tag color="green">{report.level}</Tag></div></div><div className="drawer-section-title">能力维度得分</div>{radarEntries.length ? <Chart height={280} option={{ radar: { indicator: radarEntries.map(([key]) => ({ name: report.radar_labels[key] || key, max: 100 })), axisName: { color: '#6c788b', fontSize: 11 } }, series: [{ type: 'radar', data: [{ value: radarEntries.map(([, v]) => v), areaStyle: { color: 'rgba(72,108,227,.25)' }, lineStyle: { color: '#496ce0' } }] }] }}/> : <div className="empty-hint">暂无可用维度得分</div>}<div className="drawer-section-title">AI 综合研判</div><div className="portrait-summary">{report.conclusion}</div><div className="drawer-section-title">核心优势</div><Row gutter={12}>{report.strengths.map((s) => <Col span={12} key={s}><div style={{ background: '#f0faf6', padding: 14, borderRadius: 8, color: '#347d68', fontSize: 12, marginBottom: 12 }}>{s}</div></Col>)}</Row><div className="drawer-section-title">发展建议</div><div style={{ fontSize: 13, lineHeight: 25, color: '#59667a' }}>{report.suggestions.map((s, i) => <div key={s}>{i + 1}. {s}</div>)}</div></> : <div className="empty-hint">{reportLoading ? '报告加载中…' : '暂无报告或加载失败'}</div>}</Spin>}
     </Drawer>
   </>;
 }

@@ -9,7 +9,7 @@
 - Framer Motion（人才简历弱透视 CoverFlow、弹簧拖拽交互）
 - ECharts（驾驶舱、人才画像、测评雷达、数据分析、中国人才热力地图）
 - React Router、Axios（JWT 自动刷新、统一错误处理）
-- 按页面懒加载、响应式布局、演示数据降级
+- 按页面懒加载、响应式布局
 
 ## 本地运行
 
@@ -34,33 +34,33 @@ npm run preview
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `VITE_API_BASE_URL` | `/api/v1` | API 基础路径，生产建议使用同源相对地址 |
-| `VITE_DEMO_FALLBACK` | `true` | 后端未启动或模块返回 501 时使用演示数据；生产应设为 `false` |
+
+## 真实数据契约
+
+- 前端不再包含 `mockData`、演示登录或 `VITE_DEMO_FALLBACK` 降级。
+- 所有业务请求统一走 `{ code, message, data, trace_id }` 响应契约，页面只消费 `data`。
+- 登录、用户、组织、人才、简历、测评、匹配、培训、知识库、数据分析、AI 助手均对接后端真实接口。
+- 后端尚未实现的占位模块（如文件中心、审计、岗位 CRUD）会展示空态/错误提示，不再用模拟数据填充。
+- 页面交互与既有字段命名保持不变；后端未返回的扩展字段以空态展示，不参与伪造统计。
 
 ## 页面与接口
 
-| 页面 | 路径 | 后端接口状态 |
+| 页面 | 路径 | 后端接口 |
 | --- | --- | --- |
-| 登录 / 当前用户 / 修改密码 | `/login` `/profile` | 已对接 `/auth/*`，支持 access token 自动刷新 |
-| 用户与权限 | `/users` | 已对接用户分页、创建、编辑、角色分配、启停、重置密码、删除 |
-| 组织架构 | `/organizations` | 已对接组织树、创建、编辑、移动、删除 |
-| 人才档案 | `/talents` | 列表、CRUD、语义搜索；独立 CoverFlow / 中国人才地图 / 表格组件与三方联动筛选；501 时演示 |
-| 岗位管理 | `/positions` | 按契约对接 CRUD、状态流转；501 时演示 |
-| 简历解析 | `/resumes` | 按契约对接 multipart 上传与异步解析 |
-| 人岗匹配 | `/matchings` | 按契约对接匹配跑批与解释界面 |
-| 智能测评 | `/assessments` | 按契约对接智能组卷，能力雷达与报告完整呈现 |
-| 培训发展 | `/trainings` | 课程、培养计划、滞后预警与 AI 推课交互 |
-| 知识库 | `/knowledge` | 按契约对接引用式 RAG 问答 |
-| 数据洞察 | `/analytics` | 按契约对接 NL2SQL、图表解读与报告导出 |
-| AI 智能助手 | `/assistant` | 按契约对接多轮 Agent 对话 |
-| 文件中心 | `/files` | 按契约对接通用上传，鉴权下载与删除入口 |
-| 操作审计 | `/audit` | 按契约实现日志筛选、Trace ID 与快照详情 |
-
-## 演示与真实数据
-
-- 未登录且允许演示回退时，默认进入带有「演示环境」标识的产品界面。
-- 点击用户菜单退出后可进入登录页；登录页支持「进入产品演示」。
-- 演示操作不会写入后端。真实登录后写操作严格按 API 契约发送。
-- 后端尚未实现的 501 模块会展示「演示数据」标识，避免将样例数据误认为生产数据。
+| 登录 / 当前用户 / 修改密码 | `/login` `/profile` | `/auth/*` |
+| 用户与权限 | `/users` | `/users/*` |
+| 组织架构 | `/organizations` | `/organizations/*` |
+| 人才档案 | `/talents` | `/talents/*`、`/organizations/tree`、`/resumes/*` |
+| 岗位管理 | `/positions` | `/positions` 占位、`/positions/{id}/profile*` |
+| 简历解析 | `/resumes` | `/resumes/*` |
+| 人岗匹配 | `/matchings` | `/matchings/*` |
+| 智能测评 | `/assessments` | `/assessments/*`、`/resumes/upload` |
+| 培训发展 | `/trainings` | `/trainings/*` |
+| 知识库 | `/knowledge` | `/knowledge/docs*`、`/text2answer`、`/conversations*` |
+| 数据洞察 | `/analytics` | `/analytics/*` |
+| AI 智能助手 | `/assistant` | `/agents/chat/stream`、`/agents/conversations*` |
+| 文件中心 | `/files` | `/files` 占位 |
+| 操作审计 | `/audit` | `/audit` 占位 |
 
 ## 后端启动
 
