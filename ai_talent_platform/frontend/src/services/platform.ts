@@ -1,7 +1,7 @@
 import { request } from './api';
 import type {
   Assessment, AssessmentReport, AssessmentSummary, AgentConversation, AuditEntry, Course,
-  DistributionResult, FileItem, KnowledgeDoc, MatchingRunResult, NL2SQLResult, OrgNode, PageResult,
+  DistributionResult, KnowledgeDoc, MatchingRunResult, NL2SQLResult, OrgNode, PageResult,
   Position, ReportItem, Resume, ResumeParseResult, Talent, TalentPortrait, TrainingNotification,
   TrainingPlan, TrainingRecommendation, TrendResult, User,
 } from '../types';
@@ -110,9 +110,14 @@ export const knowledgeApi = {
   upload: (files: File[], category: string, title?: string, doc_id?: number) => {
     const form = new FormData(); files.forEach((file) => form.append('file', file)); form.append('category', category);
     if (title) form.append('title', title); if (doc_id) form.append('doc_id', String(doc_id));
-    return request<Record<string, unknown>>({ url: '/knowledge/docs/upload', method: 'POST', data: form, headers: { 'Content-Type': 'multipart/form-data' } });
+    return request<Record<string, unknown>>({ url: '/files/upload', method: 'POST', data: form, headers: { 'Content-Type': 'multipart/form-data' } });
   },
-  retry: (docId: number) => request<unknown>({ url: `/knowledge/docs/${docId}/retry`, method: 'POST' }),
+  retry: (docId: number) => request<unknown>({ url: `/files/docs/${docId}/retry`, method: 'POST' }),
+  /** 文档版本列表（草稿/历史/当前生效；含 file_id 与乐观锁 version）。 */
+  revisions: (docId: number, params?: { offset?: number; limit?: number }) =>
+    request<{ total: number; items: RevisionItem[] }>({ url: `/knowledge/docs/${docId}/revisions`, params }),
+  /** 版本正文（version 用于编辑/发布时的并发校验）。 */
+  revision: (revisionId: number) => request<RevisionItem & { body?: string; content?: string }>({ url: `/knowledge/revisions/${revisionId}` }),
   ask: (data: { question: string; session_id?: string | null; category?: string | null; top_k?: number; use_rerank?: boolean; suggest?: boolean }) =>
     request<{ answer: string; session_id: string; intent: string; sources: { doc_id?: number; chunk_id?: number; file_id?: number; source?: string; page?: number | null; score?: number }[]; suggestions: string[] }>({ url: '/text2answer', method: 'POST', data }),
   conversations: (params?: Record<string, unknown>) => request<PageResult<{ session_id: string; title: string; message_count: number; last_message_at?: string | null }>>({ url: '/conversations', params }),
@@ -134,50 +139,71 @@ export const agentsApi = {
   messages: (conversationId: string | number) => request<unknown[]>({ url: `/agents/conversations/${conversationId}/messages` }),
 };
 
-/* ======================= 文件中心 [架构组] ======================= */
-export interface FileListParams { page?: number; page_size?: number; keyword?: string; biz_type?: string; biz_id?: number; uploader_id?: number; content_type?: string }
-export interface FileUploadOptions { biz_type?: string; biz_id?: number; is_public?: boolean }
-export interface FileStats { total_files: number; total_size: number; by_biz_type: Record<string, number> }
+/* ======================= 文件管理 [架构组] ======================= */
+/*
+   说明：/files 下是「文件」相关动作，不是一份独立的文件元数据库 ——
+   上传/版本下载/索引维护都复用知识库已有的实现（详见后端 file_router.py）。
+   因此这里不提供 list/stats/batch-upload：它们在后端并不存在，
+   前端若照旧调用只会拿到 404（上一轮曾凭空造过这套接口，本轮已删）。
+*/
+export interface FileUploadResult { doc_id?: number; revision_id?: number; status?: string; [key: string]: unknown }
+export interface FileBatchUploadResult {
+  total: number; success_count: number; failed_count: number; category: string;
+  items: { file_name?: string; status?: string; error?: string; [key: string]: unknown }[];
+}
+export interface RevisionItem {
+  id?: number; revision_id?: number; doc_id?: number; version: number;
+  status?: string; title?: string; category?: string; file_id?: number | null;
+  source_revision_id?: number | null; created_at?: string | null; updated_at?: string | null;
+}
+export interface QuestionImportResult { imported_count: number; failed_count: number; pending_count: number; sync_error?: string | null; [key: string]: unknown }
 
 export const filesApi = {
-  list: (params?: FileListParams) => request<PageResult<FileItem>>({ url: '/files', params }),
-  detail: (id: number) => request<FileItem>({ url: `/files/${id}` }),
-  stats: () => request<FileStats>({ url: '/files/stats' }),
-  upload: (file: File, options: FileUploadOptions = {}) => {
+  /** 上传文件（同 knowledgeApi.upload，保留独立入口便于文件页调用）。 */
+  upload: (files: File[], category: string, title?: string, docId?: number) => {
     const form = new FormData();
-    form.append('file', file);
-    form.append('biz_type', options.biz_type || 'other');
-    if (options.biz_id) form.append('biz_id', String(options.biz_id));
-    form.append('is_public', String(Boolean(options.is_public)));
-    return request<FileItem>({ url: '/files/upload', method: 'POST', data: form, headers: { 'Content-Type': 'multipart/form-data' } });
+    files.forEach((file) => form.append('file', file));
+    form.append('category', category);
+    if (title) form.append('title', title);
+    if (docId) form.append('doc_id', String(docId));
+    return request<FileUploadResult | FileBatchUploadResult>({ url: '/files/upload', method: 'POST', data: form, headers: { 'Content-Type': 'multipart/form-data' } });
   },
-  batchUpload: (files: File[], options: FileUploadOptions = {}) => {
-    const form = new FormData();
-    files.forEach((file) => form.append('files', file));
-    form.append('biz_type', options.biz_type || 'other');
-    if (options.biz_id) form.append('biz_id', String(options.biz_id));
-    form.append('is_public', String(Boolean(options.is_public)));
-    return request<{ total: number; success_count: number; failed_count: number; items: { file_name: string; ok: boolean; file?: FileItem; error?: string }[] }>(
-      { url: '/files/batch-upload', method: 'POST', data: form, headers: { 'Content-Type': 'multipart/form-data' } },
-    );
-  },
-  remove: (id: number) => request<{ id: number; deleted: boolean }>({ url: `/files/${id}`, method: 'DELETE' }),
-  /** 下载走浏览器直连（带 Authorization 头用 blob，避免 token 出现在 URL）。 */
-  download: async (id: number, fileName?: string) => {
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api/v1'}/files/${id}/download`, {
-      headers: (() => {
-        const token = localStorage.getItem('talentos_access_token');
-        return token ? { Authorization: `Bearer ${token}` } : ({} as Record<string, string>);
-      })(),
+  /** 重试失败索引（doc_id 是文档 ID，不是文件 ID）。 */
+  retry: (docId: number) => request<unknown>({ url: `/files/docs/${docId}/retry`, method: 'POST' }),
+  /** 下载版本文件（source=true 取上传原件，false 取编辑后生成的版本文件）。 */
+  downloadRevision: async (revisionId: number, fileName: string, source = false) => {
+    const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+    const token = localStorage.getItem('talentos_access_token');
+    const response = await fetch(`${base}/files/revisions/${revisionId}/download?source=${source}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : ({} as Record<string, string>),
     });
     if (!response.ok) throw new Error('下载失败：无权限或文件不存在');
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = url; link.download = fileName || `file-${id}`;
+    link.href = url; link.download = fileName;
     document.body.appendChild(link); link.click(); link.remove();
     URL.revokeObjectURL(url);
   },
+  /** 上传并导入笔试题库（JSON）。 */
+  uploadQuestions: (file: File, syncIndex = true) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('sync_index', String(syncIndex));
+    return request<QuestionImportResult>({ url: '/files/questions/upload', method: 'POST', data: form, headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+  /** 版本流转：编辑正文另存 / 发布 / 历史恢复 / 取消草稿（都作用在文件版本上）。 */
+  editRevision: (revisionId: number, data: { content: string; title?: string; category?: string; expected_version: number }) =>
+    request<RevisionItem>({ url: `/files/revisions/${revisionId}/edit`, method: 'POST', data }),
+  publishRevision: (revisionId: number, expectedVersion: number) =>
+    request<RevisionItem>({ url: `/files/revisions/${revisionId}/publish`, method: 'POST', data: { expected_version: expectedVersion } }),
+  restoreRevision: (revisionId: number, expectedVersion: number) =>
+    request<RevisionItem>({ url: `/files/revisions/${revisionId}/restore`, method: 'POST', data: { expected_version: expectedVersion } }),
+  discardRevision: (revisionId: number, expectedVersion: number) =>
+    request<RevisionItem>({ url: `/files/revisions/${revisionId}/discard`, method: 'POST', data: { expected_version: expectedVersion } }),
+  /** 删除文档索引（逻辑删除 + 补偿任务清理向量，不代表立即完成）。 */
+  deleteIndex: (fileId: string | number, category: string) =>
+    request<unknown>({ url: '/files/index/delete', method: 'POST', data: { file_id: String(fileId), category } }),
 };
 
 /* ======================= 审计日志 [架构组] ======================= */

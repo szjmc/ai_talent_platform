@@ -114,12 +114,47 @@ def test_no_duplicate_path_method_registration(paths):
     assert not duplicates, f"重复注册的路由：{json.dumps(duplicates, ensure_ascii=False)}"
 
 
-def test_file_upload_belongs_to_file_module_only(paths):
-    """`/files/upload` 必须只属于文件管理（不能既做知识上传又做通用上传）。"""
-    operation = paths[f"{settings.API_PREFIX}/files/upload"]["post"]
-    assert operation["tags"] == ["文件管理"]
-    body_ref = json.dumps(operation.get("requestBody", {}), ensure_ascii=False)
-    assert "biz_type" in body_ref or "multipart" in body_ref
-    # 知识库上传保持自己的路径，两者参数契约不同（category vs biz_type），不可混用
-    knowledge = paths[f"{settings.API_PREFIX}/knowledge/docs/upload"]["post"]
-    assert knowledge["tags"] == ["知识库"]
+def test_file_actions_live_in_file_group_only(paths):
+    """文件动作只在「文件管理」分组；知识库只留检索/切片语义。
+
+    本轮把**已经实现**的文件类接口整体迁到 /files（不是另写一套实现）：
+    上传、版本文件下载、版本流转、题库导入、索引删除都复用原有 Service。
+    此用例守住迁移结果，防止有人再把上传挂回 /knowledge 或新增一条平行路径。
+    """
+    api = settings.API_PREFIX
+
+    # 1) 上传：只存在于 /files，且仍是 multipart + category（原有契约不变）
+    upload = paths[f"{api}/files/upload"]["post"]
+    assert upload["tags"] == ["文件管理"]
+    body_ref = json.dumps(upload.get("requestBody", {}), ensure_ascii=False)
+    assert "multipart" in body_ref
+    assert f"{api}/knowledge/docs/upload" not in paths, "知识库不应再暴露上传路径"
+
+    # 2) 版本文件类动作在 /files；切片预览与正文读取留在 /knowledge
+    for path in ("/files/revisions/{revision_id}/download", "/files/revisions/{revision_id}/edit",
+                 "/files/revisions/{revision_id}/publish", "/files/revisions/{revision_id}/restore",
+                 "/files/revisions/{revision_id}/discard", "/files/questions/upload", "/files/index/delete"):
+        assert f"{api}{path}" in paths, f"{path} 未迁移到文件管理分组"
+    for path in ("/knowledge/revisions/{revision_id}", "/knowledge/revisions/{revision_id}/preview",
+                 "/knowledge/retrieve", "/knowledge/docs"):
+        assert f"{api}{path}" in paths, f"{path} 应保留在知识库分组"
+
+    # 3) 旧路径不得残留（同一实现不允许有两个入口）
+    for stale in ("/api/v1/knowledge/questions/upload", "/api/v1/ingestion/delete",
+                  "/api/v1/files/batch-upload", "/api/v1/files/stats"):
+        assert stale not in paths, f"{stale} 是已下线的重复路径"
+
+
+def test_files_group_has_no_orphan_metadata_crud(paths):
+    """`/files` 不应出现凭空造的文件元数据 CRUD。
+
+    文件是按「文档 → 版本」查看的；后端从未提供 /files 列表、/files/{id} 详情、
+    秒传或批量上传。上一轮为了填满分组凭空加了这套接口，本轮已删除 ——
+    这条用例保证它不会被再次引入（前端会照着一个不存在的契约开发）。
+    """
+    api = settings.API_PREFIX
+    operations = {(path, method) for path in paths if path.startswith(f"{api}/files")
+                  for method in paths[path]}
+    suspicious = [op for op in operations
+                  if op[0].count("/") <= 4 and op[1] in {"get", "delete"}]
+    assert not suspicious, f"/files 下不应有元数据 CRUD：{suspicious}"

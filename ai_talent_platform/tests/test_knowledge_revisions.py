@@ -12,30 +12,42 @@ from tests.test_collection_routing import Client
 
 
 def test_version_routes_registered_with_chinese_descriptions():
+    """知识库只留检索/切片语义；文件类动作已迁到 /files 分组。
+
+    拆分依据：/knowledge 下只保留「读语义内容」的接口（检索、文档与版本正文、
+    切片预览、题库检索），任何「写文件 / 换版本 / 删索引」的动作都归「文件管理」。
+    这样 Swagger 分组与路径前缀一致，联调方不会再在知识库分组里找上传接口。
+    """
     from app.core.application import create_application
+    from app.routers.file_router import router as file_router
     from app.routers.knowledge_router import router
+
     paths = create_application().openapi()['paths']
-    assert len(router.routes) == 15
+    assert len(router.routes) == 7, [r.path for r in router.routes]
+    assert len(file_router.routes) == 9, [r.path for r in file_router.routes]
     assert '/api/v1/knowledge/drafts/upload' not in paths
-    # [接口分组治理] /api/v1/files/upload 已归位到「文件管理」分组（file_router），
-    # 不再是知识库上传的隐藏别名；此处改为校验它确实归属文件管理。
+
+    # 上传只存在于文件管理分组，且知识库下不再有同名路径
     assert '/api/v1/files/upload' in paths
     assert paths['/api/v1/files/upload']['post']['tags'] == ['文件管理']
-    assert sum(route.path == '/knowledge/docs/upload' for route in router.routes) == 1
-    for route in router.routes:
-        for method in route.methods:
-            operation = paths['/api/v1' + route.path][method.lower()]
-            assert operation['description']
-            assert operation['tags'] == ['知识库']
-            assert any('\u4e00' <= c <= '\u9fff' for c in operation['summary'])
+    assert '/api/v1/knowledge/docs/upload' not in paths
+
+    for target, tag in ((router, '知识库'), (file_router, '文件管理')):
+        for route in target.routes:
+            for method in route.methods:
+                operation = paths['/api/v1' + route.path][method.lower()]
+                assert operation['description'], route.path
+                assert operation['tags'] == [tag], (route.path, operation['tags'])
+                assert any('\u4e00' <= c <= '\u9fff' for c in operation['summary']), route.path
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('path', ['/api/v1/knowledge/docs/upload'])
+@pytest.mark.parametrize('path', ['/api/v1/files/upload'])
 async def test_original_upload_urls_use_draft_service(path):
     from fastapi import FastAPI
     from httpx import AsyncClient, ASGITransport
-    from app.routers.knowledge_router import router, get_revision_service
+    from app.routers.file_router import router
+    from app.routers.knowledge_router import get_revision_service
     app = FastAPI()
     app.include_router(router, prefix='/api/v1')
     service = NS(upload=AsyncMock(return_value={'doc_id': 1, 'revision_id': 2, 'status': 'draft'}))

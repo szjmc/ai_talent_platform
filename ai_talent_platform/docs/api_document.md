@@ -1058,12 +1058,19 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
 | POST | `/knowledge/docs` | `knowledge:manage` | 新建文本型知识（`title` / `category` / `content` / 权限范围） |
-| POST | `/knowledge/docs/upload` | `knowledge:manage` | 上传文档（PDF/Word/Excel/TXT/图片），异步索引 |
-| GET | `/knowledge/docs` | `knowledge:read` | 文档列表（`status` / `category` / `keyword`） |
-| DELETE | `/knowledge/docs/{id}` | `knowledge:manage` | 删除文档（同步删除 Milvus 向量） |
+| GET | `/knowledge/docs` | `knowledge:manage` | 文档列表（含草稿；`category` 筛选，分页） |
+| GET | `/knowledge/docs/{doc_id}/revisions` | `knowledge:manage` | 文档版本列表（草稿/历史/当前生效，含 `file_id` 与乐观锁 `version`） |
+| GET | `/knowledge/revisions/{revision_id}` | `knowledge:manage` | 版本正文（`version` 用于编辑/发布并发校验） |
+| POST | `/knowledge/revisions/{revision_id}/preview` | `knowledge:manage` | 生成切片预览快照（不写 Milvus） |
+| GET | `/knowledge/revisions/{revision_id}/preview` | `knowledge:manage` | 查看已保存的切片预览（分页） |
+| POST | `/knowledge/questions/search` | `knowledge:read` | 按技术/等级/题型查笔试题库 |
 | POST | `/knowledge/retrieve` | `knowledge:read` | 向量检索（返回 chunk + 得分） |
 | POST | `/knowledge/ask` | `knowledge:read` | RAG 问答（答案 + 引用来源） |
 | GET | `/knowledge/retrieve-eval` | `knowledge:manage` | 检索效果自检（准确率 / 召回率） |
+
+> **上传与版本文件不在本分组**：`POST /knowledge/docs/upload`、版本编辑/发布/恢复/取消、
+> 题库上传、索引删除均已迁至「文件管理」分组（`/files/*`），见第十八节。
+> 本分组只保留「读语义内容」的接口：检索、文档与版本正文、切片预览、题库选题。
 
 **文档对象**：`id`、`title`、`category`、`source_type`（`file`/`text`）、`status`（`indexing`/`indexed`/`failed`）、`chunk_count`、`permission_scope`（`public`/`dept`/`role`）、`allowed_roles`、`organization_id`、`embedding_model`、`index_error`、`indexed_at`。
 
@@ -1224,51 +1231,47 @@ event: error   data: {"code":5002,"message":"模型调用失败"}
 
 ## 十八、文件模块 Files — ✅ 已实现
 
+> 主责组：`[架构组]`（前缀与分组一致） ｜ 代码位置：`routers/file_router.py`
+>
+> **定位**：`/files` 管的是「文件本身」——上传、版本文件下载、版本流转、题库文件导入、
+> 索引删除。检索与切片预览仍属「知识库」（`/knowledge/retrieve`、`/knowledge/revisions/*`）。
+>
+> **重要**：这些接口**不是新写的实现**。上传、版本文件、索引维护在知识库链路上本就可用，
+> 原先只是挂在 `/knowledge/*` 与 `/ingestion/*` 路径下，导致 Swagger「文件管理」分组为空、
+> 知识库分组里塞满写操作。本轮把处理函数原样迁到 `/files`，逻辑与权限没有变。
+
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
-| POST | `/files/upload` | `file:upload` | `multipart/form-data`，字段 `file` + `biz_type`（`resume`/`knowledge`/`avatar`/`export`/`interview`/`other`）+ 可选 `biz_id`/`is_public`；返回文件元数据 |
-| POST | `/files/batch-upload` | `file:upload` | 批量上传（字段 `files`），逐份返回成功/失败明细，单份失败不影响其余 |
-| GET | `/files` | 登录即可 | 分页列表（`keyword`/`biz_type`/`biz_id`/`uploader_id`/`content_type`）；非管理员仅见本人上传 |
-| GET | `/files/{id}` | 登录即可 | 文件元数据（含 `download_url` / `preview_url` / `uploader_name`） |
-| GET | `/files/{id}/download` | 登录即可 | 下载（`FileResponse` + RFC5987 `Content-Disposition`，响应头带 `X-Content-SHA256`，`download_count` 原子自增） |
-| GET | `/files/stats` | 登录即可 | 文件中心概览：总数 / 总占用 / 按业务类型分组 |
-| DELETE | `/files/{id}` | `file:delete` | 删除（默认软删元数据，物理对象由巡检任务清理） |
+| POST | `/files/upload` | `knowledge:manage` | 上传文件（multipart `file` 可多份 + `category` + 可选 `title`/`doc_id`）。**单份存为草稿**，需预览确认后发布；**多份逐份自动解析发布**，返回 `total`/`success_count`/`failed_count`/`items`，部分失败不撤销已成功项 |
+| POST | `/files/docs/{doc_id}/retry` | `knowledge:manage` | 重试失败索引（`doc_id` 是文档 ID，不是文件 ID） |
+| GET | `/files/revisions/{revision_id}/download` | `knowledge:manage` | 下载版本文件；`source=false` 取版本文件（编辑后为新生成 Word），`source=true` 取上传原件 |
+| POST | `/files/revisions/{revision_id}/edit` | `knowledge:manage` | 修改正文另存新版本（生成新 Word 文件，原版本保留） |
+| POST | `/files/revisions/{revision_id}/publish` | `knowledge:manage` | 确认发布版本，切换可检索内容 |
+| POST | `/files/revisions/{revision_id}/restore` | `knowledge:manage` | 从历史版本恢复为新草稿 |
+| POST | `/files/revisions/{revision_id}/discard` | `knowledge:manage` | 取消未发布草稿（已发布版本不可取消） |
+| POST | `/files/questions/upload` | `knowledge:manage` | 上传 JSON 题库文件并导入（1~10000 道，按 `bank_id`+`external_id` 幂等） |
+| POST | `/files/index/delete` | `knowledge:manage` | 删除文档索引（逻辑删除 + 补偿任务清理向量，HTTP 202 表示已受理，不代表立即完成；**不物理删除原始文件**） |
 
-> **路径说明**：`/files/upload` 只属于文件中心，入参是 `biz_type`。
-> 知识文档上传请用 `/knowledge/docs/upload`（入参 `category`，返回 `doc_id`/`revision_id`）。
-> 两者契约不同，历史上曾把知识上传隐藏映射到 `/files/upload`，导致按文件文档传 `biz_type` 时 422，已下线该别名。
+### 与知识库的分工
 
-**上传响应**
+| 关注点 | 文件管理 `/files` | 知识库 `/knowledge` |
+| --- | --- | --- |
+| 上传 / 下载文件 | ✅ | — |
+| 版本流转（编辑/发布/恢复/取消） | ✅ | — |
+| 题库文件导入 | ✅ | — |
+| 删除索引 | ✅ | — |
+| 文档与版本正文、版本列表 | — | ✅ `GET /knowledge/docs`、`/knowledge/revisions/{id}` |
+| 切片预览（生成 / 查看） | — | ✅ `POST`/`GET /knowledge/revisions/{id}/preview` |
+| 检索 / 题库选题 | — | ✅ `POST /knowledge/retrieve`、`/knowledge/questions/search` |
 
-```json
-{
-  "id": 21,
-  "file_name": "张三-简历.pdf",
-  "file_size": 348212,
-  "content_type": "application/pdf",
-  "extension": ".pdf",
-  "file_hash": "b1946ac92492d2347c6235b4d2611184…",
-  "storage_type": "local",
-  "biz_type": "resume",
-  "biz_id": 1301,
-  "uploader_id": 7,
-  "uploader_name": "李HR",
-  "is_public": false,
-  "download_count": 3,
-  "download_url": "/api/v1/files/21/download",
-  "preview_url": "/api/v1/files/21/download",
-  "duplicated": false,
-  "created_at": "2026-11-07T10:12:31"
-}
-```
+> **为何 `/files` 没有「文件列表」**：文件按「文档 → 版本」维度查看才有业务含义
+> （入口是 `/knowledge/docs` 拿文档，再取版本列表）。后端从未提供
+> `/files` 列表、`/files/{id}` 详情、秒传、批量上传等元数据 CRUD —— 早期文档里的这套
+> 契约与实现不符，已删除，避免前端照着不存在的接口开发。
 
-**秒传**：同一 `file_hash` + 同一 `biz_type` 已存在时不再落盘，直接返回已有记录并置 `duplicated=true`。
-
-**错误约定**：`5003` 类型不支持 / 空文件 / 超过 `MAX_UPLOAD_SIZE_MB`；`403/2004` 无权限下载他人私有文件；`404/3001` 文件不存在或对象已清理。
+**错误约定**：`5003` 文件类型不支持 / 为空 / 超过 `MAX_UPLOAD_SIZE_MB`；`422` `category` 缺失或不在七大分类内；`3001` 文档或版本不存在；`2004` 越权访问他人文档。
 
 ---
-
-<a id="api-audit"></a>
 
 ## 十九、审计模块 Audit — ✅ 已实现
 

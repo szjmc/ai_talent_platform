@@ -1,202 +1,231 @@
 """
 模块：app/routers/file_router.py
-职责：文件中心接口（/files）：上传 / 批量上传 / 列表 / 详情 / 下载 / 删除 / 统计。
+职责：文件管理接口（/files）——把「文件」相关能力从知识库分组迁出，独立成组。
 
-标签：[架构组] [P1]（文件管理模块的真实实现，替换原 501 占位路由）
+标签：[架构组] [P1]（文件管理分组：上传 / 版本文件 / 索引维护 / 题库导入）
 
-背景（本轮修复的「接口分错组」问题）：
-    /api/v1/files 之前只有 `placeholder_router` 生成的 `GET /files` 占位（返回 501），
-    而真正可用的上传能力挂在了知识库分组下（/knowledge/docs/upload），
-    旧地址 `/files/upload` 只是一条 `include_in_schema=False` 的兼容跳转，
-    Swagger 上「文件管理」分组对外不可用 —— 前端 FilesPage 只能提示「待实现」。
+============================ 本轮修正（重要） ============================
+上一轮的做法是错的：为了填满 `/files` 分组，新建了一套 FileCenterService +
+FileResponse + CRUD，等于在已经跑通的链路上又造了一个平行实现 —— 两套上传、
+两套元数据、两套权限判断，长期必然分叉。
 
-契约（与 docs/api_document.md §十八 一致）：
-    POST   /files/upload          上传（multipart: file + biz_type + biz_id + is_public）
-    POST   /files/batch-upload    批量上传（逐份结果，部分失败不撤销成功项）
-    GET    /files                 分页列表（keyword / biz_type / uploader_id / content_type）
-    GET    /files/stats           概览（总数 / 总占用 / 分类计数）
-    GET    /files/{file_id}       详情（含 download_url）
-    GET    /files/{file_id}/download  下载（私有文件按归属人鉴权）
-    DELETE /files/{file_id}       删除（软删元数据 + 延迟清理对象）
+真正的做法是：**文件能力本来就已经实现**（KnowledgeService/KnowledgeRevisionService
+/ QuestionBankImportService / IngestionService + FileService + files 表），
+只是这些接口都挂在 `/knowledge/*` 与 `/ingestion/*` 路径下，于是 Swagger 里
+「文件管理」分组是空的，而知识库分组里塞满了上传、下载、版本文件、题库导入等
+与检索无关的写接口。
 
-权限：
-    上传：file:upload；删除：file:delete；查看 / 下载：登录 + 归属校验（公开文件人人可读）。
+本轮把这些**已有实现原样迁移**到 `/files/*`（处理函数体不改逻辑，只换路径），
+让分组与路径一致：
+    POST /files/upload                              上传知识文档（原 /knowledge/docs/upload）
+    POST /files/docs/{doc_id}/retry                 重试失败索引（原 /knowledge/docs/{doc_id}/retry）
+    GET  /files/revisions/{revision_id}/download     下载版本文件/原件（原 /knowledge/revisions/{id}/file）
+    POST /files/revisions/{revision_id}/edit        修改正文另存版本
+    POST /files/revisions/{revision_id}/publish     确认发布版本
+    POST /files/revisions/{revision_id}/restore     历史版本恢复为新草稿
+    POST /files/revisions/{revision_id}/discard     取消未发布草稿
+    POST /files/questions/upload                    上传导入笔试题库（原 /knowledge/questions/upload）
+    POST /files/index/delete                        删除文档索引（原 /ingestion/delete）
+
+留在「知识库」的只保留检索与切片语义：
+    /knowledge/retrieve、/knowledge/docs、/knowledge/docs/{id}/revisions、
+    /knowledge/revisions/{id}（正文）、/knowledge/revisions/{id}/preview（生成/查看）、
+    /knowledge/questions/search
+
+注意：`/files/revisions/...` 等静态前缀路由必须先于任何 `/files/{file_id}` 形态的
+动态路由注册，否则会被动态段吃掉（FastAPI 按注册顺序匹配）。
+=========================================================================
 """
 
 from __future__ import annotations
 
-from typing import Annotated
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File as FastAPIFile, Form, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.responses import Response
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import CurrentUser, get_db, require_permission
-from app.core.pagination import PageParams, build_page_result
+from app.config.settings import settings
+from app.core.dependencies import require_permission
 from app.core.permissions import PermissionEnum
-from app.core.response import ApiResponse, PageResult, success
-from app.schemas.common import COMMON_ERROR_RESPONSES
-from app.schemas.file import (
-    FileBatchUploadResponse,
-    FileBizType,
-    FileDeleteResponse,
-    FileResponse,
-    FileStatsResponse,
-)
-from app.services.file_center_service import FileCenterService
+from app.core.rag_constants import CategoryLiteral
+from app.core.response import ApiResponse, success
+from app.schemas.knowledge_revision import RevisionAction, RevisionEdit
+from app.schemas.question_bank import QuestionImportResponse
+from app.services.knowledge_revision_service import KnowledgeRevisionService
+from app.services.question_bank_import_service import QuestionBankImportService
+from app.routers.knowledge_router import get_revision_service, get_service
+from app.services.ingestion_service import IngestionService
+from app.schemas.rag import IndexDeleteRequest
 
-router = APIRouter(prefix="/files", tags=["文件管理"], responses=COMMON_ERROR_RESPONSES)
-
-
-def get_file_service(db: AsyncSession = Depends(get_db)) -> FileCenterService:
-    """文件中心服务依赖（请求级会话）。"""
-    return FileCenterService(db)
+router = APIRouter(prefix="/files", tags=["文件管理"])
 
 
-def _content_disposition(filename: str) -> str:
-    """中文文件名下载头（RFC 5987：filename* + ASCII 兜底）。"""
-    from urllib.parse import quote
-
-    ascii_name = filename.encode("ascii", "ignore").decode() or "download"
-    return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename)}"
-
-
+# ============================================================================
+# 上传
+# ============================================================================
 @router.post(
     "/upload",
-    summary="上传文件",
-    response_model=ApiResponse[FileResponse],
-    dependencies=[Depends(require_permission(PermissionEnum.FILE_UPLOAD))],
+    summary="上传文件并建立文档草稿",
+    description="上传知识文档原件。file可选择多份文件，整批必须且只能选择一个七大分类category。单份保存草稿，人工检查正文、预览切片并确认发布；多份逐份自动解析、切片、向量化并发布，无需人工确认，返回total、success_count、failed_count和逐份items，部分失败不撤销已成功文件。title省略时各自使用文件名；doc_id为空时各自新建文档，填写时沿用已有文档追加版本（多份顺序发布，最后成功版本生效）。需要知识库管理及文档归属权限。",
 )
-async def upload_file(
-    user: CurrentUser,
-    file: Annotated[UploadFile, FastAPIFile(..., description="待上传文件，单次一份（多份请用 batch-upload）")],
-    biz_type: Annotated[FileBizType, Form(description="业务类型：resume/knowledge/avatar/export/interview/other")] = "other",
-    biz_id: Annotated[int | None, Form(gt=0, description="关联业务 ID（可选）")] = None,
-    is_public: Annotated[bool, Form(description="是否公开访问（默认私有）")] = False,
-    service: FileCenterService = Depends(get_file_service),
+async def upload_document(
+    file: list[UploadFile] = File(
+        ..., description="一份保存草稿，多份自动发布；所有文件共用category",
+        json_schema_extra={"items": {"type": "string", "format": "binary"}},
+    ),
+    title: str | None = Form(None, min_length=1, max_length=255),
+    category: CategoryLiteral = Form(...),
+    doc_id: int | None = Form(None, ge=1),
+    context=Depends(get_revision_service, scope="function"),
 ):
-    """上传单个文件；相同摘要同业务类型命中去重（duplicated=true，不重复落盘）。"""
-    content = await file.read()
-    data = await service.upload(
-        filename=file.filename,
-        content=content,
-        content_type=file.content_type,
-        biz_type=biz_type,
-        biz_id=biz_id,
-        is_public=is_public,
-        user=user,
+    """单文件保存草稿，多文件逐份解析并自动发布。"""
+    service, user = context
+    # 保留 multipart 字段名 file，旧单份客户端无需更名；按文件数选择处理流程。
+    if len(file) == 1:
+        item = file[0]
+        data = await item.read(settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024 + 1)
+        return success(
+            data=await service.upload(
+                data, item.filename or "document.txt", item.content_type, category,
+                title if title is not None else (item.filename or "document.txt")[:255], user, doc_id,
+            ),
+            message="草稿已保存，请检查正文和切片预览后确认发布",
+        )
+    results = []
+    # 逐份读取并独立提交，避免一份失败回滚整批，或同时把多份大文件读入内存。
+    for item in file:
+        name = item.filename or "document.txt"
+        try:
+            data = await item.read(settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024 + 1)
+            result = await service.upload_and_publish(
+                data, name, item.content_type, category,
+                title if title is not None else name[:255], user, doc_id,
+            )
+        except Exception as exc:
+            result = KnowledgeRevisionService.batch_error(name, exc)
+        results.append(result)
+    count = sum(item["status"] == "published" for item in results)
+    return success(
+        data={
+            "total": len(results),
+            "success_count": count,
+            "failed_count": len(results) - count,
+            "category": category,
+            "items": results,
+        },
+        message="批量处理完成，请确认每份文件的处理结果",
     )
-    return success(data=data, message="文件已上传（已存在相同文件，直接复用）" if data.duplicated else "上传成功")
+
+
+@router.post("/docs/{doc_id}/retry", summary="重试失败文档索引", description="根据知识文档ID读取已保存的原件，重新执行解析、分块、向量化和索引写入。需要知识库管理权限且为创建人或超级管理员；已成功索引的文档直接返回，正在索引的文档拒绝重复触发。doc_id是文档ID，不是文件ID。")
+async def retry_document(
+    doc_id: int,
+    user=Depends(require_permission(PermissionEnum.KNOWLEDGE_MANAGE)),
+    service=Depends(get_service, scope="function"),
+):
+    """重试已保存原件的失败索引。"""
+    return success(data=await service.retry(doc_id, user))
+
+
+# ============================================================================
+# 版本文件（编辑 / 发布 / 恢复 / 取消 / 下载）
+# 这些操作都作用在「文件版本」上，因此归文件管理；切片预览仍属知识库。
+# ============================================================================
+@router.get("/revisions/{revision_id}/download", summary="下载版本文件或来源原件", description="source=false下载该版本文件，正文编辑后为新生成Word；source=true下载保留的来源原件。仅文档管理者可下载，不暴露MinIO对象键或凭证。")
+async def download_revision_file(
+    revision_id: int, source: bool = False, context=Depends(get_revision_service)
+):
+    """按权限下载版本文件或原始上传文件。"""
+    service, user = context
+    data, name, mime = await service.download(revision_id, user, source)
+    return Response(
+        content=data,
+        media_type=mime or "application/octet-stream",
+        headers={"Content-Disposition": "attachment; filename*=UTF-8''" + quote(name)},
+    )
+
+
+@router.post("/revisions/{revision_id}/edit", summary="修改正文并另存新版本", description="基于指定版本编辑完整正文、标题和分类，生成新的Word文件和版本记录，原版本保持不变。expected_version必须匹配详情中的version，新版本需重新预览切片后发布。")
+async def edit_revision(
+    revision_id: int, request: RevisionEdit, context=Depends(get_revision_service, scope="function")
+):
+    """将编辑后的正文保存为新草稿。"""
+    service, user = context
+    return success(data=await service.edit(revision_id, request, user))
+
+
+@router.post("/revisions/{revision_id}/publish", summary="确认发布文档版本", description="校验预览与并发版本，准备新向量及BM25快照后，在事务中切换当前内容；失败不影响旧版。旧向量由恢复任务延迟按精确切片ID清理。expected_version取预览返回值；当前同步等待发布完成。")
+async def publish_revision(
+    revision_id: int, request: RevisionAction, context=Depends(get_revision_service, scope="function")
+):
+    """发布已确认的切片快照，并切换可检索版本。"""
+    service, user = context
+    return success(data=await service.publish(revision_id, request, user))
+
+
+@router.post("/revisions/{revision_id}/restore", summary="从历史版本恢复为新草稿", description="基于历史正文生成新的Word文件和草稿版本，不直接切换检索内容。需重新检查切片并确认发布，恢复过程保留完整版本链。")
+async def restore_revision(
+    revision_id: int, request: RevisionAction, context=Depends(get_revision_service, scope="function")
+):
+    """根据历史版本另存新草稿。"""
+    service, user = context
+    return success(data=await service.restore(revision_id, request, user))
+
+
+@router.post("/revisions/{revision_id}/discard", summary="取消未发布草稿", description="归档未发布草稿，保留版本文件和来源关系，不影响当前已发布版本；已发布版本不能通过本接口取消。")
+async def discard_revision(
+    revision_id: int, request: RevisionAction, context=Depends(get_revision_service, scope="function")
+):
+    """归档未发布草稿。"""
+    service, user = context
+    return success(data=await service.discard(revision_id, request, user))
+
+
+# ============================================================================
+# 题库文件导入 / 索引维护
+# ============================================================================
+@router.post(
+    "/questions/upload",
+    summary="上传并导入笔试题库",
+    description="上传UTF-8编码的JSON题库文件，内容为1至10000道题目的数组。每题携带bank_id、external_id、technology、difficulty、question_type、stem、answer，选择题另需options；支持单选、多选、判断、填空、简答和编程题。整批校验通过后按bank_id+external_id幂等写入，归属人为当前登录用户。sync_index默认true，数据库提交后仅同步本批题目向量；返回导入数量、题目ID、已同步/失败/待同步数量，索引失败保留题目供重试。需要knowledge:manage权限；普通管理者不可覆盖他人题目。仅导入结构化题库，不创建测评试卷。",
+    response_model=ApiResponse[QuestionImportResponse],
+    response_model_exclude_none=True,
+)
+async def upload_question_bank(
+    file: UploadFile = File(
+        ..., description="固定格式JSON题库文件，支持UTF-8及UTF-8 BOM",
+        json_schema_extra={"type": "string", "format": "binary"},
+    ),
+    sync_index: bool = Form(True, description="是否在导入提交后同步本批题目向量，默认开启"),
+    user=Depends(require_permission(PermissionEnum.KNOWLEDGE_MANAGE)),
+):
+    """校验题库文件，提交题目后同步本批向量。"""
+    data = await file.read(settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024 + 1)
+    result = await QuestionBankImportService().upload(data, file.filename or "", user, sync_index)
+    message = "题库导入完成"
+    if result.failed_count or result.pending_count or result.sync_error:
+        message = "题目已导入，请查看索引同步结果"
+    return success(data=result, message=message)
 
 
 @router.post(
-    "/batch-upload",
-    summary="批量上传文件",
-    response_model=ApiResponse[FileBatchUploadResponse],
-    dependencies=[Depends(require_permission(PermissionEnum.FILE_UPLOAD))],
+    "/index/delete",
+    status_code=202,
+    summary="删除知识文档索引",
+    description="按文件ID和分类受理删除，先提交文档逻辑删除，再由恢复任务清理向量。需要知识库管理权限及文档归属权限；HTTP202和deletion_pending表示已受理，不代表立即清理完成。此接口不物理删除原始文件。",
 )
-async def batch_upload_files(
-    user: CurrentUser,
-    files: Annotated[list[UploadFile], FastAPIFile(..., description="待上传文件（可多选）")],
-    biz_type: Annotated[FileBizType, Form(description="整批共用的业务类型")] = "other",
-    biz_id: Annotated[int | None, Form(gt=0, description="关联业务 ID（整批共用）")] = None,
-    is_public: Annotated[bool, Form(description="是否公开访问")] = False,
-    service: FileCenterService = Depends(get_file_service),
+async def delete_index(
+    request: IndexDeleteRequest,
+    user=Depends(require_permission(PermissionEnum.KNOWLEDGE_MANAGE)),
+    service=Depends(get_service, scope="function"),
 ):
-    """批量上传：逐份校验与落库，返回成功 / 失败明细（部分失败不撤销已成功文件）。"""
-    payload = [(item.filename, await item.read(), item.content_type) for item in files]
-    data = await service.batch_upload(
-        payload, biz_type=biz_type, biz_id=biz_id, is_public=is_public, user=user
-    )
+    """受理逻辑删除；202表示已受理，不代表远程向量已立即清理完成。"""
+    bridge = IngestionService(service.db)
+    # Service先记录持久化任务，再逻辑删除；恢复worker确认事务结果后清理向量。
+    # 共享任务列表让外层get_service正确释放锁，并保留待补偿任务。
+    bridge.ingest_jobs = service.ingest_jobs
     return success(
-        data=data,
-        message=f"上传完成：成功 {data.success_count} 份，失败 {data.failed_count} 份",
-    )
-
-
-@router.get(
-    "/stats",
-    summary="文件中心概览",
-    response_model=ApiResponse[FileStatsResponse],
-)
-async def file_stats(
-    user: CurrentUser, service: FileCenterService = Depends(get_file_service)
-):
-    """文件总数 / 总占用 / 分类计数（普通用户仅统计本人可见范围）。"""
-    return success(data=await service.stats(user=user), message="OK")
-
-
-@router.get(
-    "",
-    summary="文件列表（分页）",
-    response_model=ApiResponse[PageResult[FileResponse]],
-)
-async def list_files(
-    user: CurrentUser,
-    page: PageParams = Depends(),
-    keyword: str | None = Query(None, max_length=64, description="文件名 / 哈希模糊搜索"),
-    biz_type: FileBizType | None = Query(None, description="按业务类型筛选"),
-    biz_id: int | None = Query(None, gt=0, description="按关联业务 ID 筛选"),
-    uploader_id: int | None = Query(None, gt=0, description="按上传人筛选（管理员）"),
-    content_type: str | None = Query(None, max_length=128, description="按 MIME 前缀筛选，如 image/"),
-    service: FileCenterService = Depends(get_file_service),
-):
-    """分页查询文件；普通用户仅本人上传（管理可见全部，公开文件对所有登录用户可见）。"""
-    result = await service.page_list(
-        page,
-        biz_type=biz_type,
-        biz_id=biz_id,
-        uploader_id=uploader_id,
-        content_type=content_type,
-        keyword=keyword,
-        user=user,
-    )
-    return success(
-        data=build_page_result(result.items, result.total, page), message="查询成功"
-    )
-
-
-@router.get(
-    "/{file_id}",
-    summary="文件详情",
-    response_model=ApiResponse[FileResponse],
-)
-async def get_file(
-    file_id: int, user: CurrentUser, service: FileCenterService = Depends(get_file_service)
-):
-    """文件元数据（含 download_url / preview_url）。"""
-    return success(data=await service.get(file_id, user=user), message="OK")
-
-
-@router.get("/{file_id}/download", summary="下载文件")
-async def download_file(
-    file_id: int, user: CurrentUser, service: FileCenterService = Depends(get_file_service)
-):
-    """下载文件内容；私有文件仅上传人与管理员可下载。"""
-    record, content = await service.prepare_download(file_id, user=user)
-    return Response(
-        content=content,
-        media_type=record.content_type or "application/octet-stream",
-        headers={
-            "Content-Disposition": _content_disposition(record.file_name),
-            "Content-Length": str(len(content)),
-            "X-Content-SHA256": record.file_hash or "",
-        },
-    )
-
-
-@router.delete(
-    "/{file_id}",
-    summary="删除文件",
-    response_model=ApiResponse[FileDeleteResponse],
-    dependencies=[Depends(require_permission(PermissionEnum.FILE_DELETE))],
-)
-async def delete_file(
-    file_id: int, user: CurrentUser, service: FileCenterService = Depends(get_file_service)
-):
-    """删除文件（软删元数据，物理对象由定时任务延迟清理）。"""
-    await service.delete(file_id, user=user)
-    return success(
-        data=FileDeleteResponse(id=file_id, deleted=True, message="文件已删除（对象延迟清理）"),
-        message="删除成功",
+        data=await bridge.delete_document(request.file_id, request.category, user),
+        code=202,
+        message="删除已受理，向量由补偿任务清理",
     )

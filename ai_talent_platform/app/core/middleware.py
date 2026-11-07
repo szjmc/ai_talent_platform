@@ -27,6 +27,7 @@ import re
 import time
 import uuid
 from collections import defaultdict, deque
+from contextvars import ContextVar
 from collections.abc import Awaitable, Callable
 
 from fastapi import FastAPI, Request, Response
@@ -47,6 +48,21 @@ SLOW_REQUEST_MS = 1000
 # trace_id 白名单：仅允许 URL 安全字符，长度 1-64；其余一律视为非法输入（防日志注入）
 TRACE_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
+# 当前请求的对外 base URL（scheme://host）。
+# 用途：邀约链接等「需要绝对地址但配置项为空」的场景，回退到请求 Host，
+# 而不是直接抛 1002 让业务不可用。用 ContextVar 而非层层传参，
+# 是因为调用点在 Service 内部（build_invitation_link），拿不到 Request。
+request_base_url_ctx: ContextVar[str] = ContextVar("request_base_url", default="")
+
+
+def request_base_url(request: Request) -> str:
+    """从请求推导对外 base URL（优先 X-Forwarded-*，兼容反向代理）。"""
+    proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "http").split(",")[0].strip()
+    host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").split(",")[0].strip()
+    if not host:
+        return ""
+    return f"{proto}://{host}"
+
 
 class TraceIdMiddleware(BaseHTTPMiddleware):
     """为每个请求注入 trace_id（复用入参前先做格式校验）。"""
@@ -57,6 +73,7 @@ class TraceIdMiddleware(BaseHTTPMiddleware):
         incoming = request.headers.get(TRACE_HEADER, "")
         trace_id = incoming if TRACE_ID_RE.match(incoming) else uuid.uuid4().hex[:16]
         token = trace_id_ctx.set(trace_id)
+        base_token = request_base_url_ctx.set(request_base_url(request))
         request.state.trace_id = trace_id
         try:
             response = await call_next(request)
@@ -64,6 +81,7 @@ class TraceIdMiddleware(BaseHTTPMiddleware):
             # 复位日志 trace_id + 清空请求级 AI 上下文（AIContext.set_context 由
             # get_current_user 写入），防止同 task 复用时身份泄漏到下一个请求
             trace_id_ctx.reset(token)
+            request_base_url_ctx.reset(base_token)
             clear_context()
         response.headers[TRACE_HEADER] = trace_id
         return response

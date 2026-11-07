@@ -139,9 +139,34 @@ def grade_answers(
 
 
 def build_invitation_link(token: str) -> str:
+    """生成候选人公开邀约链接。
+
+    取值优先级：
+        1. INVITE_BASE_URL   —— 专用前缀（生产推荐，形如 https://hr.example.com）
+        2. FRONTEND_URL      —— 前端站点地址（与邮件考试链接共用同一配置）
+        3. PUBLIC_BASE_URL   —— 后端内置公开页地址
+        4. 当前请求的 scheme://host —— 兜底，保证开发环境 / 未配配置时功能可用
+
+    第 4 级是本次修复：此前三级全空时直接抛 1002「未配置…无法生成邀约链接」，
+    开发环境新建邀约必然失败（前端只看到「业务异常 code=1002」）。兜底到请求 Host 后
+    功能立刻可用，同时打 WARNING 提醒生产必须显式配置 —— 反向代理或容器内网时
+    请求 Host 可能不是候选人能访问的地址，这种情况下链接会指向内网。
+    """
     base = settings.INVITE_BASE_URL or settings.FRONTEND_URL or settings.PUBLIC_BASE_URL
     if not base:
-        raise BusinessRuleError("未配置 INVITE_BASE_URL / FRONTEND_URL / PUBLIC_BASE_URL，无法生成邀约链接")
+        from app.core.middleware import request_base_url_ctx
+
+        base = request_base_url_ctx.get()
+        if base:
+            logger.warning(
+                "邀约链接回退到请求 Host（%s）：生产环境请显式配置 INVITE_BASE_URL，"
+                "否则反向代理下的链接可能指向内网地址", base,
+            )
+    if not base:
+        raise BusinessRuleError(
+            "未配置 INVITE_BASE_URL / FRONTEND_URL / PUBLIC_BASE_URL，且当前请求没有可用的 Host；"
+            "请在 .env 中配置 INVITE_BASE_URL（形如 https://hr.example.com）"
+        )
     return f"{base.rstrip('/')}/invite/{token}"
 
 

@@ -18,6 +18,14 @@ class IngestRequest(BaseModel):
 class IngestResponse(BaseModel):
     file_id: str
 
+class IndexDeleteRequest(BaseModel):
+    """删除文档索引请求：文件ID采用数字字符串，分类只允许平台约定的英文标识。"""
+
+    # 这里是 files 表主键，不是 knowledge_docs 主键，也不是任意 UUID。
+    file_id: str = Field(pattern=r"^[1-9][0-9]*$")
+    category: CategoryLiteral
+
+
 class EmbedQueryRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=2000, description="需要转向量的查询文本")
 

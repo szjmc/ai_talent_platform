@@ -38,13 +38,14 @@ export interface Position {
   status: 'open'|'paused'|'closed'; description: string; skill_tags: string[]; salary_min: number; salary_max: number;
   requirements?: { education: string; experience_years: number; skills: string[] }; publish_at?: string;
 }
-/** 文件中心元数据（后端 /files 返回；file_path/stored_name 等内部字段不下发）。 */
-export interface FileItem {
-  id: number; file_name: string; file_size: number; content_type: string | null; extension: string | null;
-  file_hash: string | null; storage_type: string; biz_type: string; biz_id: number | null;
-  uploader_id: number | null; uploader_name?: string | null; is_public: boolean; download_count: number;
-  download_url: string; preview_url?: string | null; duplicated?: boolean;
-  created_at?: string | null; updated_at?: string | null;
+/** 文件版本（文件管理的核心对象：一个文档有多个版本文件）。
+ *  注意：后端 /files 不提供「文件元数据列表」接口，文件按文档版本维度查看，
+ *  所以这里没有 FileItem 之类的独立文件实体，避免前端按不存在的契约开发。
+ */
+export interface FileRevision {
+  id?: number; revision_id?: number; doc_id?: number; version: number;
+  status?: string; title?: string; category?: string; file_id?: number | null;
+  created_at?: string | null;
 }
 /** 审计日志（只增不改，仅 audit:read 可查）。 */
 export interface AuditEntry {
