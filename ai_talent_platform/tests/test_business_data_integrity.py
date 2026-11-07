@@ -205,6 +205,7 @@ async def test_submit_rejects_foreign_and_duplicate_questions():
     service.repo = SimpleNamespace(
         get_by_id_or_404=AsyncMock(return_value=SimpleNamespace(status="in_progress", deadline=None)),
         list_questions=AsyncMock(return_value=[question]),
+        list_answers=AsyncMock(return_value=[]),
         save_answer=AsyncMock(), update_status=AsyncMock(),
     )
     with pytest.raises(ParamError, match="不属于"):

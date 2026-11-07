@@ -55,6 +55,7 @@ export const assessmentsApi = {
   detail: (id: number) => request<Assessment & { resume_keywords?: Record<string, unknown>; exam_url?: string }>({ url: `/assessments/${id}` }),
   report: (id: number) => request<AssessmentReport>({ url: `/assessments/${id}/report` }),
   paper: (id: number) => request<{ assessment_id: number; questions: unknown[] }>({ url: `/assessments/${id}/paper` }),
+  start: (id: number) => request<{ assessment_id: number; questions: unknown[] }>({ url: `/assessments/${id}/start`, method: 'POST' }),
   submit: (id: number, answers: { question_id: number; answer: unknown }[]) => request<Record<string, unknown>>({ url: `/assessments/${id}/submit`, method: 'POST', data: { answers } }),
   interviewRecords: (id: number) => request<unknown[]>({ url: `/assessments/${id}/interview/records` }),
 };

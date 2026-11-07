@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from app.adapters.vector_store.question_bank_adapter import QuestionBankVectorAdapter
 from app.ai.rag.question_embeddings import get_question_embeddings, question_embedding_signature
 from app.core.exceptions import DataConflictError
+from app.infrastructure.database.advisory_lock import acquire_advisory_lock, release_advisory_lock
 from app.core.question_bank_constants import DIFFICULTY_LABELS, TYPE_LABELS
 from app.repositories.question_bank_repository import QuestionBankRepository
 
@@ -48,14 +49,14 @@ class QuestionBankIndexService:
         # 与平台入库任务一致使用MySQL命名锁，防止两个脚本将新旧版本乱序写入同一主键。
         lock_key = 'question-index:' + hashlib.sha256(self.store.collection.encode()).hexdigest()[:48]
         async with engine.connect() as connection:
-            acquired = await connection.scalar(select(func.GET_LOCK(lock_key, 0)))
+            acquired = await acquire_advisory_lock(connection, lock_key, 0)
             await connection.commit()
             if acquired != 1:
                 raise DataConflictError('题库索引同步正在执行，请稍后重试')
             try:
                 return await self._sync_batches(session_factory, batch_size, force, question_ids)
             finally:
-                await connection.execute(select(func.RELEASE_LOCK(lock_key)))
+                await release_advisory_lock(connection, lock_key)
                 await connection.commit()
 
     async def _sync_batches(self, session_factory, batch_size, force, question_ids=None):

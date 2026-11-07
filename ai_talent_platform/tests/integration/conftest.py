@@ -67,17 +67,19 @@ def prepare_db():
     """建库 -> 建表（先删后建）-> 写入内置角色。"""
 
     async def _setup() -> None:
-        server = create_async_engine(settings.MYSQL_SERVER_URL, poolclass=NullPool)
-        try:
-            async with server.begin() as conn:
-                await conn.execute(
-                    text(
-                        f"CREATE DATABASE IF NOT EXISTS `{settings.DB_NAME}` "
-                        f"DEFAULT CHARACTER SET {settings.DB_CHARSET}"
+        # 1) 建库（SQLite 单文件模式无需建库）
+        if not settings.is_sqlite:
+            server = create_async_engine(settings.MYSQL_SERVER_URL, poolclass=NullPool)
+            try:
+                async with server.begin() as conn:
+                    await conn.execute(
+                        text(
+                            f"CREATE DATABASE IF NOT EXISTS `{settings.DB_NAME}` "
+                            f"DEFAULT CHARACTER SET {settings.DB_CHARSET}"
+                        )
                     )
-                )
-        finally:
-            await server.dispose()
+            finally:
+                await server.dispose()
 
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)

@@ -29,12 +29,15 @@ import pytest_asyncio
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
-# 在导入 app 之前把环境切到测试配置（MySQL 测试库）
+# 在导入 app 之前把环境切到测试配置（默认 MySQL 测试库；
+# 无 MySQL 的环境可用 TEST_DB_DRIVER=sqlite 走 SQLite 回退，此时使用
+# 独立测试库文件 data/test_talent_platform.db，不污染开发/演示库）
+_TEST_DB_DRIVER = os.getenv("TEST_DB_DRIVER", "mysql")
 os.environ.update(
     {
         "APP_ENV": "test",
         "DEBUG": "true",
-        "DB_DRIVER": "mysql",
+        "DB_DRIVER": _TEST_DB_DRIVER,
         "DB_NAME": os.getenv("TEST_DB_NAME", "ai_talent_platform_test"),
         "LOG_LEVEL": "WARNING",
         "PGSQL_ENABLED": "false",      # 单元/集成测试不依赖分析库
@@ -44,6 +47,9 @@ os.environ.update(
         "BCRYPT_ROUNDS": "4",          # 测试中降低哈希强度，加快执行
     }
 )
+if _TEST_DB_DRIVER == "sqlite":
+    os.environ["DB_SQLITE_FILE"] = os.getenv(
+        "TEST_DB_SQLITE_FILE", "data/test_talent_platform.db")
 
 from sqlalchemy import text  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine  # noqa: E402
@@ -64,10 +70,12 @@ app = create_application()
 # 注意：必须用 NullPool。pytest-asyncio 每个用例一个事件循环，QueuePool 会跨用例复用连接，
 # 而复用的连接绑定在上一个已关闭的循环上，pre_ping 时向已销毁的 transport 写入，
 # Windows 下报 `AttributeError: 'NoneType' object has no attribute 'send'`。
+# SQLite 回退模式（TEST_DB_DRIVER=sqlite）不接受 charset/autocommit 连接参数。
 engine = create_async_engine(
     TEST_DATABASE_URL,
     poolclass=NullPool,
-    connect_args={"charset": settings.DB_CHARSET, "autocommit": False},
+    connect_args={} if settings.is_sqlite
+    else {"charset": settings.DB_CHARSET, "autocommit": False},
 )
 TestingSessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
 
@@ -97,19 +105,20 @@ def mysql_ready() -> Generator[None, None, None]:
     import asyncio
 
     async def _setup() -> None:
-        # 1) 确保测试库存在（连服务器级 DSN）
-        server_engine = create_async_engine(settings.MYSQL_SERVER_URL, pool_pre_ping=True)
-        try:
-            async with server_engine.begin() as conn:
-                await conn.execute(
-                    text(
-                        f"CREATE DATABASE IF NOT EXISTS `{settings.DB_NAME}` "
-                        f"DEFAULT CHARACTER SET {settings.DB_CHARSET} "
-                        f"COLLATE {settings.DB_CHARSET}_general_ci"
+        # 1) 确保测试库存在（连服务器级 DSN；SQLite 单文件模式无需建库）
+        if not settings.is_sqlite:
+            server_engine = create_async_engine(settings.MYSQL_SERVER_URL, pool_pre_ping=True)
+            try:
+                async with server_engine.begin() as conn:
+                    await conn.execute(
+                        text(
+                            f"CREATE DATABASE IF NOT EXISTS `{settings.DB_NAME}` "
+                            f"DEFAULT CHARACTER SET {settings.DB_CHARSET} "
+                            f"COLLATE {settings.DB_CHARSET}_general_ci"
+                        )
                     )
-                )
-        finally:
-            await server_engine.dispose()
+            finally:
+                await server_engine.dispose()
 
         # 2) 建表（先删后建，保证结构最新）
         async with engine.begin() as conn:

@@ -190,7 +190,16 @@ async def get_paper(assessment_id: int, db: DbSession = None):
     })
 
 
-# ------------------------------------------------------------------ 4. 提交笔试（达标自动邀约）
+# ------------------------------------------------------------------ 4. 开始测评（pending -> in_progress）
+@router.post("/{assessment_id}/start", summary="开始测评：状态置为作答中并下发试卷",
+             response_model=SuccessResponse[dict],
+             dependencies=[Depends(require_permission(P.ASSESSMENT_MANAGE))])
+async def start(assessment_id: int, db: DbSession = None):
+    data = await _svc(db).start_assessment(assessment_id)
+    return success(data=data, message="测评已开始")
+
+
+# ------------------------------------------------------------------ 5. 提交笔试（达标自动邀约）
 @router.post("/{assessment_id}/submit", summary="提交笔试答案；达标自动发面试邀约",
              response_model=SuccessResponse[dict],
              dependencies=[Depends(require_permission(P.ASSESSMENT_MANAGE))])

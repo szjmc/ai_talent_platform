@@ -58,10 +58,12 @@ async def test_swagger_available(client):
 
 
 async def test_health_ready(client):
-    """就绪探针：MySQL 必须可用（PgSQL 在测试环境关闭）。
+    """就绪探针：业务库必须可用（PgSQL 在测试环境关闭）。
 
     返回结构：mysql / pgsql 已从早期版本的字符串升级为结构化对象
     （target / status / reason / message / cost_ms），driver 信息在 drivers 字段。
+    SQLite 回退模式（TEST_DB_DRIVER=sqlite）下业务库为单文件 SQLite，
+    就绪口径同样要求 status=up。
     """
     resp = await client.get("/health/ready")
     assert resp.status_code == 200
@@ -69,11 +71,13 @@ async def test_health_ready(client):
 
     mysql = data["mysql"]
     assert isinstance(mysql, dict), f"mysql 应为结构化对象，实际为 {type(mysql)}"
-    assert mysql["status"] == "up", f"MySQL 未就绪：{mysql}"
-    assert mysql["target"].endswith(settings.DB_NAME)
+    assert mysql["status"] == "up", f"业务库未就绪：{mysql}"
+    if not settings.is_sqlite:
+        assert mysql["target"].endswith(settings.DB_NAME)
     assert data["pgsql"]["status"] == "disabled"
     assert data["status"] == "up"
-    assert data["drivers"]["mysql"] == "mysql+aiomysql"
+    assert data["drivers"]["mysql"] == ("sqlite+aiosqlite" if settings.is_sqlite
+                                        else "mysql+aiomysql")
 
 
 async def test_404_unified_response(client):

@@ -2,8 +2,41 @@
 """知识文档和切片 ORM 访问，事务由调用方管理。
 标签：[RAG组] [P0]。"""
 from sqlalchemy import select, or_, and_, func
+from sqlalchemy import Boolean, String, literal
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql.functions import FunctionElement
 from app.models.knowledge import KnowledgeDoc, KnowledgeChunk
 from app.repositories.base import BaseRepository
+
+
+class json_array_contains_role(FunctionElement):
+    """allowed_roles JSON 数组包含角色判断（跨方言，与 talent_profile_repository 同思路）。
+
+    MySQL 8 用 JSON_CONTAINS(col, JSON_QUOTE(v))；SQLite 没有 JSON_CONTAINS 函数，
+    退化为 JSON 文本 LIKE '%"角色"%'（元素带引号，不会误命中前缀相同的角色码）。
+    """
+
+    inherit_cache = True
+    type = Boolean
+
+
+@compiles(json_array_contains_role, "mysql")
+def _role_contains_mysql(element, compiler, **kw):
+    column, value = list(element.clauses)
+    return compiler.process(func.JSON_CONTAINS(column, func.JSON_QUOTE(value)) == 1, **kw)
+
+
+@compiles(json_array_contains_role, "sqlite")
+def _role_contains_sqlite(element, compiler, **kw):
+    column, value = list(element.clauses)
+    pattern = literal('%"') + value + literal('"%')
+    return compiler.process(column.cast(String).like(pattern), **kw)
+
+
+@compiles(json_array_contains_role)
+def _role_contains_default(element, compiler, **kw):
+    return _role_contains_mysql(element, compiler, **kw)
+
 
 class KnowledgeRepository(BaseRepository):
     model = KnowledgeDoc
@@ -18,7 +51,7 @@ class KnowledgeRepository(BaseRepository):
             if user.organization_id is not None:
                 rules.append(and_(KnowledgeDoc.permission_scope == "dept", KnowledgeDoc.organization_id == user.organization_id))
             for role in user.role_codes:
-                rules.append(and_(KnowledgeDoc.permission_scope == "role", func.JSON_CONTAINS(KnowledgeDoc.allowed_roles, func.JSON_QUOTE(role)) == 1))
+                rules.append(and_(KnowledgeDoc.permission_scope == "role", json_array_contains_role(KnowledgeDoc.allowed_roles, role)))
             stmt = stmt.where(or_(*rules))
         if category:
             stmt = stmt.where(KnowledgeDoc.category == category)

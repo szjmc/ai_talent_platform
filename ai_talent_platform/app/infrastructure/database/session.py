@@ -31,6 +31,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from app.config.settings import settings
 from app.infrastructure.database.mysql import (
     create_async_engine_from_settings,
     dispose_engine,
@@ -149,6 +150,7 @@ async def init_db() -> None:
     导入 app.models 是为了让所有模型类注册到 Base.metadata；
     通过 MySQL 命名锁 GET_LOCK 串行化多 worker / 多实例同时启动的建表；
     逐表创建（见 create_tables_individually），单表 DDL 错误不会拖垮其余表。
+    SQLite 回退模式没有 GET_LOCK，单文件库本身由文件锁串行化，直接建表即可。
     """
     from sqlalchemy import text
 
@@ -156,12 +158,16 @@ async def init_db() -> None:
     import app.models  # noqa: F401 - 触发所有模型模块的注册
 
     engine = get_engine()
-    async with engine.begin() as conn:
-        await conn.execute(text("SELECT GET_LOCK('ai_talent_platform:create_all', 30)"))
-        try:
+    if settings.is_sqlite:
+        async with engine.begin() as conn:
             failures = await conn.run_sync(create_tables_individually)
-        finally:
-            await conn.execute(text("SELECT RELEASE_LOCK('ai_talent_platform:create_all')"))
+    else:
+        async with engine.begin() as conn:
+            await conn.execute(text("SELECT GET_LOCK('ai_talent_platform:create_all', 30)"))
+            try:
+                failures = await conn.run_sync(create_tables_individually)
+            finally:
+                await conn.execute(text("SELECT RELEASE_LOCK('ai_talent_platform:create_all')"))
 
     total = len(Base.metadata.tables)
     if failures:

@@ -421,16 +421,23 @@ async def read_all_notifications(
     talent_id: int | None = Query(None, gt=0, description="管理者可指定收件人"),
     service: TrainingNotificationService = Depends(get_notification_service),
 ) -> Any:
-    """把某人的培训站内信全部标记已读。"""
+    """把培训站内信全部标记已读。
+
+    非管理者只能操作本人（未绑定人才档案时无可更新项）；
+    管理者不传 talent_id 时作用于其可见的全部站内信 —— 与
+    GET /notifications 不传 talent_id 的「管理者看全部」口径一致，
+    否则前端「全部已读」按钮对管理员永远报错。
+    """
     if not _is_manager(user):
         own = getattr(user, "talent_id", None)
         if own is None:
             return success(data={"updated": 0}, message="当前账号未绑定人才档案，无可更新通知")
         talent_id = int(own)
-    if talent_id is None:
-        raise ParamError("请指定 talent_id（管理者批量标记时需要）")
-    updated = await service.mark_all_read(talent_id=int(talent_id))
-    return success(data={"updated": updated, "talent_id": int(talent_id)}, message="已全部标记已读")
+    updated = await service.mark_all_read(talent_id=talent_id)
+    return success(
+        data={"updated": updated, **({"talent_id": int(talent_id)} if talent_id else {})},
+        message="已全部标记已读",
+    )
 
 
 @router.post(

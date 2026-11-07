@@ -88,8 +88,16 @@ class FileService:
             raise
 
     async def read(self, file_id):
-        """gxd-读取已由调用Service鉴权的简历文件，存储路径不返回前端。"""
-        file = await self.repo.get_file(self.db, file_id)
+        """gxd-读取已由调用Service鉴权的简历文件，存储路径不返回前端。
+
+        兼容两种入参：文件 ID（int）或已查出的 File 对象——
+        assessment_service 等调用方此前直接把 File ORM 对象传进来，
+        `File.id == <File对象>` 会抛 ArgumentError（建测评必现 500）。
+        """
+        if hasattr(file_id, "id") and hasattr(file_id, "file_path"):
+            file = file_id
+        else:
+            file = await self.repo.get_file(self.db, file_id)
         if file is None:
             raise NotFoundError("原始文件不存在")
         return file, await self.read_original(file)

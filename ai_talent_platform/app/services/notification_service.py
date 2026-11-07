@@ -167,15 +167,22 @@ class TrainingNotificationService:
             await self.db.flush()
         return row
 
-    async def mark_all_read(self, *, talent_id: int) -> int:
-        """把某人的未读全部标记已读，返回影响条数。"""
+    async def mark_all_read(self, *, talent_id: int | None = None) -> int:
+        """把未读全部标记已读，返回影响条数。
+
+        talent_id 为 None 时作用于全部站内信（仅管理者可达，见 Router 的
+        _is_manager 校验）；语义与 GET /notifications 不传 talent_id 时
+        「管理者看全部」保持一致，否则前端「全部已读」按钮对管理员必然报错。
+        """
+        conditions = [
+            TrainingNotification.is_read.is_(False),
+            TrainingNotification.is_deleted.is_(False),
+        ]
+        if talent_id is not None:
+            conditions.append(TrainingNotification.talent_id == talent_id)
         stmt = (
             update(TrainingNotification)
-            .where(
-                TrainingNotification.talent_id == talent_id,
-                TrainingNotification.is_read.is_(False),
-                TrainingNotification.is_deleted.is_(False),
-            )
+            .where(*conditions)
             .values(is_read=True, read_at=datetime.now())
         )
         result = await self.db.execute(stmt)

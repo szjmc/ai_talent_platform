@@ -41,7 +41,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.models.base import Base, BaseModel, TimestampMixin
+from app.models.base import Base, BaseModel, BigIntPrimaryKey, TimestampMixin
 
 # ------------------------------------------------------------------ 状态常量
 REVIEW_PENDING = "pending"
@@ -167,7 +167,7 @@ class MatchingReviewEvent(Base, TimestampMixin):
     )
 
     id: Mapped[int] = mapped_column(
-        BigInteger, primary_key=True, autoincrement=True, comment="主键 ID"
+        BigIntPrimaryKey, primary_key=True, autoincrement=True, comment="主键 ID"
     )
     review_id: Mapped[int] = mapped_column(
         BigInteger, nullable=False, comment="所属复核记录 ID（matching_reviews.id）"
