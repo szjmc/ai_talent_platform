@@ -234,18 +234,24 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 | 认证 | `/auth` | ✅ | 6 | `[架构组]` |
 | 用户 | `/users` | ✅ | 8 | `[架构组]` |
 | 组织 | `/organizations` | ✅ | 7 | `[架构组]` |
-| 岗位 | `/positions` | 🚧 | 7 | `[Agent组]` |
-| 人才 | `/talents` | 🚧 | 9 | `[RAG组]` |
-| 简历 | `/resumes` | 🚧 | 6 | `[RAG组]` |
-| 测评 | `/assessments` | 🚧 | 6 | `[Vanna组]` |
-| 培训 | `/trainings` | 🚧 | 9 | `[Dify组]` |
-| 匹配 | `/matchings` | 🚧 | 5 | `[Agent组]` |
-| 知识库 | `/knowledge` | 🚧 | 7 | `[RAG组]` |
-| 分析 | `/analytics` | ✅ | 6 | `[Vanna组]` |
-| 智能体 | `/agents` | ✅ | 7 | `[Agent组]`（含 `[Dify组]` 双模分支） |
-| 文件 | `/files` | 🚧 | 5 | `[架构组]` |
-| 审计 | `/audit` | 🚧 | 3 | `[架构组]` |
+| 岗位 | `/positions` | ✅ | 9 | `[Agent组]` |
+| 人才 | `/talents` | ✅ | 12 | `[RAG组]` |
+| 简历 | `/resumes` | ✅ | 6 | `[RAG组]` |
+| 测评 | `/assessments` | ✅ | 9 | `[Vanna组]` |
+| 培训 | `/trainings` | ✅ | 16 | `[Dify组]` |
+| 匹配 | `/matchings` | ✅ | 15 | `[Agent组]` |
+| 知识库 | `/knowledge` | ✅ | 15 | `[RAG组]` |
+| 知识入库 | `/ingestion` | ✅ | 4 | `[RAG组]` |
+| 人才邀约 | `/invites` | ✅ | 8 | `[Agent组]` |
+| 分析 | `/analytics` | ✅ | 8 | `[Vanna组]` |
+| 智能体 | `/agents` | ✅ | 9 | `[Agent组]`（含 `[Dify组]` 双模分支） |
+| Dify 中台 | `/dify` | ✅ | 10 | `[Dify组]` |
+| 文件 | `/files` | ✅ | 7 | `[架构组]` |
+| 审计 | `/audit` | ✅ | 3 | `[架构组]` |
 | 系统 | `/system` + 探针 | ✅ | 4 | `[架构组]` |
+
+> 上表接口数由 `create_application().openapi()` 实际导出（`tests/test_api_grouping.py` 守门），
+> 不再手写维护。`/api/v1` 下当前共 **162** 个端点，**已无任何 501 占位分组**。
 
 ---
 
@@ -636,10 +642,10 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 <a id="api-positions"></a>
 
-## 九、岗位模块 Positions — 🚧 待实现
+## 九、岗位模块 Positions — ✅ 已实现
 
 > 主责组：`[Agent组]`（岗位管理垂直归口） ｜ 代码位置：`routers/position_router.py`、`services/position_service.py`、`models/position.py`
-> 当前访问返回 `501`，契约如下（前端可按此先联调 mock）。
+> CRUD 与上下架已实现（原先只有 501 占位），`headcount_filled` 由服务端统计后下发。
 
 ### 数据对象 `PositionResponse`
 
@@ -678,13 +684,15 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
-| POST | `/positions` | `position:manage` | 创建岗位 |
-| GET | `/positions` | `position:read` | 分页列表（`keyword` / `organization_id` / `level` / `status` / 排序） |
-| GET | `/positions/{id}` | `position:read` | 详情（含 `requirements`、`headcount_filled`） |
-| PUT | `/positions/{id}` | `position:manage` | 更新（`code` 不可改） |
-| PATCH | `/positions/{id}/status` | `position:manage` | 上架 / 暂停 / 关闭 |
-| DELETE | `/positions/{id}` | `position:manage` | 逻辑删除（有进行中的匹配任务时禁止） |
-| POST | `/positions/{id}/parse` | `position:manage` | 上传岗位说明书（JD）→ AI 解析出 `requirements`，异步返回任务号 |
+| POST | `/positions` | `position:manage` | 创建岗位；不传 `code` 时自动生成 `POS-{id}` |
+| GET | `/positions` | `position:read` | 分页列表（`keyword` 匹配名称/编码、`organization_id`、`level`、`status`）；部门名称与最新画像版本批量补齐，无 N+1 |
+| GET | `/positions/{id}` | `position:read` | 详情（含 `requirements`、`snapshot_version`） |
+| PUT | `/positions/{id}` | `position:manage` | 更新（只更新传入字段；状态变更走状态机校验） |
+| PATCH | `/positions/{id}/status` | `position:manage` | 上架 / 暂停 / 关闭（前端一键切换） |
+| DELETE | `/positions/{id}` | `position:manage` | 逻辑删除（历史匹配记录保留，可追溯） |
+| POST | `/positions/{id}/jd/parse` | `position:manage` | 粘贴 JD 文本 → AI 解析出 `requirements` 草稿 |
+| POST | `/positions/{id}/profile/confirm` | `position:manage` | 确认画像草稿，生成新版本（生效后可用于匹配） |
+| GET | `/positions/{id}/profile` | `position:read` | 查询当前画像与版本/确认状态 |
 
 **创建请求示例**
 
@@ -709,15 +717,15 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 }
 ```
 
-**错误约定**：`409/3002` 岗位编码重复；`404/3001` 部门不存在；`400/1002` `closed` 岗位不可直接改回 `open`（需重新发布）。
+**错误约定**：`409/3002` 岗位编码重复；`400/1000` 参数不合法（如 `salary_min > salary_max`、部门不存在）；`400/1002` 状态流转非法（如 `closed → paused`）。
 
-**状态机**：`open → paused ⇄ open`，`open/paused → closed`（单向）。关闭后不再参与匹配，历史匹配记录保留。
+**状态机**：`open ⇄ paused`，`open/paused → closed`，`closed → open`（重新发布需显式传 `status`）。关闭后不再参与匹配，历史匹配记录保留。
 
 ---
 
 <a id="api-talents"></a>
 
-## 十、人才模块 Talents — 🚧 待实现
+## 十、人才模块 Talents — ✅ 已实现
 
 > 主责组：`[RAG组]`（人才档案垂直归口） ｜ 代码位置：`routers/talent_router.py`、`models/talent.py`
 
@@ -819,7 +827,7 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 <a id="api-resumes"></a>
 
-## 十一、简历模块 Resumes — 🚧 待实现
+## 十一、简历模块 Resumes — ✅ 已实现
 
 ### 数据对象 `ResumeResponse`
 
@@ -887,7 +895,7 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 <a id="api-assessments"></a>
 
-## 十二、测评模块 Assessments — 🚧 待实现
+## 十二、测评模块 Assessments — ✅ 已实现
 
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
@@ -943,7 +951,7 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 <a id="api-trainings"></a>
 
-## 十三、培训模块 Trainings — 🚧 待实现
+## 十三、培训模块 Trainings — ✅ 已实现
 
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
@@ -988,7 +996,7 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 <a id="api-matchings"></a>
 
-## 十四、匹配模块 Matchings — 🚧 待实现
+## 十四、匹配模块 Matchings — ✅ 已实现
 
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
@@ -1045,7 +1053,7 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 <a id="api-knowledge"></a>
 
-## 十五、知识库模块 Knowledge — 🚧 待实现
+## 十五、知识库模块 Knowledge — ✅ 已实现
 
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
@@ -1214,15 +1222,21 @@ event: error   data: {"code":5002,"message":"模型调用失败"}
 
 <a id="api-files"></a>
 
-## 十八、文件模块 Files — 🚧 待实现
+## 十八、文件模块 Files — ✅ 已实现
 
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
-| POST | `/files/upload` | 登录即可 | `multipart/form-data`，字段 `file` + `biz_type`（`resume`/`knowledge`/`avatar`/`export`）；返回文件元数据 |
-| GET | `/files/{id}` | 登录即可 | 文件元数据（含下载地址） |
-| GET | `/files/{id}/download` | 登录即可 | 下载（`FileResponse`，校验 `biz_type` 与归属人） |
-| DELETE | `/files/{id}` | 登录即可 | 删除（软删元数据 + 延迟清理磁盘） |
-| POST | `/files/batch-upload` | 登录即可 | 批量上传，返回成功/失败明细 |
+| POST | `/files/upload` | `file:upload` | `multipart/form-data`，字段 `file` + `biz_type`（`resume`/`knowledge`/`avatar`/`export`/`interview`/`other`）+ 可选 `biz_id`/`is_public`；返回文件元数据 |
+| POST | `/files/batch-upload` | `file:upload` | 批量上传（字段 `files`），逐份返回成功/失败明细，单份失败不影响其余 |
+| GET | `/files` | 登录即可 | 分页列表（`keyword`/`biz_type`/`biz_id`/`uploader_id`/`content_type`）；非管理员仅见本人上传 |
+| GET | `/files/{id}` | 登录即可 | 文件元数据（含 `download_url` / `preview_url` / `uploader_name`） |
+| GET | `/files/{id}/download` | 登录即可 | 下载（`FileResponse` + RFC5987 `Content-Disposition`，响应头带 `X-Content-SHA256`，`download_count` 原子自增） |
+| GET | `/files/stats` | 登录即可 | 文件中心概览：总数 / 总占用 / 按业务类型分组 |
+| DELETE | `/files/{id}` | `file:delete` | 删除（默认软删元数据，物理对象由巡检任务清理） |
+
+> **路径说明**：`/files/upload` 只属于文件中心，入参是 `biz_type`。
+> 知识文档上传请用 `/knowledge/docs/upload`（入参 `category`，返回 `doc_id`/`revision_id`）。
+> 两者契约不同，历史上曾把知识上传隐藏映射到 `/files/upload`，导致按文件文档传 `biz_type` 时 422，已下线该别名。
 
 **上传响应**
 
@@ -1230,25 +1244,33 @@ event: error   data: {"code":5002,"message":"模型调用失败"}
 {
   "id": 21,
   "file_name": "张三-简历.pdf",
-  "stored_name": "9f2c1a7b8d3e4f50a1b2c3d4e5f60718.pdf",
   "file_size": 348212,
   "content_type": "application/pdf",
   "extension": ".pdf",
   "file_hash": "b1946ac92492d2347c6235b4d2611184…",
   "storage_type": "local",
   "biz_type": "resume",
+  "biz_id": 1301,
+  "uploader_id": 7,
+  "uploader_name": "李HR",
+  "is_public": false,
+  "download_count": 3,
   "download_url": "/api/v1/files/21/download",
-  "duplicated": false
+  "preview_url": "/api/v1/files/21/download",
+  "duplicated": false,
+  "created_at": "2026-11-07T10:12:31"
 }
 ```
 
-**错误约定**：`5003` 类型不支持 / 超过 `MAX_UPLOAD_SIZE_MB`；`403/2004` 无权限下载他人文件；`404/3001`。
+**秒传**：同一 `file_hash` + 同一 `biz_type` 已存在时不再落盘，直接返回已有记录并置 `duplicated=true`。
+
+**错误约定**：`5003` 类型不支持 / 空文件 / 超过 `MAX_UPLOAD_SIZE_MB`；`403/2004` 无权限下载他人私有文件；`404/3001` 文件不存在或对象已清理。
 
 ---
 
 <a id="api-audit"></a>
 
-## 十九、审计模块 Audit — 🚧 待实现
+## 十九、审计模块 Audit — ✅ 已实现
 
 > 审计日志**只增不改**，不提供写接口。仅管理员可查询。
 

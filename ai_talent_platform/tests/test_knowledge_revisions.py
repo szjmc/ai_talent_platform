@@ -17,7 +17,10 @@ def test_version_routes_registered_with_chinese_descriptions():
     paths = create_application().openapi()['paths']
     assert len(router.routes) == 15
     assert '/api/v1/knowledge/drafts/upload' not in paths
-    assert '/api/v1/files/upload' not in paths
+    # [接口分组治理] /api/v1/files/upload 已归位到「文件管理」分组（file_router），
+    # 不再是知识库上传的隐藏别名；此处改为校验它确实归属文件管理。
+    assert '/api/v1/files/upload' in paths
+    assert paths['/api/v1/files/upload']['post']['tags'] == ['文件管理']
     assert sum(route.path == '/knowledge/docs/upload' for route in router.routes) == 1
     for route in router.routes:
         for method in route.methods:
@@ -28,15 +31,13 @@ def test_version_routes_registered_with_chinese_descriptions():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize('path', ['/api/v1/knowledge/docs/upload', '/api/v1/files/upload'])
+@pytest.mark.parametrize('path', ['/api/v1/knowledge/docs/upload'])
 async def test_original_upload_urls_use_draft_service(path):
     from fastapi import FastAPI
     from httpx import AsyncClient, ASGITransport
     from app.routers.knowledge_router import router, get_revision_service
-    from app.routers.a_rag_router import router as files_router
     app = FastAPI()
     app.include_router(router, prefix='/api/v1')
-    app.include_router(files_router, prefix='/api/v1')
     service = NS(upload=AsyncMock(return_value={'doc_id': 1, 'revision_id': 2, 'status': 'draft'}))
     user = NS(id=3)
     async def context():

@@ -24,11 +24,12 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from app.schemas.common import BaseSchema
+from app.schemas.common import BaseSchema, ORMModel
 
 # TODO(负责人)：按上述设计实现本文件的 Pydantic 模型。
 
@@ -181,3 +182,124 @@ class JdParseResponse(BaseSchema):
     channel: Literal["dify", "rule_fallback"] = Field(..., description="实际解析通道")
     profile: JobProfileParsed = Field(..., description="结构化画像草稿（需 HR 确认后生效）")
     message: str = Field("解析完成", max_length=200, description="提示语（含缺失字段说明）")
+
+
+# ============================================================================
+# [本轮接口对齐] 岗位 CRUD 契约（前端 PositionsPage 依赖）
+# 背景：/api/v1/positions 长期只有 501 占位，岗位列表/新建/编辑/上下架全部不可用，
+#      前端只能提示「后端岗位 CRUD 接口尚未实现」。本段补齐最小可用契约。
+# 约定：
+#   - 与前端 types/index.ts 的 Position 字段一一对应（含 headcount_filled 派生字段）；
+#   - 金额单位为「元/月」，允许为 None（面议）；
+#   - requirements / skill_tags 为结构化 JSON，前端只读展示 + 编辑技能标签。
+# ============================================================================
+
+
+PositionLevel = Literal["junior", "middle", "senior", "expert"]
+PositionStatus = Literal["open", "paused", "closed"]
+
+
+class PositionCreate(BaseSchema):
+    """新建岗位。"""
+
+    title: str = Field(..., min_length=1, max_length=128, description="岗位名称")
+    code: str | None = Field(
+        None, max_length=64, pattern=r"^[A-Za-z0-9_\-]+$",
+        description="岗位编码（不传自动生成 POS-{id} 风格编码；同租户唯一）",
+    )
+    organization_id: int = Field(..., gt=0, description="所属部门 ID")
+    level: PositionLevel = Field("middle", description="岗位层级")
+    headcount: int = Field(1, ge=0, le=9999, description="编制人数")
+    status: PositionStatus = Field("open", description="状态：open/paused/closed")
+    description: str | None = Field(None, max_length=20000, description="岗位说明书全文（JD）")
+    requirements: dict | None = Field(None, description="结构化要求：education/experience_years/skills/...")
+    skill_tags: list[str] = Field(default_factory=list, max_length=50, description="技能标签")
+    salary_min: float | None = Field(None, ge=0, description="薪资下限（元/月）")
+    salary_max: float | None = Field(None, ge=0, description="薪资上限（元/月）")
+
+    @field_validator("skill_tags")
+    @classmethod
+    def _clean_skill_tags(cls, value: list[str]) -> list[str]:
+        """去空白、去重（忽略大小写），保持输入顺序。"""
+        seen: set[str] = set()
+        cleaned: list[str] = []
+        for item in value:
+            text = str(item).strip()
+            key = text.lower()
+            if text and key not in seen:
+                seen.add(key)
+                cleaned.append(text[:64])
+        return cleaned
+
+    @model_validator(mode="after")
+    def _check_salary_range(self) -> "PositionCreate":
+        if (
+            self.salary_min is not None
+            and self.salary_max is not None
+            and self.salary_min > self.salary_max
+        ):
+            raise ValueError("薪资下限不能大于上限")
+        return self
+
+
+class PositionUpdate(BaseSchema):
+    """更新岗位（全部可选；只更新传入的字段）。"""
+
+    title: str | None = Field(None, min_length=1, max_length=128)
+    code: str | None = Field(None, max_length=64, pattern=r"^[A-Za-z0-9_\-]+$")
+    organization_id: int | None = Field(None, gt=0)
+    level: PositionLevel | None = None
+    headcount: int | None = Field(None, ge=0, le=9999)
+    status: PositionStatus | None = None
+    description: str | None = Field(None, max_length=20000)
+    requirements: dict | None = None
+    skill_tags: list[str] | None = Field(None, max_length=50)
+    salary_min: float | None = Field(None, ge=0)
+    salary_max: float | None = Field(None, ge=0)
+
+    @field_validator("skill_tags")
+    @classmethod
+    def _clean_skill_tags(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        seen: set[str] = set()
+        cleaned: list[str] = []
+        for item in value:
+            text = str(item).strip()
+            key = text.lower()
+            if text and key not in seen:
+                seen.add(key)
+                cleaned.append(text[:64])
+        return cleaned
+
+
+class PositionStatusUpdate(BaseSchema):
+    """岗位上下架（只改状态，独立于整体更新，便于前端一键切换）。"""
+
+    status: PositionStatus = Field(..., description="目标状态：open（在招）/ paused（暂停）/ closed（关闭）")
+    reason: str | None = Field(None, max_length=200, description="变更原因（写入审计）")
+
+
+class PositionResponse(ORMModel):
+    """岗位视图（列表 / 详情共用）。"""
+
+    id: int
+    title: str
+    code: str
+    organization_id: int
+    organization_name: str | None = Field(None, description="所属部门名称（列表批量补齐，无 N+1）")
+    level: str
+    headcount: int = 1
+    headcount_filled: int = Field(0, description="已到岗人数（由在岗人才数派生）")
+    status: str
+    description: str | None = None
+    requirements: dict | None = None
+    skill_tags: list[str] = Field(default_factory=list)
+    salary_min: float | None = None
+    salary_max: float | None = None
+    publish_at: datetime | None = None
+    close_at: datetime | None = None
+    requirement_version: int | None = Field(None, description="最近一次已确认画像版本")
+    version: int = 0
+    created_at: datetime | None = None
+    updated_at: datetime | None = None

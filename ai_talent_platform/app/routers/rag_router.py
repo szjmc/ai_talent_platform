@@ -17,7 +17,11 @@ from fastapi import Query
 from pydantic import BaseModel,Field
 from app.core.rag_constants import CategoryLiteral
 # 最终路径为/api/v1/ingestion/...；tags用于Swagger中的接口分组。
-router=APIRouter(prefix='/ingestion',tags=['知识库'])
+# [接口分组治理] /ingestion/* 是「文件解析 -> 切片 -> 向量入库」的管线运维接口，
+# 不是知识文档管理接口。此前挂在「知识库」分组下，和 /knowledge/docs/* 混在一起，
+# 联调方在知识库分组里看到 4 个与文档 CRUD 无关的运维口，无法判断归属。
+# 现独立为「知识入库」分组（tag 变更不影响路径与权限，前端未直接调用这些接口）。
+router=APIRouter(prefix='/ingestion',tags=['知识入库'])
 
 # require_permission返回已认证用户；Service还会检查文件是否属于该用户。
 # scope='function'使提交/回滚在响应发送前完成，避免前端先收到成功再发生提交失败。

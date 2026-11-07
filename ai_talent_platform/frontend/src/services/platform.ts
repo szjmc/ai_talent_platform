@@ -1,9 +1,9 @@
 import { request } from './api';
 import type {
-  Assessment, AssessmentReport, AssessmentSummary, AgentConversation, Course, DistributionResult,
-  KnowledgeDoc, MatchingRunResult, NL2SQLResult, OrgNode, PageResult, ReportItem, Resume,
-  ResumeParseResult, Talent, TalentPortrait, TrainingNotification, TrainingPlan,
-  TrainingRecommendation, TrendResult, User,
+  Assessment, AssessmentReport, AssessmentSummary, AgentConversation, AuditEntry, Course,
+  DistributionResult, FileItem, KnowledgeDoc, MatchingRunResult, NL2SQLResult, OrgNode, PageResult,
+  Position, ReportItem, Resume, ResumeParseResult, Talent, TalentPortrait, TrainingNotification,
+  TrainingPlan, TrainingRecommendation, TrendResult, User,
 } from '../types';
 
 /** 与后端 OpenAPI 对齐的业务接口封装；不在前端构造任何模拟业务数据。 */
@@ -67,9 +67,22 @@ export const matchingsApi = {
   explain: (data: { position_id: number; talent_id: number; requirement_version?: number }) => request<Record<string, unknown>>({ url: '/matchings/explain', method: 'POST', data }),
 };
 
+export interface PositionListParams { page?: number; page_size?: number; keyword?: string; organization_id?: number; level?: string; status?: string }
+export interface PositionPayload {
+  title: string; code?: string; organization_id: number; level?: string; headcount?: number; status?: string;
+  description?: string | null; skill_tags?: string[]; salary_min?: number | null; salary_max?: number | null;
+  requirements?: Record<string, unknown> | null;
+}
 export const positionsApi = {
-  /** 后端当前仅提供岗位画像接口；岗位 CRUD 占位接口返回 501 时由页面如实提示。 */
-  listPlaceholder: () => request<PageResult<unknown>>({ url: '/positions' }),
+  /** 岗位 CRUD（后端 /positions 已由 501 占位切换为真实实现）。 */
+  list: (params?: PositionListParams) => request<PageResult<Position>>({ url: '/positions', params }),
+  detail: (id: number) => request<Position>({ url: `/positions/${id}` }),
+  create: (data: PositionPayload) => request<Position>({ url: '/positions', method: 'POST', data }),
+  update: (id: number, data: Partial<PositionPayload>) => request<Position>({ url: `/positions/${id}`, method: 'PUT', data }),
+  setStatus: (id: number, status: string, reason?: string) =>
+    request<Position>({ url: `/positions/${id}/status`, method: 'PATCH', data: { status, reason } }),
+  remove: (id: number) => request<unknown>({ url: `/positions/${id}`, method: 'DELETE' }),
+  /** 岗位画像（JD 解析 -> HR 确认 -> 生成版本）。 */
   profile: (id: number) => request<{ position_id: number; position_title: string; version: number; confirmed: boolean; profile: Record<string, unknown> }>({ url: `/positions/${id}/profile` }),
   parseJd: (id: number, data: { jd_text: string; job_title?: string }) => request<Record<string, unknown>>({ url: `/positions/${id}/jd/parse`, method: 'POST', data }),
   confirmProfile: (id: number, data: Record<string, unknown>) => request<unknown>({ url: `/positions/${id}/profile/confirm`, method: 'POST', data }),
@@ -121,9 +134,60 @@ export const agentsApi = {
   messages: (conversationId: string | number) => request<unknown[]>({ url: `/agents/conversations/${conversationId}/messages` }),
 };
 
-export const stubModulesApi = {
-  files: () => request<unknown>({ url: '/files' }),
-  audit: () => request<unknown>({ url: '/audit' }),
+/* ======================= 文件中心 [架构组] ======================= */
+export interface FileListParams { page?: number; page_size?: number; keyword?: string; biz_type?: string; biz_id?: number; uploader_id?: number; content_type?: string }
+export interface FileUploadOptions { biz_type?: string; biz_id?: number; is_public?: boolean }
+export interface FileStats { total_files: number; total_size: number; by_biz_type: Record<string, number> }
+
+export const filesApi = {
+  list: (params?: FileListParams) => request<PageResult<FileItem>>({ url: '/files', params }),
+  detail: (id: number) => request<FileItem>({ url: `/files/${id}` }),
+  stats: () => request<FileStats>({ url: '/files/stats' }),
+  upload: (file: File, options: FileUploadOptions = {}) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('biz_type', options.biz_type || 'other');
+    if (options.biz_id) form.append('biz_id', String(options.biz_id));
+    form.append('is_public', String(Boolean(options.is_public)));
+    return request<FileItem>({ url: '/files/upload', method: 'POST', data: form, headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+  batchUpload: (files: File[], options: FileUploadOptions = {}) => {
+    const form = new FormData();
+    files.forEach((file) => form.append('files', file));
+    form.append('biz_type', options.biz_type || 'other');
+    if (options.biz_id) form.append('biz_id', String(options.biz_id));
+    form.append('is_public', String(Boolean(options.is_public)));
+    return request<{ total: number; success_count: number; failed_count: number; items: { file_name: string; ok: boolean; file?: FileItem; error?: string }[] }>(
+      { url: '/files/batch-upload', method: 'POST', data: form, headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+  },
+  remove: (id: number) => request<{ id: number; deleted: boolean }>({ url: `/files/${id}`, method: 'DELETE' }),
+  /** 下载走浏览器直连（带 Authorization 头用 blob，避免 token 出现在 URL）。 */
+  download: async (id: number, fileName?: string) => {
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || '/api/v1'}/files/${id}/download`, {
+      headers: (() => {
+        const token = localStorage.getItem('talentos_access_token');
+        return token ? { Authorization: `Bearer ${token}` } : ({} as Record<string, string>);
+      })(),
+    });
+    if (!response.ok) throw new Error('下载失败：无权限或文件不存在');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = fileName || `file-${id}`;
+    document.body.appendChild(link); link.click(); link.remove();
+    URL.revokeObjectURL(url);
+  },
+};
+
+/* ======================= 审计日志 [架构组] ======================= */
+export interface AuditListParams { page?: number; page_size?: number; keyword?: string; user_id?: number; module?: string; action?: string; status?: string; trace_id?: string; start_at?: string; end_at?: string }
+export interface AuditStats { total: number; by_action: Record<string, number>; by_module: Record<string, number>; success: number; failed: number; fail_rate: number }
+
+export const auditApi = {
+  logs: (params?: AuditListParams) => request<PageResult<AuditEntry>>({ url: '/audit/logs', params }),
+  detail: (id: number) => request<AuditEntry>({ url: `/audit/logs/${id}` }),
+  stats: (params?: { start_at?: string; end_at?: string }) => request<AuditStats>({ url: '/audit/stats', params }),
 };
 
 export function flattenOrgs(items: OrgNode[]): OrgNode[] {

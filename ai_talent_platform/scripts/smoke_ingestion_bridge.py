@@ -27,8 +27,8 @@ async def main():
   async with AsyncClient(transport=ASGITransport(app=create_application()),base_url='http://test') as c:
    r=await c.post('/api/v1/auth/login',json={'username':'bridge_'+run[:12],'password':run});assert r.status_code==200
    headers={'Authorization':'Bearer '+r.json()['data']['access_token']}
-   assert (await c.post('/api/v1/files/upload',data={'category':'policy'},files={'file':('test.txt',b'test','text/plain')})).status_code==401
-   r=await c.post('/api/v1/files/upload',headers=headers,data={'category':'policy'},files={'file':('bridge.txt',('制度联调'+run).encode(),'text/plain')})
+   assert (await c.post('/api/v1/knowledge/docs/upload',data={'category':'policy'},files={'file':('test.txt',b'test','text/plain')})).status_code==401
+   r=await c.post('/api/v1/knowledge/docs/upload',headers=headers,data={'category':'policy'},files={'file':('bridge.txt',('制度联调'+run).encode(),'text/plain')})
    assert r.status_code==200,r.text
    did=r.json()['data']['id'];fid=r.json()['data']['file_id'];assert r.json()['data']['status']=='indexed',r.text
    async with get_session_factory()() as db:

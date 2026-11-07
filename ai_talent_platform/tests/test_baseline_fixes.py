@@ -48,6 +48,7 @@ from app.ai.agents.base_agent import BaseAgent
 from app.ai.context import clear_context, get_context, set_context
 from app.config.logging_config import redact_sensitive, trace_id_ctx
 from app.config.settings import Settings, settings
+from app.core.application import create_application
 from app.core.exceptions import AuthError, DuplicateError
 from app.core.permissions import visible_organization_ids
 from app.core.security import (
@@ -518,9 +519,22 @@ def test_get_db_delegates_to_session_scope():
 # ==================================================================== 15 501 占位统一
 # 说明：resumes / knowledge 已由真实 router 挂载（不再返回 501），
 # 因此骨架一致性只覆盖仍处于占位状态的四个模块。
-async def test_mounted_stub_returns_501_contract(client):
-    """仍为占位的 files 模块返回统一 501；已实现模块不再期待占位响应。"""
-    resp = await client.get("/api/v1/files")
+async def test_placeholder_returns_501_contract():
+    """占位工厂仍返回统一 501 契约（用合成前缀验证，不依赖清单里真有未实现模块）。
+
+    [接口分组治理] 原先断言 `GET /api/v1/files` 返回 501，那正是「文件管理只有占位接口」
+    的写照；本轮 files 已切换为真实实现，因此把契约验证移到占位工厂本身 ——
+    以后每实现一个模块就不必再改这条用例。
+    """
+    from app.routers._stub import placeholder_router
+
+    app = FastAPI()
+    app.include_router(
+        placeholder_router(prefix="files", tag="文件管理", description="[架构组] 文件上传、下载、预览")
+    )
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
+                                 base_url="http://stub.test") as stub_client:
+        resp = await stub_client.get("/files")
     assert resp.status_code == 501
     body = resp.json()
     assert body["code"] == 501
@@ -530,26 +544,49 @@ async def test_mounted_stub_returns_501_contract(client):
 
 
 @pytest.mark.asyncio
-async def test_skeleton_routers_share_stub_contract(client):
-    """占位工厂与挂载占位同契约；真实业务路由不得被本用例误判为 501。"""
+async def test_implemented_files_module_no_longer_returns_501():
+    """文件管理已由真实路由接管：同路径不再返回 501，且归属「文件管理」分组。
+
+    不依赖 DB 版 `client` fixture：未带 Token 访问真实路由会先被鉴权拦下（401），
+    而占位路由是公开的、直接返回 501 —— 两者可区分，却能离线运行。
+    """
+    paths = create_application().openapi()["paths"]
+    assert paths["/api/v1/files/upload"]["post"]["tags"] == ["文件管理"]
+    assert paths["/api/v1/files"]["get"]["tags"] == ["文件管理"]
+
+    app = create_application()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
+                                 base_url="http://test") as anon:
+        resp = await anon.get("/api/v1/files")
+    assert resp.status_code == 401
+    assert resp.status_code != 501
+
+
+@pytest.mark.asyncio
+async def test_stub_registry_does_not_shadow_implemented_modules():
+    """占位清单与已实现清单不得重叠；清单清空后也不能有前缀被 501 抢占。
+
+    [接口分组治理] 曾出现「positions 既在 IMPLEMENTED_MODULES 又在 _STUB_MODULES」，
+    以及「files/audit 真实路由已 include，但 501 占位仍注册」——真实路由先注册所以占位
+    不可达，但 Swagger 同一分组里出现「（待实现）接口占位」，联调方无法判断哪个可用。
+    """
     from app.routers._stub import placeholder_router
     from app.routers.router import IMPLEMENTED_MODULES, _STUB_MODULES
 
+    overlap = {prefix for prefix, _, _ in _STUB_MODULES} & set(IMPLEMENTED_MODULES)
+    assert not overlap, f"以下模块既已实现又登记为占位：{sorted(overlap)}"
+
+    paths = create_application().openapi()["paths"]
+    for prefix, _tag, _desc in _STUB_MODULES:
+        assert f"/api/v1/{prefix}" not in paths, f"{prefix} 已实现，不应再挂 501 占位"
+
+    # 占位工厂本身仍可用：合成前缀确认 501 契约没有随清单清空而失效。
     skeleton_app = FastAPI()
-    stubs = [(prefix, tag, desc) for prefix, tag, desc in _STUB_MODULES
-             if prefix not in IMPLEMENTED_MODULES]
-    assert stubs, "应至少保留一个真实占位模块用于契约回归"
-    for prefix, tag, desc in stubs:
-        skeleton_app.include_router(placeholder_router(prefix=prefix, tag=tag, description=desc))
+    skeleton_app.include_router(placeholder_router(prefix="demo", tag="演示", description="[架构组] 演示模块"))
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=skeleton_app),
                                  base_url="http://skeleton.test") as skel_client:
-        for prefix, _tag, _desc in stubs:
-            skel_resp = await skel_client.get(f"/{prefix}")
-            mount_resp = await client.get(f"/api/v1/{prefix}")
-            assert skel_resp.status_code == mount_resp.status_code == 501
-            assert skel_resp.json()["code"] == mount_resp.json()["code"] == 501
-            assert skel_resp.json()["message"] == mount_resp.json()["message"]
-            assert skel_resp.json()["data"] == mount_resp.json()["data"]
+        resp = await skel_client.get("/demo")
+    assert resp.status_code == 501 and resp.json()["data"]["module"] == "演示"
 
 
 # ==================================================================== 16/17/18 死配置与删除
