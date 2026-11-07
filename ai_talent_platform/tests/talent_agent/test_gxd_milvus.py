@@ -51,9 +51,33 @@ class _FakeMilvus:
         self.collections[collection_name] = kwargs
         self.rows[collection_name] = {}
 
+    def describe_collection(self, collection_name):
+        options = self.collections[collection_name]
+        primary = options.get("primary_field_name") or "id"
+        return {"fields": [{"name": primary, "is_primary": True},
+                           {"name": "vector", "params": {"dim": options.get("dimension")}}],
+                "enable_dynamic_field": True}
+
+    def _primary(self, collection_name):
+        return self.collections[collection_name].get("primary_field_name") or "id"
+
     def upsert(self, collection_name, data):
+        primary = self._primary(collection_name)
         for row in data:
-            self.rows[collection_name][row["id"]] = row
+            self.rows[collection_name][row[primary]] = row
+
+    def query(self, collection_name, filter, output_fields, limit):
+        import re
+        primary = self._primary(collection_name)
+        rows = list(self.rows[collection_name].values())
+        equals = re.findall(r"(\w+)\s*==\s*([\w.-]+)", filter or "")
+        if " in [" in (filter or ""):
+            match = re.search(r"(\w+) in \[([^\]]*)\]", filter)
+            if match:
+                allowed = {int(x) for x in match.group(2).split(",") if x.strip()}
+                rows = [r for r in rows if r.get(match.group(1)) in allowed]
+        rows = [r for r in rows if all(str(r.get(k)) == v.strip("'\"") for k, v in equals)]
+        return [{k: r.get(k) for k in output_fields if k in r} for r in rows[:limit]]
 
     def search(self, collection_name, data, limit, filter, output_fields):
         import re
@@ -101,3 +125,28 @@ async def test_talent_vector_store_offline_contract(monkeypatch):
         await store.upsert("talent_vectors", [3], [[1.0, 0.0], [0.0, 1.0]])
     await store.drop("talent_vectors")
     assert "talent_vectors" not in client.collections
+
+
+async def test_talent_vectors_primary_field_talent_id(monkeypatch):
+    """gxd-一人一条向量：主键 talent_id，重复同步覆盖同一行，可按主键读回。"""
+    import app.adapters.vector_store.talent_vector_store as module
+
+    client = _FakeMilvus()
+    monkeypatch.setattr(module, "_get_client", lambda: client)
+    store = module.TalentVectorStore()
+    await store.create_collection("talent_vectors", 2, primary_field="talent_id")
+    assert await store.primary_key_of("talent_vectors") == "talent_id"
+
+    await store.upsert("talent_vectors", [7], [[1.0, 0.0]],
+                       [{"version": 3, "kind": "profile", "name": "甲"}], primary_field="talent_id")
+    await store.upsert("talent_vectors", [7], [[0.5, 0.5]],
+                       [{"version": 4, "kind": "profile", "name": "甲"}], primary_field="talent_id")
+    rows = await store.query("talent_vectors", "talent_id == 7",
+                             output_fields=["talent_id", "version"], limit=10)
+    assert len(rows) == 1 and rows[0]["version"] == 4 and rows[0]["talent_id"] == 7
+
+    # 主键名不一致的既有集合必须报错，不能静默写入错误的 Schema
+    client.collections["legacy_collection"] = {"primary_field_name": "id"}
+    client.rows["legacy_collection"] = {}
+    with pytest.raises(module.TalentVectorUnavailableError):
+        await store.create_collection("legacy_collection", 2, primary_field="talent_id")

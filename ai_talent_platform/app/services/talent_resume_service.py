@@ -39,6 +39,7 @@ Service 的定位：把「校验 + 仓库调用 + 外部能力 + 事务」组织
 """gxd-简历上传、请求内解析、结果查询与档案绑定业务。"""
 import asyncio
 import tempfile
+from datetime import datetime
 from pathlib import Path
 from hashlib import sha256
 from sqlalchemy.exc import IntegrityError
@@ -46,7 +47,7 @@ from app.services.talent_access import actor_context
 from app.core.exceptions import NotFoundError, DuplicateError, BusinessRuleError, BusinessException, FileError
 from app.models.resume import Resume
 from app.repositories.talent_resume_repository import ResumeRepository
-from app.schemas.talent_resume_schema import ResumeParsedData , ResumeResponse
+from app.schemas.resume import ResumeResponse
 from app.services.file_service import FileService
 from app.utils.resume_data import extract_parsed, extract_warnings
 
@@ -66,7 +67,7 @@ class ResumeService:
         return row
 
     async def process_uploaded_file(self, file_id: int):
-        """gxd-RAG对接点1：文件及元数据提交后，以可信上传人身份调用，自动处理一份简历。"""
+        """gxd-RAG对接点1：简历文件及元数据提交后，以可信上传人身份自动处理一份简历。"""
         self.context.require_permission("resume:parse")
         if self.db is None:
             # gxd-上传成功后调用 await ResumeService(context=可信上下文).process_uploaded_file(file_id)。
@@ -79,9 +80,63 @@ class ResumeService:
             raise NotFoundError("简历文件不存在或无权处理")
         if file.uploader_id != self.context.user_id and not self.context.is_super_admin:
             raise NotFoundError("简历文件不存在或无权处理")
-        if not file.storage_type or file.storage_type == "local":
-            raise BusinessRuleError("上传通知需要对象存储中的简历，请核对文件存储类型")
+        result = await self.ingest_file(file)
+        await self.record_ingest(result)
+        return result
 
+    async def process_rag_revision(self, revision_id: int, *, context=None):
+        """gxd-RAG对接点2：知识库原件（category=resume）提交后，按 revision_id 自动进入人才链路。
+
+        与 process_uploaded_file 的差别只在**入口校验**：
+            - 原件的 biz_type 是 knowledge_revision（不是 resume），storage_type 可以是 local；
+            - 归属按「版本原件上传人」判断，不接受请求体传入的身份或角色。
+
+        其余步骤（哈希秒传/查重、原件读取、解析工作流、画像与向量）完全复用同一份实现，
+        不另写一套解析器，避免两条链路各自演化。
+
+        调用约定：
+            - 只在「原件 + 版本记录已提交 MySQL」之后调用一次；
+            - 预览 / 发布 / 恢复等后续操作不得再次触发（由 file_router 的调度点保证）。
+        """
+        self.context.require_permission("resume:parse")
+        if self.db is None:
+            from app.infrastructure.database.session import session_scope
+            async with session_scope() as db:
+                return await ResumeService(
+                    db, context=context or self.context).process_rag_revision(revision_id)
+
+        revision = await self.revision_row(revision_id)
+        if revision is None:
+            raise NotFoundError("文档版本不存在")
+        if revision.category != "resume":
+            raise BusinessRuleError("该版本不是简历分类，未触发人才处理")
+        if not revision.source_file_id:
+            raise NotFoundError("版本缺少来源原件")
+        file = await self.repo.get_file(self.db, revision.source_file_id, lock=True)
+        if file is None:
+            raise NotFoundError("版本原件不存在")
+        if file.uploader_id != self.context.user_id and not self.context.is_super_admin:
+            # 不泄露他人原件是否存在
+            raise NotFoundError("版本原件不存在或无权处理")
+
+        result = await self.ingest_file(file)
+        result["revision_id"] = revision.id
+        result["source_file_id"] = revision.source_file_id
+        result["doc_id"] = revision.doc_id
+        await self.record_ingest(result)
+        return result
+
+    async def revision_row(self, revision_id):
+        """gxd-读取知识库版本记录（入口事实来源：category / source_file_id）。"""
+        from app.repositories.knowledge_revision_repository import KnowledgeRevisionRepository
+        return await KnowledgeRevisionRepository().revision(self.db, revision_id)
+
+    async def ingest_file(self, file):
+        """gxd-原件 -> 简历 -> 人才 的唯一实现，由两个入口共用。
+
+        同一内容哈希必然落到同一条 resumes 记录（MySQL 唯一键），因此
+        「重复上传字节完全相同的文件」只会复用既有简历与人才档案，不会重复建模。
+        """
         files = FileService(self.db)
         extension = files.resume_extension(file.file_name)
         digest = file.file_hash
@@ -106,15 +161,115 @@ class ResumeService:
                     raise
 
         row = await self.get_resume(row.id, lock=True)
+        # 已绑定人才但派生资料没补齐（例如上次索引失败）：只补缺失阶段，不重复解析。
+        if row.status == "success" and row.talent_id:
+            result = self.parse_result_data(row)
+            result["processing_status"] = "succeeded"
+            result["reused"] = True
+            result["refresh"] = await self.ensure_derived(row.talent_id)
+            result["file_id"] = file.id
+            return result
         if row.status == "success":
             result = self.parse_result_data(row)
-            result["processing_status"] = "succeeded" if row.talent_id else "needs_review"
+            result["processing_status"] = "needs_review"
             result["reused"] = True
         else:
             result = await self.parse_resume(resume_id=row.id)
             result["reused"] = False
-        result["file_id"] = file_id
+        result["file_id"] = file.id
         return result
+
+    async def ensure_derived(self, talent_id):
+        """gxd-只在画像缺失 / 向量过期时补齐（索引失败后重试只补索引）。"""
+        from app.services.talent_profile_service import TalentService
+        try:
+            self.last_refresh = await TalentService(
+                self.db, context=self.context).ensure_derived(talent_id)
+        except BusinessException as exc:
+            # 派生资料失败不影响已保存的档案与简历；错误随结果返回，可稍后重试。
+            self.last_refresh = {"talent_id": talent_id, "status": "failed", "message": exc.message}
+        return self.last_refresh
+
+    async def record_ingest(self, result):
+        """gxd-把本次自动处理的结果写回简历行，便于按 revision_id 追溯整条链路。
+
+        不新增表：parsed_data 已是 JSON 列，ingest 段只记录状态、时间与版本，
+        便于前端/运维在「不点任何按钮」的情况下查到处理进度。
+        """
+        resume_id = result.get("resume_id")
+        if not resume_id:
+            return
+        row = await self.get_resume(resume_id, lock=True)
+        data = dict(row.parsed_data or {})
+        refresh = result.get("refresh") or {}
+        data["ingest"] = {
+            "status": result.get("processing_status") or "unknown",
+            "revision_id": result.get("revision_id"),
+            "source_file_id": result.get("source_file_id"),
+            "file_id": result.get("file_id"),
+            "talent_id": result.get("talent_id"),
+            "reused": bool(result.get("reused")),
+            "derived_status": refresh.get("status"),
+            "duplicates": len(result.get("duplicates") or []),
+            "processed_at": datetime.now().isoformat(timespec="seconds"),
+        }
+        row.parsed_data = data
+        await self.db.flush()
+
+    async def revision_ingest_status(self, revision_id):
+        """gxd-按 revision_id 回查整条链路：原件 -> 简历 -> 人才 -> 画像/向量。
+
+        验收口径（不点任何按钮）：
+            revision_id -> source_file_id -> resume_id -> talent_id，
+            同一 talent_id 在 MySQL 有画像、在 Milvus 有一条同版本向量。
+        """
+        self.context.require_permission("talent:read")
+        revision = await self.revision_row(revision_id)
+        if revision is None:
+            raise NotFoundError("文档版本不存在")
+        file = await self.repo.get_file(self.db, revision.source_file_id) if revision.source_file_id else None
+        chain = {
+            "revision_id": revision.id,
+            "doc_id": revision.doc_id,
+            "category": revision.category,
+            "revision_status": revision.status,
+            "source_file_id": revision.source_file_id,
+            "file_name": getattr(file, "file_name", None),
+            "storage_type": getattr(file, "storage_type", None),
+            "resume_id": None,
+            "resume_status": None,
+            "talent_id": None,
+            "processing_status": "not_started",
+            "duplicates": [],
+            "portrait": {"status": "unknown"},
+            "index": {"status": "unknown"},
+            "complete": False,
+        }
+        if file is None:
+            return chain
+        rows = await self.repo.list(
+            self.db, filters={"file_id": file.id}, extra_where=[self.repo.scope(self.context)], limit=1)
+        if not rows:
+            chain["processing_status"] = "not_ingested"
+            return chain
+        row = rows[0]
+        ingest = (row.parsed_data or {}).get("ingest") or {}
+        chain.update(
+            resume_id=row.id,
+            resume_status=row.status,
+            talent_id=row.talent_id,
+            processing_status=ingest.get("status") or ("succeeded" if row.talent_id else row.status),
+            duplicates=(row.parsed_data or {}).get("duplicates") or [],
+            processed_at=ingest.get("processed_at"),
+        )
+        if row.talent_id:
+            from app.services.talent_profile_service import TalentService
+            detail = await TalentService(self.db, context=self.context).detail(row.talent_id)
+            chain["portrait"] = detail.get("portrait", {"status": "unknown"})
+            chain["index"] = detail.get("index", {"status": "unknown"})
+            chain["complete"] = bool(detail.get("complete"))
+            chain["needs_review"] = chain["processing_status"] == "needs_review"
+        return chain
 
     async def upload(self, filename, content, content_type=None):
         """gxd-按文件哈希幂等上传，同文件跨权限范围不泄露已有记录。"""

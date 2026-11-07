@@ -8,15 +8,12 @@
 会把模块 docstring 提前闭合，导致「、」被当成代码 → 整个应用 import 失败。
 此处合并为单个 docstring，并补上守门测试要求的「标签：」行。
 """
-from datetime import datetime
+from fastapi import APIRouter, Depends
 
-from fastapi import APIRouter, Depends, Query
-from app.core.dependencies import CurrentUser, DbSession, require_permission
 from app.core.dependencies import CurrentUser, DbSession, require_permission
 from app.core.pagination import PageParams
 from app.core.response import ApiResponse, success
-from app.schemas.common import COMMON_ERROR_RESPONSES, SuccessResponse  # SuccessResponse 为合并时补齐（原文件使用但未导入）
-from app.schemas.common import COMMON_ERROR_RESPONSES, SuccessResponse
+from app.schemas.common import COMMON_ERROR_RESPONSES
 from app.schemas.talent import (
     TalentAskRequest,
     TalentCreate,
@@ -25,7 +22,6 @@ from app.schemas.talent import (
     TalentSemanticSearchRequest,
     TalentUpdate,
 )
-from app.schemas.talent import TalentSemanticSearchRequest, TalentMergeRequest, TalentAskRequest
 from app.services.talent_profile_service import TalentService
 from app.services.talent_retrieval_service import TalentRetrievalService
 
@@ -38,6 +34,12 @@ def get_service(db: DbSession, user: CurrentUser):
 def get_retrieval_service(db: DbSession, user: CurrentUser):
     """gxd-注入同一权限上下文用于语义检索与档案问答。"""
     return TalentRetrievalService(db, user=user)
+
+def get_resume_service(db: DbSession, user: CurrentUser):
+    """gxd-注入简历服务，用于按 revision_id 回查自动入库链路。"""
+    from app.services.talent_resume_service import ResumeService
+
+    return ResumeService(db, user=user)
 
 @router.get("", summary="人才档案分页列表", response_model=ApiResponse, dependencies=[Depends(require_permission("talent:read"))])
 async def list_talents(page: PageParams = Depends(), query: TalentQuery = Depends(), service: TalentService = Depends(get_service)):
@@ -58,6 +60,16 @@ async def search_talent(data: TalentSemanticSearchRequest, service: TalentRetrie
 async def ask_talent(data: TalentAskRequest, service: TalentRetrievalService = Depends(get_retrieval_service)):
     """gxd-仅在指定人才范围内检索，并返回带原文引用的回答。"""
     return success(data=await service.ask(data))
+
+@router.get("/ingest/revisions/{revision_id}", summary="按文档版本回查简历自动入库链路", response_model=ApiResponse[dict], dependencies=[Depends(require_permission("talent:read"))])
+async def revision_ingest_status(revision_id: int, service=Depends(get_resume_service)):
+    """gxd-返回 revision_id -> 原件 -> 简历 -> 人才 的整条链路及画像/向量完成状态。
+
+    上传接口返回后无需点任何按钮即可用它确认：source_file_id、resume_id、talent_id、
+    portrait.status、index.status 与 complete（画像与向量都就绪才为 true）。
+    疑似重复的简历在这里返回 processing_status=needs_review 与 duplicates，不会自动合并。
+    """
+    return success(data=await service.revision_ingest_status(revision_id))
 
 @router.post("/merge", summary="确认合并重复人才", response_model=ApiResponse[dict], dependencies=[Depends(require_permission("talent:update"))])
 async def merge_talent(data: TalentMergeRequest, service: TalentService = Depends(get_service)):

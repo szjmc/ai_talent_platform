@@ -1,5 +1,5 @@
 """
-模块：app/services/talent_service.py
+模块：app/services/talent_profile_service.py
 职责：人才档案业务服务层。
 
 标签：[RAG组] [P0]（被 [Agent组] talent_agent / [Vanna组] 分析依赖）
@@ -88,6 +88,10 @@ class TalentService:
         """
         self.context.require_permission("talent:read")
         filters = query.model_dump(exclude_none=True)
+        # 区间反了就直接拒绝，别把空结果当成「没有符合条件的人」返回给前端。
+        low, high = filters.get("work_years_min"), filters.get("work_years_max")
+        if low is not None and high is not None and low > high:
+            raise BusinessRuleError("工作年限下限不能大于上限")
         extra_where = self.repo.filtered_conditions(self.context, filters)
         result = await self.repo.paginate(
             self.db, page, keyword=filters.get("keyword"), extra_where=extra_where
@@ -96,19 +100,52 @@ class TalentService:
         return result
 
     async def detail(self, talent_id):
-        """gxd-返回人才详情、简历摘要及当前索引状态。"""
+        """gxd-返回人才详情、简历摘要及当前索引状态。
+
+        索引状态改为**现场核对 Milvus**（按 talent_id 读回版本号），不再返回
+        「未使用独立索引状态表」这类无信息占位：团队约定一名人才一条向量，
+        主键即 talent_id，读得到且版本一致才算已索引。
+        """
+        from app.config.settings import settings
+        from app.services.talent_retrieval_service import TalentRetrievalService
         obj = await self.get_talent(talent_id)
         result = self.public_data(obj)
         rows = await ResumeRepository().list_by_talent(self.db, obj.id)
         result["resumes"] = [{"id": x.id, "file_name": x.file_name, "status": x.status} for x in rows]
-        result["index"] = {"status": "not_checked", "version": obj.version,
-                           "message": "未使用独立索引状态表；同步结果由刷新接口返回，检索时核对当前资料"}
+        portrait = await self.repo.latest_portrait(self.db, obj.id)
+        result["portrait"] = ({"status": "ready", "version": portrait.version,
+                               "potential_level": portrait.potential_level}
+                              if portrait else {"status": "pending"})
+        if settings.MILVUS_ENABLED:
+            try:
+                found, state = await TalentRetrievalService(
+                    self.db, context=self.context).index_state(obj)
+            except Exception as exc:  # noqa: BLE001 - 索引探测失败不影响档案详情
+                found, state = {"status": "unknown", "indexed": False}, "unknown"
+                result["index_error"] = f"{type(exc).__name__}"
+            result["index"] = {
+                "status": state,
+                "version": obj.version,
+                "indexed_version": found.get("version"),
+                "primary_field": found.get("primary_field", "talent_id"),
+                "message": {"current": "向量与当前档案版本一致",
+                            "stale": "向量版本落后于档案，请重建索引",
+                            "missing": "尚未写入该人才的向量",
+                            "unknown": "索引状态读取失败，可稍后重试"}.get(state, ""),
+            }
+        else:
+            result["index"] = {"status": "disabled", "version": obj.version,
+                               "message": "Milvus未启用，向量尚未同步"}
+        # 完成标准：画像存在（MySQL）且向量为当前版本（Milvus）。
+        result["complete"] = bool(portrait) and result["index"]["status"] == "current"
         return result
 
     async def create_talent(self, data, operator=None, *, refresh=True):
         """gxd-保存人才后直接尝试刷新画像；简历绑定流程可延后到绑定完成再刷新。"""
         self.context.require_permission("talent:create")
-        values = data.model_dump()
+        # exclude_none：gender / status 在库里是 NOT NULL（有默认值），
+        # 请求未提交时不能把 None 写进去（否则数据库直接拒绝）。
+        values = data.model_dump(exclude_none=True)
         organization_id = values.get("organization_id")
         if not (self.context.is_super_admin or self.context.data_scope == "all"):
             if organization_id not in (None, self.context.organization_id):
@@ -147,7 +184,14 @@ class TalentService:
         """gxd-只更新明确提交字段、提升原有版本号并直接尝试刷新画像和向量。"""
         self.context.require_permission("talent:update")
         obj = await self.get_talent(talent_id, lock=True)
+        # 乐观锁：请求带了 version 就必须与当前版本一致，防止两人同时编辑互相覆盖。
+        self.repo.check_version(obj, getattr(data, "version", None))
         values = data.model_dump(exclude_unset=True)
+        values.pop("version", None)  # version 只用于校验，不直接写入
+        # 非空列不接受显式 null（前端清空下拉时可能提交 null）。
+        for field in ("gender", "status"):
+            if values.get(field, "keep") is None:
+                values.pop(field, None)
         if values.get("organization_id") not in (None, obj.organization_id) and not (self.context.is_super_admin or self.context.data_scope == "all"):
             raise PermissionDeniedError("无权跨部门移动人才")
         other = await self.repo.get_by_mobile(self.db, values.get("mobile"))
@@ -175,13 +219,18 @@ class TalentService:
         await self.db.flush()
 
     async def refresh_derived(self, talent_id, *, portrait=True):
-        """gxd-请求内刷新派生资料；AI故障回滚本阶段并返回提示，保留已保存主档。"""
+        """gxd-请求内刷新派生资料；AI故障回滚本阶段并返回提示，保留已保存主档。
+
+        完成标准（团队约定）：画像与向量索引**都成功**才算 complete。
+        任一阶段失败时返回 partial/failed，主档与已完成的阶段都保留，
+        重试时用 ensure_derived() 只补没成功的部分。
+        """
         from app.config.settings import settings
         from app.config.talent_config import talent_settings
         from app.services.talent_retrieval_service import TalentRetrievalService
         obj = await self.get_talent(talent_id, lock=True)
         result = {"talent_id": talent_id, "portrait": {"status": "not_requested"},
-                  "index": {"status": "not_run"}}
+                  "index": {"status": "not_run"}, "status": "pending"}
         stages = (["portrait"] if portrait else []) + ["index"]
         for stage in stages:
             if stage == "index" and not settings.MILVUS_ENABLED:
@@ -200,8 +249,82 @@ class TalentService:
                 message = exc.message if isinstance(exc, BusinessException) else "刷新失败或超时，请检查服务后重新调用刷新接口"
                 result[stage] = {"status": "failed", "message": message}
                 break
+        result["status"] = self.derived_status(result, stages)
+        if result["status"] != "complete":
+            result["message"] = self.derived_message(result)
         self.last_refresh = result
         return result
+
+    @staticmethod
+    def derived_status(result, stages):
+        """gxd-汇总阶段结果：全部 success 才算 complete，其余区分 partial/failed。"""
+        statuses = [result.get(stage, {}).get("status") for stage in stages]
+        if statuses and all(x == "success" for x in statuses):
+            return "complete"
+        if any(x == "success" for x in statuses):
+            return "partial"
+        return "failed"
+
+    @staticmethod
+    def derived_message(result):
+        """gxd-把未完成的原因说清楚，避免前端只看到「完成」两个字。"""
+        parts = []
+        for stage, label in (("portrait", "画像"), ("index", "向量索引")):
+            item = result.get(stage) or {}
+            state = item.get("status")
+            if state in (None, "success"):
+                continue
+            if state == "disabled":
+                parts.append("Milvus未启用，向量索引未同步")
+            elif state == "failed":
+                parts.append(f"{label}生成失败：{item.get('message') or '请稍后重试'}")
+            elif state == "not_run":
+                parts.append(f"{label}未执行（前置阶段失败），档案已保留，可只重试该阶段")
+            elif state == "not_requested":
+                continue
+        return "；".join(parts) or "派生资料未全部完成，可重试"
+
+    async def ensure_derived(self, talent_id):
+        """gxd-只补缺失阶段：画像没有才生成，向量缺失/过期才重建索引。
+
+        用于「索引失败后重试只补索引」以及 RAG 上传链路的幂等补偿：
+        画像已存在、向量已是当前版本时不会重复调用模型或 embedding。
+        """
+        from app.config.settings import settings
+        from app.services.talent_retrieval_service import TalentRetrievalService
+        obj = await self.get_talent(talent_id)
+        portrait = await self.repo.latest_portrait(self.db, talent_id)
+        need_portrait = portrait is None
+        state = "unknown"
+        if settings.MILVUS_ENABLED:
+            try:
+                _, state = await asyncio.wait_for(
+                    TalentRetrievalService(self.db, context=self.context).index_state(obj), timeout=15)
+            except Exception as exc:  # noqa: BLE001 - 探测失败按「需要重建」处理，不阻断主流程
+                logging.getLogger(__name__).warning("gxd-索引状态探测失败 type=%s", type(exc).__name__)
+                state = "unknown"
+        need_index = bool(settings.MILVUS_ENABLED) and state != "current"
+
+        actions = [name for name, needed in (("portrait", need_portrait), ("index", need_index)) if needed]
+        if not actions:
+            current = {"talent_id": talent_id, "actions": [], "status": "complete",
+                       "portrait": {"status": "skipped", "version": getattr(portrait, "version", None)},
+                       "index": {"status": "skipped", "version": getattr(obj, "version", None)}}
+            self.last_refresh = current
+            return current
+
+        # 复用同一套阶段执行逻辑：portrait 只在缺失时执行，index 只在缺失/过期时执行。
+        refreshed = await self.refresh_derived(talent_id, portrait=need_portrait)
+        refreshed["actions"] = actions
+        refreshed["index_state"] = state
+        if not need_index and refreshed.get("index", {}).get("status") == "not_run":
+            # 向量已是最新（但画像刚补）：不要让「未执行索引」把它判成未完成。
+            refreshed["index"] = {"status": "success", "version": getattr(obj, "version", None),
+                                  "message": "向量已是当前版本，无需重建", "skipped": True}
+            refreshed["status"] = self.derived_status(refreshed, ["portrait", "index"])
+            refreshed.pop("message", None)
+        self.last_refresh = refreshed
+        return refreshed
 
     async def profile_source(self, talent_id):
         """gxd-提供已鉴权的当前档案与简历证据，屏蔽联系方式后交给模型。"""

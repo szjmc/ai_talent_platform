@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import io
 import json
+import logging
 import tempfile
 import time
 from datetime import datetime
@@ -13,7 +14,7 @@ from pathlib import Path
 from uuid import uuid4
 from langchain_core.documents import Document
 from app.config.settings import settings
-from app.core.exceptions import BusinessException, DataConflictError, FileError, NotFoundError, ParamError, PermissionDeniedError
+from app.core.exceptions import AIError, BusinessException, DataConflictError, FileError, NotFoundError, ParamError, PermissionDeniedError
 from app.core.rag_constants import collection_for_category
 from app.models.knowledge import KnowledgeDoc, KnowledgeChunk
 from app.models.knowledge_revision import KnowledgeRevision
@@ -21,6 +22,8 @@ from app.repositories.knowledge_revision_repository import KnowledgeRevisionRepo
 from app.repositories.knowledge_repository import KnowledgeRepository
 from app.repositories.rag_ingest_job import IngestJob
 from app.services.file_service import FileService
+
+logger = logging.getLogger(__name__)
 from app.ai.rag.document_loader import load
 from app.ai.rag.document_splitter import RESUME_SPLIT_VERSION, SECTION_SPLIT_VERSION, split_for_index
 from app.ai.rag.embedding_service import EmbeddingService
@@ -175,6 +178,11 @@ class KnowledgeRevisionService:
         if parse_error:
             result['error'] = parse_error
         return result
+
+    async def commit_upload(self):
+        # 上传接口在返回前显式提交：人才自动处理是后台任务，只能在「原件 + 版本记录
+        # 已提交 MySQL」之后触发；依赖里的提交发生在响应之后，靠它定序并不可靠。
+        await self.db.commit()
 
     async def upload_and_publish(self, data, filename, mime, category, title, user, doc_id=None):
         """批量中的单份文件独立提交：先保留原件，再自动预览并发布。
@@ -333,7 +341,17 @@ class KnowledgeRevisionService:
         if preview['base_doc_version'] != doc.version:
             raise DataConflictError('已有其他版本发布，请重新预览以确认当前内容')
         chunks = preview['chunks']
-        vectors = await EmbeddingService().embed_texts([c['content'] for c in chunks])
+        # 未配置向量供应商时不要整条发布链路失败：退化为「仅词法检索」发布，
+        # 切片、BM25 快照照常落库，向量留待配置密钥后重建（index_error 会明确提示）。
+        vectors: list = []
+        vector_error = None
+        try:
+            vectors = await EmbeddingService().embed_texts([c['content'] for c in chunks])
+        except AIError as exc:
+            if not settings.RAG_ALLOW_PUBLISH_WITHOUT_EMBEDDING:
+                raise
+            vector_error = str(exc)
+            logger.warning('版本 %s 发布时跳过向量写入：%s（仅词法检索可用）', row.id, vector_error)
         old = await self.repo.chunks(self.db, doc.id)
         previous = await self.repo.published(self.db, doc.id)
         # 文档行锁负责串行发布；每次操作独立命名锁，避免恢复任务与发布者反向等锁。
@@ -346,11 +364,12 @@ class KnowledgeRevisionService:
             page_no=c['metadata'].get('page')) for i, c in enumerate(chunks)]
         await KnowledgeRepository().save_chunks(self.db, rows)
         await job.record(new_chunk_ids=[c.id for c in rows])
-        await MilvusAdapter().upsert([c.id for c in rows], vectors, doc.id, metadata=[
-            {'file_id': row.file_id, 'category': row.category, 'content': c.content,
-             'source': row.title, 'page_number': c.page_no} for c in rows])
-        for chunk in rows:
-            chunk.milvus_pk = chunk.id
+        if vectors:
+            await MilvusAdapter().upsert([c.id for c in rows], vectors, doc.id, metadata=[
+                {'file_id': row.file_id, 'category': row.category, 'content': c.content,
+                 'source': row.title, 'page_number': c.page_no} for c in rows])
+            for chunk in rows:
+                chunk.milvus_pk = chunk.id
         manifest = await self.json_file({'doc_id': doc.id, 'revision_id': row.id,
             'chunk_ids': [c.id for c in rows], 'category': row.category,
             'collection': collection_for_category(row.category), 'preview_hash': row.preview_hash,
@@ -365,7 +384,11 @@ class KnowledgeRevisionService:
         row.status, row.version = 'published', row.version + 1
         row.index_manifest, row.published_by, row.published_at = manifest.id, user.id, datetime.now()
         doc.title, doc.category, doc.file_id = row.title, row.category, row.file_id
-        doc.status, doc.chunk_count, doc.index_error = 'indexed', len(rows), None
+        doc.status, doc.chunk_count = 'indexed', len(rows)
+        doc.index_error = (
+            '向量索引未写入（Embedding 未配置，当前仅词法检索可用）：' + vector_error
+            if vector_error else None
+        )
         # 旧表DATETIME没有微秒精度，与提交后BM25版本指纹保持一致。
         doc.embedding_model, doc.indexed_at, doc.version = select_embedding_model(), datetime.now().replace(microsecond=0), doc.version + 1
         await self.db.flush()

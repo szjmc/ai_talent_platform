@@ -9,12 +9,12 @@ from unittest.mock import AsyncMock
 import pytest
 from pydantic import ValidationError
 from app.ai.context import AIContext
-from app.schemas.talent_resume_schema import ResumeParsedData, ResumeBindRequest
-from app.schemas.talent import TalentUpdate, TalentCreate, TalentMergeRequest, TalentSemanticSearchRequest, TalentAskRequest
+from app.schemas.resume import ResumeBindRequest
+from app.schemas.talent_resume_schema import ResumeParsedData
+from app.schemas.talent import TalentUpdate, TalentMergeRequest, TalentAskRequest
 from app.ai.utils.resume_normalizer import normalize, clean_text
-from app.config.talent_config import talent_settings as cfg
 from app.config.settings import settings
-from app.core.exceptions import AIError, FileError, NotFoundError, PermissionDeniedError, BusinessRuleError
+from app.core.exceptions import AIError, FileError, PermissionDeniedError
 
 CTX = AIContext(user_id=1, roles=["super_admin"])
 
@@ -159,25 +159,63 @@ async def test_vector_adapter_validates_existing_collection():
     client.drop_collection.assert_not_called()
 
 async def test_retrieval_filters_stale_and_foreign_vectors(monkeypatch):
-    """gxd-回表重建证据，拒绝越权、旧版本与旧内容摘要的向量。"""
+    """gxd-一人一条向量：回表重建证据，拒绝越权、旧版本向量。
+
+    团队 Schema：talent_vectors 主键 talent_id，扁平字段（不是嵌套 metadata）。
+    """
     import app.services.talent_retrieval_service as mod
     monkeypatch.setattr(settings,"MILVUS_ENABLED",True)
     monkeypatch.setattr(mod,"embed_query",AsyncMock(return_value=[1,0]))
     service=mod.TalentRetrievalService(Obj(),context=CTX)
     service.repo.filtered=AsyncMock(return_value=[Obj(id=1,version=3,name="甲")])
-    chunk={"chunk_id":"t1:v3:0:current","talent_id":1,"version":3,"text":"可信文本","source":"a.txt","page":1,"kind":"resume"}
-    service.build_chunks=AsyncMock(return_value=[chunk])
+    service.build_profile_text=AsyncMock(return_value="可信文本")
     service.vector.search=AsyncMock(return_value=[
-        {"id":"foreign","score":1,"metadata":{"talent_id":999,"version":3}},
-        {"id":"old","score":.99,"metadata":{"talent_id":1,"version":2}},
-        {"id":"t1:v3:0:old-content","score":.95,"metadata":{"talent_id":1,"version":3}},
-        {"id":chunk["chunk_id"],"score":.9,"metadata":{"talent_id":1,"version":3,"text":"篡改文本"}},
+        {"talent_id":999,"id":999,"score":1,"version":3},
+        {"talent_id":1,"id":1,"score":.99,"version":2},
+        {"talent_id":1,"id":1,"score":.9,"version":3},
     ])
     hits, rows, pending=await service.retrieve("Python",5)
     assert len(hits)==1 and hits[0]["text"]=="可信文本" and pending is None
-    assert service.build_chunks.await_count == 1
+    assert hits[0]["talent_id"]==1 and hits[0]["chunk_id"]=="t1:v3"
+    assert service.build_profile_text.await_count == 1
     expr=service.vector.search.call_args.kwargs["expr"]
-    assert '== 1' in expr and '== 3' in expr
+    assert expr == "talent_id in [1]"
+
+async def test_sync_index_writes_one_vector_keyed_by_talent_id(monkeypatch):
+    """gxd-写入按 MySQL talent_id 覆盖一人一条向量，不再按切片写字符串主键。"""
+    import app.services.talent_retrieval_service as mod
+    monkeypatch.setattr(settings,"MILVUS_ENABLED",True)
+    monkeypatch.setattr(mod,"embed_texts",AsyncMock(return_value=[[0.1,0.2]]))
+    service=mod.TalentRetrievalService(Obj(),context=CTX)
+    talent=Obj(id=7,version=4,name="甲",skill_tags=["Python"],education=None,school=None,
+               major=None,work_years=None,current_company=None,current_position=None,
+               self_evaluation=None,portrait_summary=None)
+    service.get_talent=AsyncMock(return_value=talent)
+    service.build_profile_text=AsyncMock(return_value="甲 技能：Python")
+    service.vector=AsyncMock()
+    service.vector.has_collection=AsyncMock(return_value=False)
+    result=await service.sync_index(7)
+    assert result["talent_id"]==7 and result["version"]==4 and result["vectors"]==1
+    args=service.vector.upsert.call_args
+    assert args.args[1]==[7] and args.kwargs["primary_field"]=="talent_id"
+    assert args.args[3][0]["version"]==4
+    created=service.vector.create_collection.call_args
+    assert created.kwargs["primary_field"]=="talent_id"
+
+async def test_read_index_uses_talent_id_filter(monkeypatch):
+    """gxd-读回与写入同一字段：query 条件必须是 talent_id == N。"""
+    import app.services.talent_retrieval_service as mod
+    monkeypatch.setattr(settings,"MILVUS_ENABLED",True)
+    service=mod.TalentRetrievalService(Obj(),context=CTX)
+    service.vector=AsyncMock()
+    service.vector.has_collection=AsyncMock(return_value=True)
+    service.vector.query=AsyncMock(return_value=[{"talent_id":5,"version":9}])
+    found=await service.read_index(5)
+    assert found["indexed"] is True and found["version"]==9
+    assert service.vector.query.call_args.args[1]=="talent_id == 5"
+    obj=Obj(id=5,version=10)
+    _,state=await service.index_state(obj)
+    assert state=="stale"
 
 @pytest.mark.parametrize("citations", [[{"chunk_id":"foreign","quote":"Python"}], [{"chunk_id":"c1","quote":"不存在的原文"}]])
 async def test_rag_rejects_bad_citations(monkeypatch,citations):
@@ -211,7 +249,6 @@ async def test_workflow_runs_all_nodes_without_external_services(monkeypatch):
     """gxd-用明确替身验证真实LangGraph节点顺序、保存和新建分支。"""
     import app.ai.workflows.resume_talent_workflow as mod
     events=[]
-    row=Obj(id=1,talent_id=None,status="uploaded",parsed_data={})
     class Resumes:
         def __init__(self,*a,**kw):
             """gxd-构造测试简历服务。"""

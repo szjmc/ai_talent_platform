@@ -23,8 +23,30 @@ def test_version_routes_registered_with_chinese_descriptions():
     from app.routers.knowledge_router import router
 
     paths = create_application().openapi()['paths']
-    assert len(router.routes) == 7, [r.path for r in router.routes]
-    assert len(file_router.routes) == 9, [r.path for r in file_router.routes]
+
+    # 用「路径集合」而非「条数」守护归属：
+    # 条数断言在每次新增接口时都要改测试（/files/docs/{doc_id}/edit 落地时就是这样误报的），
+    # 真正要防的是「读写动作挂错分组」，所以逐条列出允许的路径。
+    assert {r.path for r in router.routes} == {
+        '/knowledge/retrieve',
+        '/knowledge/docs',
+        '/knowledge/docs/{doc_id}/revisions',
+        '/knowledge/revisions/{revision_id}',
+        '/knowledge/revisions/{revision_id}/preview',
+        '/knowledge/questions/search',
+    }, sorted(r.path for r in router.routes)
+    assert {r.path for r in file_router.routes} == {
+        '/files/upload',
+        '/files/docs/{doc_id}/retry',
+        '/files/docs/{doc_id}/edit',
+        '/files/revisions/{revision_id}/download',
+        '/files/revisions/{revision_id}/edit',
+        '/files/revisions/{revision_id}/publish',
+        '/files/revisions/{revision_id}/restore',
+        '/files/revisions/{revision_id}/discard',
+        '/files/questions/upload',
+        '/files/index/delete',
+    }, sorted(r.path for r in file_router.routes)
     assert '/api/v1/knowledge/drafts/upload' not in paths
 
     # 上传只存在于文件管理分组，且知识库下不再有同名路径
@@ -50,7 +72,9 @@ async def test_original_upload_urls_use_draft_service(path):
     from app.routers.knowledge_router import get_revision_service
     app = FastAPI()
     app.include_router(router, prefix='/api/v1')
-    service = NS(upload=AsyncMock(return_value={'doc_id': 1, 'revision_id': 2, 'status': 'draft'}))
+    # 上传接口在返回前显式提交草稿（提交后才可能触发人才自动处理），测试替身需要该入口。
+    service = NS(upload=AsyncMock(return_value={'doc_id': 1, 'revision_id': 2, 'status': 'draft'}),
+                 commit_upload=AsyncMock())
     user = NS(id=3)
     async def context():
         yield service, user
