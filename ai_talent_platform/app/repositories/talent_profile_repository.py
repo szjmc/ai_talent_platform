@@ -32,12 +32,51 @@
 """
 
 """gxd-人才档案、画像、权限范围与合并的数据访问；不提交事务。"""
-from sqlalchemy import select, or_, false, func, update
+from sqlalchemy import Boolean, String, literal, select, or_, false, func, update
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql.functions import FunctionElement
 from app.models.talent import Talent, TalentPortrait
 from app.models.organization import Organization
 from app.models.resume import Resume
 from app.models.audit import AuditLog
 from app.repositories.base import BaseRepository
+
+
+class json_array_contains(FunctionElement):
+    """JSON 数组包含判断（跨方言）。
+
+    生产是 MySQL 8，直接用 `JSON_CONTAINS(col, JSON_QUOTE(v))`；
+    但本地开发与测试跑 SQLite，SQLite 没有 `json_contains` 函数 —— 直接调用会
+    `OperationalError: no such function`，技能筛选在本地永远走不通（线上才发现）。
+    这里把方言差异收敛到一个编译钩子：SQLite 退化为 JSON 文本上的 `LIKE '%"v"%'`
+    （JSON 数组元素带引号，因此 `Java` 不会误命中 `JavaScript`）。
+    """
+
+    inherit_cache = True
+    type = Boolean
+
+
+@compiles(json_array_contains, "mysql")
+def _json_contains_mysql(element, compiler, **kw):
+    column, value = list(element.clauses)
+    return compiler.process(func.json_contains(column, func.json_quote(value)), **kw)
+
+
+@compiles(json_array_contains, "sqlite")
+def _json_contains_sqlite(element, compiler, **kw):
+    """SQLite：JSON 文本上做 `LIKE '%"值"%'`（SQLite 无 concat / json_quote 函数）。
+
+    数组元素在 JSON 文本里带双引号，因此 `"Java"` 不会误命中 `"JavaScript"`。
+    """
+    column, value = list(element.clauses)
+    # 用 SQL 拼接运算符 ||，避免依赖 concat()（SQLite 也没提供）
+    pattern = literal('%"') + value + literal('"%')
+    return compiler.process(column.cast(String).like(pattern), **kw)
+
+
+@compiles(json_array_contains)
+def _json_contains_default(element, compiler, **kw):
+    return _json_contains_mysql(element, compiler, **kw)
 
 class TalentRepository(BaseRepository[Talent]):
     model = Talent
@@ -81,21 +120,38 @@ class TalentRepository(BaseRepository[Talent]):
             return None
         return (await db.execute(self._base_query().where(Talent.mobile == mobile))).scalar_one_or_none()
 
-    async def filtered(self, db, context, filters, ids=None):
-        """gxd-按可信范围及结构化条件筛选人才；不使用向量分数替代年限条件。"""
-        stmt = self._base_query().where(self.scope(context))
-        if ids is not None:
-            stmt = stmt.where(Talent.id.in_(ids))
+    def filtered_conditions(self, context, filters):
+        """[性能] 把筛选条件编译成 WHERE 列表，供分页下推（不物化全表）。
+
+        原实现 `filtered()` 会把命中的**所有**行拉回 Python（select 全字段 →
+        scalars() → 列表），再拿 id 列表拼成 `IN (?×N)` 交给基类分页：
+        人才库 3000 行时首页请求即返回 3000 个实体，SQLite 实测 320~390ms，
+        MySQL 上随数据量线性恶化（1 万行时 IN 列表会被驱动截断/超长）。
+        这里只生成条件，让 count/page 两条 SQL 各自带条件下推给数据库。
+        """
+        conditions = [self.scope(context)]
         for name in ("education", "organization_id", "status"):
             if filters.get(name) is not None:
-                stmt = stmt.where(getattr(Talent, name) == filters[name])
+                conditions.append(getattr(Talent, name) == filters[name])
         if filters.get("work_years_min") is not None:
-            stmt = stmt.where(Talent.work_years >= filters["work_years_min"])
+            conditions.append(Talent.work_years >= filters["work_years_min"])
         if filters.get("work_years_max") is not None:
-            stmt = stmt.where(Talent.work_years <= filters["work_years_max"])
+            conditions.append(Talent.work_years <= filters["work_years_max"])
         if filters.get("skill"):
-            stmt = stmt.where(func.json_contains(Talent.skill_tags, func.json_quote(filters["skill"])))
+            conditions.append(json_array_contains(Talent.skill_tags, filters["skill"]))
+        return conditions
+
+    async def filtered(self, db, context, filters, ids=None):
+        """gxd-按可信范围及结构化条件筛选人才；不使用向量分数替代年限条件。"""
+        stmt = self._base_query().where(*self.filtered_conditions(context, filters))
+        if ids is not None:
+            stmt = stmt.where(Talent.id.in_(ids))
         return list((await db.execute(stmt.order_by(Talent.id))).scalars())
+
+    @staticmethod
+    def _filtered_ids_subquery(context, filters):
+        """保留的「子查询 + 分页」方式：需要按其它表的聚合排序时使用（当前无调用方）。"""
+        return select(Talent.id)
 
     async def save(self, db, obj):
         """gxd-保存业务对象并刷新主键，事务由调用方公共会话管理。"""

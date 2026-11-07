@@ -37,9 +37,13 @@ coverage.xml
 .mypy_cache/
 
 # ---------------- 本地调试临时文件（接口测试残留，禁止提交）
+# 注意：`_*.py` 会连 `__init__.py` 一起忽略，导致 Python 包在干净克隆里缺包初始化文件
+# （历史事故：app/ai/proctoring/__init__.py 未入库，服务启动即 ImportError）。
+# 因此下面用否定规则把 __init__.py 显式放行，只忽略真正的本地临时脚本。
 _*.json
 _*.txt
 _*.py
+!__init__.py
 *_req.json
 backend.log
 .workbuddy/

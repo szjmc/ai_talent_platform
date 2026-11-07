@@ -10,7 +10,6 @@ import { formatDate } from '../utils';
 import type { OrgNode, Position } from '../types';
 
 const levelMap: Record<string, string> = { junior: '初级', middle: '中级', senior: '高级', expert: '专家' };
-const BACKEND_PENDING = '后端岗位 CRUD 接口尚未实现（当前 OpenAPI 仅保留占位），无法执行该写操作。';
 
 export default function PositionsPage() {
   const [data, setData] = useState<Position[]>([]); const [total, setTotal] = useState(0); const [loading, setLoading] = useState(false);
@@ -18,27 +17,54 @@ export default function PositionsPage() {
   const [open, setOpen] = useState(false); const [editing, setEditing] = useState<Position | null>(null); const [saving, setSaving] = useState(false);
   const [keyword, setKeyword] = useState(''); const [status, setStatus] = useState<string>(); const [orgId, setOrgId] = useState<number>();
   const [organizations, setOrganizations] = useState<OrgNode[]>([]); const [form] = Form.useForm();
+  const [page, setPage] = useState(1);
   const { message, modal } = App.useApp(); const navigate = useNavigate();
 
   const load = useCallback(async () => {
     setLoading(true); setLoadError('');
     try {
-      const result = await positionsApi.listPlaceholder();
-      const items = (result.items || []) as Position[];
-      setData(items); setTotal(result.total || items.length);
+      const result = await positionsApi.list({
+        page: 1, page_size: 200,
+        keyword: keyword || undefined, status, organization_id: orgId,
+      });
+      setData(result.items || []); setTotal(result.total || 0);
     } catch (error) { setLoadError(formatApiError(error)); setData([]); setTotal(0); }
     finally { setLoading(false); }
-  }, []);
+  }, [keyword, status, orgId]);
   useEffect(() => { void load(); organizationsApi.tree().then(setOrganizations).catch(() => setOrganizations([])); }, [load]);
   const orgOptions = useMemo(() => flattenOrgs(organizations).map((item) => ({ value: item.id, label: item.name })), [organizations]);
-  const filtered = data.filter((p) => (!keyword || `${p.title}${p.code}${(p.skill_tags || []).join('')}`.toLowerCase().includes(keyword.toLowerCase())) && (!status || p.status === status) && (!orgId || p.organization_id === orgId));
-  const openEdit = (p?: Position) => { setEditing(p || null); form.setFieldsValue(p || { level: 'middle', headcount: 1, status: 'open', skill_tags: [] }); setOpen(true); };
+  // 筛选条件已下推后端（keyword/status/organization_id），前端不再二次过滤，避免与服务端分页口径不一致
+  const filtered = data;
+  const openEdit = (p?: Position) => { setEditing(p || null); form.setFieldsValue(p || { level: 'middle', headcount: 1, status: 'open', skill_tags: [], organization_id: orgOptions[0]?.value }); setOpen(true); };
   const save = async () => {
-    await form.validateFields(); setSaving(true);
-    try { message.error(BACKEND_PENDING); } finally { setSaving(false); }
+    const values = await form.validateFields();
+    setSaving(true);
+    try {
+      const payload = {
+        title: values.title, organization_id: values.organization_id, level: values.level,
+        headcount: values.headcount ?? 1, description: values.description ?? null,
+        skill_tags: values.skill_tags ?? [], salary_min: values.salary_min ?? null, salary_max: values.salary_max ?? null,
+      };
+      if (editing) {
+        await positionsApi.update(editing.id, { ...payload, code: values.code || editing.code });
+        message.success('岗位已更新');
+      } else {
+        await positionsApi.create({ ...payload, code: values.code || undefined });
+        message.success('岗位已创建');
+      }
+      setOpen(false); setEditing(null); await load();
+    } catch (error) { message.error(formatApiError(error)); }
+    finally { setSaving(false); }
   };
-  const toggleStatus = async (p: Position) => {
-    modal.confirm({ title: `确认${p.status === 'open' ? '暂停' : '恢复'}招聘「${p.title}」？`, onOk: async () => { message.error(BACKEND_PENDING); } });
+  const toggleStatus = (p: Position) => {
+    const target = p.status === 'open' ? 'paused' : 'open';
+    modal.confirm({
+      title: `确认${target === 'paused' ? '暂停' : '恢复'}招聘「${p.title}」？`,
+      onOk: async () => {
+        try { await positionsApi.setStatus(p.id, target); message.success('岗位状态已更新'); await load(); }
+        catch (error) { message.error(formatApiError(error)); }
+      },
+    });
   };
   const columns: ColumnsType<Position> = [
     { title: '岗位名称 / 编码', dataIndex: 'title', width: 240, render: (_, r) => <div className="position-title-cell">{r.title}<Tag style={{ marginLeft: 7, fontSize: 9 }} color={r.level === 'expert' ? 'purple' : 'blue'}>{levelMap[r.level] || r.level}</Tag><div className="position-code">{r.code}</div></div> },
@@ -54,7 +80,7 @@ export default function PositionsPage() {
     <PageHeader title="岗位管理" description="构建标准岗位能力模型，让每一个岗位需求清晰、可衡量、可匹配" actions={<><Button icon={<RobotOutlined/>} onClick={() => message.info('请先选择岗位，后端岗位画像接口支持 JD 解析与确认')}>AI 解析 JD</Button><Button type="primary" icon={<PlusOutlined/>} onClick={() => openEdit()}>新建岗位</Button></>}/>
     {loadError && <Alert type="warning" showIcon message="岗位列表暂不可用" description={loadError} style={{ marginBottom: 16 }}/>}
     <div className="metric-strip"><div className="metric-strip-item"><div className="metric-strip-label">岗位总数</div><div className="metric-strip-value">{total}<span className="metric-strip-extra">个</span></div></div><div className="metric-strip-item"><div className="metric-strip-label">在招岗位</div><div className="metric-strip-value">{data.filter((p) => p.status === 'open').length}<span className="metric-strip-extra">当前页</span></div></div><div className="metric-strip-item"><div className="metric-strip-label">已暂停</div><div className="metric-strip-value">{data.filter((p) => p.status === 'paused').length}<span className="metric-strip-extra">当前页</span></div></div><div className="metric-strip-item"><div className="metric-strip-label">已关闭</div><div className="metric-strip-value">{data.filter((p) => p.status === 'closed').length}<span className="metric-strip-extra">当前页</span></div></div></div>
-    <div className="card filter-card"><div className="filter-row"><Input prefix={<SearchOutlined/>} placeholder="搜索岗位名称、编码或技能" style={{ width: 285 }} value={keyword} onChange={(e) => setKeyword(e.target.value)}/><Select placeholder="岗位状态" allowClear style={{ width: 130 }} value={status} onChange={setStatus} options={[{ value: 'open', label: '招聘中' },{ value: 'paused', label: '已暂停' },{ value: 'closed', label: '已关闭' }]}/><Select placeholder="岗位层级" allowClear style={{ width: 130 }} options={Object.entries(levelMap).map(([value,label]) => ({ value,label }))}/><Select placeholder="所属部门" allowClear style={{ width: 150 }} value={orgId} onChange={setOrgId} options={orgOptions}/><div className="filter-spacer"/><Button onClick={() => { setKeyword(''); setStatus(undefined); setOrgId(undefined); }}>重置</Button></div></div>
+    <div className="card filter-card"><div className="filter-row"><Input prefix={<SearchOutlined/>} placeholder="搜索岗位名称、编码或技能" style={{ width: 285 }} value={keyword} onChange={(e) => { setKeyword(e.target.value); }}/><Select placeholder="岗位状态" allowClear style={{ width: 130 }} value={status} onChange={(v) => { setStatus(v); setPage(1); }} options={[{ value: 'open', label: '招聘中' },{ value: 'paused', label: '已暂停' },{ value: 'closed', label: '已关闭' }]}/><Select placeholder="岗位层级" allowClear style={{ width: 130 }} options={Object.entries(levelMap).map(([value,label]) => ({ value,label }))}/><Select placeholder="所属部门" allowClear style={{ width: 150 }} value={orgId} onChange={(v) => { setOrgId(v); setPage(1); }} options={orgOptions}/><div className="filter-spacer"/><Button onClick={() => { setKeyword(''); setStatus(undefined); setOrgId(undefined); }}>重置</Button></div></div>
     <div className="card content-card"><div className="table-toolbar"><div className="table-title">岗位列表<span className="table-count">共 {filtered.length} 个岗位</span></div></div><Table rowKey="id" dataSource={filtered} columns={columns} loading={loading} pagination={false} scroll={{ x: 1250 }} locale={{ emptyText: loadError ? '后端岗位接口暂不可用' : '暂无岗位数据' }}/><div className="table-footer"><Pagination total={total} pageSize={20} showSizeChanger={false}/></div></div>
     <Drawer open={!!selected} onClose={() => setSelected(null)} width={540} title="岗位详情" extra={selected && <Button size="small" onClick={() => toggleStatus(selected)}>{selected.status === 'open' ? '暂停招聘' : '恢复招聘'}</Button>}>
       {selected && <><div className="detail-hero"><div style={{ width: 52, height: 52, borderRadius: 12, background: '#e8efff', color: '#4267d8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 25 }}><FileTextOutlined/></div><div style={{ flex: 1 }}><div className="detail-name" style={{ fontSize: 19 }}>{selected.title}</div><div className="detail-meta">{selected.organization_name || '—'} · {selected.code}</div></div><StatusBadge status={selected.status}/></div>

@@ -163,16 +163,19 @@ async def test_custom_manager_cannot_import_to_another_department(monkeypatch):
 async def test_upload_http_multipart_contract_and_chinese_name(monkeypatch):
     from app.core.application import create_application
     from app.core.dependencies import get_current_user
-    from app.routers import knowledge_router
+    # [接口分组治理] 题库上传已迁到 /files/questions/upload，导入服务在 file_router
+    # 模块内是 import 时绑定的，必须 patch 该模块的符号才会生效（patch knowledge_router
+    # 会静默失效，真实服务随后去连 MySQL）。
+    from app.routers import file_router
 
     app = create_application()
     importer = NS(upload=AsyncMock(return_value=QuestionImportResponse(
         imported_count=1, question_ids=[11], sync_requested=False,
         indexed_count=0, failed_count=0, pending_count=1,
     )))
-    monkeypatch.setattr(knowledge_router, 'QuestionBankImportService', lambda: importer)
+    monkeypatch.setattr(file_router, 'QuestionBankImportService', lambda: importer)
     app.dependency_overrides[get_current_user] = admin
-    path = settings.API_PREFIX + '/knowledge/questions/upload'
+    path = settings.API_PREFIX + '/files/questions/upload'
     document = app.openapi()
     operation = document['paths'][path]['post']
     assert operation['summary'] == '上传并导入笔试题库'

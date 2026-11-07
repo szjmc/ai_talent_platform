@@ -33,6 +33,7 @@ from app.infrastructure.database.postgres import (
 from app.infrastructure.database.session import (
     check_all_connections,
     close_db,
+    create_tables_individually,
     get_db,
     get_engine,
     get_session_factory,
@@ -52,6 +53,7 @@ __all__ = [
     "session_scope",
     "release_connection",
     "init_db",
+    "create_tables_individually",
     "check_all_connections",
     "close_db",
     "reset_engine",

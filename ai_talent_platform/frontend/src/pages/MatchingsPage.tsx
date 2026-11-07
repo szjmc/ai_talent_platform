@@ -26,7 +26,7 @@ export default function MatchingsPage() {
   const [batch, setBatch] = useState<MatchingRunResult | null>(null); const { message } = App.useApp();
 
   useEffect(() => {
-    positionsApi.listPlaceholder().then((res) => setPositions((res.items || []) as Position[])).catch((error) => setPositionError(formatApiError(error)));
+    positionsApi.list({ page: 1, page_size: 200 }).then((res) => setPositions(res.items || [])).catch((error) => setPositionError(formatApiError(error)));
   }, []);
   const loadLatest = useCallback(async (id: number) => {
     setLoadingLatest(true);

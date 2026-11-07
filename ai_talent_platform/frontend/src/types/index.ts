@@ -38,6 +38,24 @@ export interface Position {
   status: 'open'|'paused'|'closed'; description: string; skill_tags: string[]; salary_min: number; salary_max: number;
   requirements?: { education: string; experience_years: number; skills: string[] }; publish_at?: string;
 }
+/** 文件版本（文件管理的核心对象：一个文档有多个版本文件）。
+ *  注意：后端 /files 不提供「文件元数据列表」接口，文件按文档版本维度查看，
+ *  所以这里没有 FileItem 之类的独立文件实体，避免前端按不存在的契约开发。
+ */
+export interface FileRevision {
+  id?: number; revision_id?: number; doc_id?: number; version: number;
+  status?: string; title?: string; category?: string; file_id?: number | null;
+  created_at?: string | null;
+}
+/** 审计日志（只增不改，仅 audit:read 可查）。 */
+export interface AuditEntry {
+  id: number; user_id: number | null; username: string | null;
+  action: string; module: string | null; target_type?: string | null; target_id?: number | null;
+  request_method?: string | null; request_path?: string | null; request_ip?: string | null;
+  user_agent?: string | null; trace_id: string | null;
+  before_data?: Record<string, unknown> | null; after_data?: Record<string, unknown> | null;
+  status: string; error_message?: string | null; created_at?: string | null;
+}
 export interface Resume {
   id: number; file_id?: number | null; talent_id?: number | null; talent_name?: string | null; file_name: string;
   file_size: number; file_type?: string | null; status: 'uploaded'|'parsing'|'success'|'failed';
