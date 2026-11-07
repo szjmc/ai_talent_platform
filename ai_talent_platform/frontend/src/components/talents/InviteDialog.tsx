@@ -59,7 +59,7 @@ export default function InviteDialog({ talent, initialKind = 'written_test', ope
     try {
       const info = await invitesApi.create({
         type: kind,
-        // 演示卡片人才不落库档案 -> 仅传快照（name/mobile/email），不传 talent_id
+        talent_id: talent.id,
         talent_name: talent.name,
         mobile: mobile.trim(),
         email: email.trim(),
@@ -70,8 +70,9 @@ export default function InviteDialog({ talent, initialKind = 'written_test', ope
         title: `${talent.name} · ${KIND_OPTIONS.find(o => o.value === kind)?.label ?? '邀约'}`,
       });
       setCreated(info);
-      const mock = info.send_results.filter(r => r.mode === 'mock' && r.ok).length;
-      message.success(mock > 0 ? '邀约已创建（演示环境为模拟发送）' : '邀约已创建并发送');
+      const failed = (info.send_results || []).filter(r => !r.ok).length;
+      if (failed > 0) message.warning(`邀约已创建，${failed} 个渠道发送失败，请查看发送结果`);
+      else message.success('邀约已创建并发送');
     } catch (error) {
       message.error(formatApiError(error));
     } finally {
@@ -157,7 +158,7 @@ export default function InviteDialog({ talent, initialKind = 'written_test', ope
             <Space direction="vertical" size={4} style={{ width: '100%' }}>
               {created.send_results.map((r, i) => (
                 <Typography.Text key={i} type={r.ok ? 'success' : 'danger'} delete={!r.ok}>
-                  {r.channel === 'sms' ? '短信' : '邮件'}：{r.ok ? (r.mode === 'mock' ? '模拟发送（演示环境未真实下发）' : '已发送') : `失败 ${r.error ?? ''}`}
+                  {r.channel === 'sms' ? '短信' : '邮件'}：{r.ok ? '已发送' : `失败 ${r.error ?? ''}`}
                 </Typography.Text>
               ))}
             </Space>

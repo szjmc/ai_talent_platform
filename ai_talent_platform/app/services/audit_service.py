@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,6 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config.logging_config import trace_id_ctx
 from app.core.pagination import PageParams
 from app.core.response import PageResult
+from app.models.audit import AuditLog
 from app.infrastructure.database.session import session_scope
 from app.infrastructure.messaging.event_bus import (
     EVENT_AI_CALL_FINISHED,
@@ -172,17 +174,35 @@ class AuditService:
         module: str | None = None,
         action: str | None = None,
         status: str | None = None,
+        trace_id: str | None = None,
+        start_at: datetime | None = None,
+        end_at: datetime | None = None,
         keyword: str | None = None,
     ) -> PageResult[AuditLog]:
-        """审计分页查询（调用方需具备 admin 权限）。"""
+        """审计分页查询（调用方需具备 admin 权限）。
+
+        trace_id / start_at / end_at 直接下推到 SQL：
+        早期版本只在已分页的结果上再做一次内存过滤，导致「翻到第 2 页才命中」
+        的日志永远查不到，且 total 与 items 对不上。
+        """
         filters = {
             "user_id": user_id,
             "module": module,
             "action": action,
             "status": status,
+            "trace_id": trace_id,
         }
-        return await self.repo.list_with_filters(
-            self.db, page_params, filters=filters, keyword=keyword
+        extra_where = []
+        if start_at is not None:
+            extra_where.append(AuditLog.created_at >= start_at)
+        if end_at is not None:
+            extra_where.append(AuditLog.created_at <= end_at)
+        return await self.repo.paginate(
+            self.db,
+            page_params,
+            filters=filters,
+            keyword=keyword,
+            extra_where=extra_where or None,
         )
 
     async def count_by_action(

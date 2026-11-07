@@ -17,9 +17,8 @@
 - 权重沿用设计文档：技能 0.4 / 经验 0.3 / 学历 0.2 / 素质 0.1。
 已完成：
     - [x] 三个技能 + 工具描述（JSON Schema）+ 纯函数打分算法 + 权限校验
-待实现（依赖方）：
-    - [ ] MatchingService.calculate / list_candidates（Agent 组）
-    - [ ] PositionRepository.search_by_title（Agent 组）
+数据库路径复用 MatchingService.get_latest 的持久化批次结果；岗位检索复用
+PositionRepository.paginate 的白名单搜索，不再依赖不存在的旧方法名。
 =========================================================================
 """
 
@@ -32,9 +31,8 @@ from app.ai.skills.base import (
     BaseSkill,
     import_dependency,
     load_skill_context,
-    require_dependency,
 )
-from app.core.exceptions import ParamError
+from app.core.exceptions import NotFoundError, ParamError
 from app.core.permissions import PermissionEnum
 from app.patterns.registry import skill_registry
 
@@ -191,8 +189,6 @@ class MatchingScoreSkill(BaseSkill):
         position: dict[str, Any] | None = None,
         **_: Any,
     ) -> dict[str, Any]:
-        context = load_skill_context()
-
         if talent is not None and position is not None:
             # 纯函数路径：Agent 已持有数据时直接算（无库依赖，保证技能始终可用）
             result = compute_match_score(talent, position)
@@ -208,25 +204,23 @@ class MatchingScoreSkill(BaseSkill):
         if talent_id is None or position_id is None:
             raise ParamError("请同时提供 talent_id 与 position_id，或直接传 talent / position 数据")
 
-        service = self._load_service()
-        calculator = getattr(service, "calculate", None) or getattr(service, "match", None)
-        require_dependency(
-            calculator is not None,
-            "MatchingService.calculate",
-            hint="Agent 组未实现，可改为直接传 talent/position 数据调用本技能",
-        )
-        result = calculator(talent_id=talent_id, position_id=position_id, context=context)
-        if hasattr(result, "__await__"):
-            result = await result
-        return self._shape(result, talent_id, position_id, "matching_service")
+        from app.infrastructure.database.session import session_scope
 
-    def _load_service(self) -> Any:
-        service_cls = import_dependency(
+        service_cls = self._load_service_cls()
+        async with session_scope() as db:
+            report = await service_cls(db).get_latest(position_id)
+        item = next((row for row in report.items if int(row.talent_id) == int(talent_id)), None)
+        if item is None:
+            raise NotFoundError("该人才不在岗位最近一次匹配结果中")
+        return self._shape(item, talent_id, position_id, "matching_service")
+
+    @staticmethod
+    def _load_service_cls() -> Any:
+        return import_dependency(
             "app.services.matching_service",
             "MatchingService",
-            hint="Agent 组未实现 MatchingService",
+            hint="MatchingService 不可用",
         )
-        return service_cls()
 
     @staticmethod
     def _shape(result: Any, talent_id: int, position_id: int, source: str) -> dict[str, Any]:
@@ -235,7 +229,7 @@ class MatchingScoreSkill(BaseSkill):
             data = dict(result)
         else:
             data = {
-                "total_score": getattr(result, "score", None) or getattr(result, "total_score", 0),
+                "total_score": getattr(result, "score", None),
                 "dimensions": getattr(result, "dimension_scores", None) or {},
                 "highlights": getattr(result, "highlights", None) or [],
                 "gaps": getattr(result, "gaps", None) or [],
@@ -295,22 +289,31 @@ class PositionSearchSkill(BaseSkill):
         return repo_cls()
 
     async def _query(self, repository: Any, keyword: str, status: str, top_k: int, context: Any) -> list[Any]:
-        for method_name in ("search_by_title", "search", "list"):
-            method = getattr(repository, method_name, None)
-            if method is None:
-                continue
-            try:
-                result = method(keyword=keyword, status=status, limit=top_k, context=context)
-            except TypeError:
-                try:
-                    result = method(keyword, status, top_k)
-                except TypeError:
-                    continue
-            if hasattr(result, "__await__"):
-                result = await result
-            return list(result or [])
-        require_dependency(False, "PositionRepository.search_by_title", hint="Agent 组未实现岗位检索方法")
-        return []
+        from app.core.pagination import PageParams
+        from app.core.permissions import DataScopeEnum, get_data_scope
+        from app.infrastructure.database.session import session_scope
+        from app.repositories.organization_repository import OrganizationRepository
+
+        filters: dict[str, Any] = {"status": status}
+        extra_where = []
+        scope = get_data_scope(context.roles)
+        async with session_scope() as db:
+            if scope != DataScopeEnum.ALL:
+                if scope == DataScopeEnum.SELF or not context.organization_id:
+                    return []
+                org_ids = {int(context.organization_id)}
+                if scope == DataScopeEnum.DEPT_SUB:
+                    org_repo = OrganizationRepository()
+                    org = await org_repo.get_by_id(db, int(context.organization_id))
+                    if org is not None:
+                        nodes = await org_repo.list_subtree(db, org.path + str(org.id) + "/")
+                        org_ids.update(int(node.id) for node in nodes)
+                extra_where.append(repository.model.organization_id.in_(sorted(org_ids)))
+            page = await repository.paginate(
+                db, PageParams(page=1, page_size=top_k), filters=filters,
+                keyword=keyword, extra_where=extra_where or None,
+            )
+        return list(page.items)
 
     @staticmethod
     def _shape(row: Any) -> dict[str, Any]:
@@ -362,23 +365,16 @@ class CandidateListSkill(BaseSkill):
         min_score: float = 0,
         **_: Any,
     ) -> list[dict[str, Any]]:
-        context = load_skill_context()
+        from app.infrastructure.database.session import session_scope
+
         service_cls = import_dependency(
             "app.services.matching_service",
             "MatchingService",
-            hint="Agent 组未实现 MatchingService",
+            hint="MatchingService 不可用",
         )
-        service = service_cls()
-        method = getattr(service, "list_candidates", None) or getattr(service, "get_latest_by_position", None)
-        require_dependency(
-            method is not None,
-            "MatchingService.list_candidates",
-            hint="Agent 组未实现，可先用 matching_score 逐个打分",
-        )
-        result = method(position_id=position_id, top_k=top_k, min_score=min_score, context=context)
-        if hasattr(result, "__await__"):
-            result = await result
-        rows = [self._shape(row) for row in list(result or [])]
+        async with session_scope() as db:
+            report = await service_cls(db).get_latest(position_id)
+        rows = [self._shape(row) for row in report.items]
         rows = [row for row in rows if float(row.get("score") or 0) >= min_score]
         return sorted(rows, key=lambda item: float(item.get("score") or 0), reverse=True)[:top_k]
 
@@ -409,14 +405,17 @@ async def calculate_matching_score(
     talent: dict[str, Any] | None = None,
     position: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return await MatchingScoreSkill().execute(
+    result = await MatchingScoreSkill().run(
         talent_id=talent_id, position_id=position_id, talent=talent, position=position
     )
+    return result.raise_for_error().data
 
 
 async def search_positions(keyword: str, status: str = "open", top_k: int = 10) -> list[dict[str, Any]]:
-    return await PositionSearchSkill().execute(keyword=keyword, status=status, top_k=top_k)
+    result = await PositionSearchSkill().run(keyword=keyword, status=status, top_k=top_k)
+    return result.raise_for_error().data
 
 
 async def list_candidates(position_id: int, top_k: int = 10, min_score: float = 0) -> list[dict[str, Any]]:
-    return await CandidateListSkill().execute(position_id=position_id, top_k=top_k, min_score=min_score)
+    result = await CandidateListSkill().run(position_id=position_id, top_k=top_k, min_score=min_score)
+    return result.raise_for_error().data

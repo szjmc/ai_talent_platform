@@ -59,7 +59,11 @@ ROLE_NAMES = {
 
 # ============================================================== MySQL
 async def create_mysql_database() -> None:
-    """MySQL：确保业务库存在。"""
+    """MySQL：确保业务库存在（SQLite 回退模式下无需建库，文件自动创建）。"""
+    if settings.is_sqlite:
+        settings.ensure_dirs()
+        print(f"[1/4] SQLite 回退模式：库文件 {settings.sqlite_path}（自动创建）")
+        return
     engine = create_async_engine(settings.MYSQL_SERVER_URL, pool_pre_ping=True)
     try:
         async with engine.begin() as conn:
@@ -80,19 +84,29 @@ async def create_mysql_tables(drop: bool = False) -> None:
 
     与 app.infrastructure.database.session.init_db 共用 MySQL 命名锁
     （GET_LOCK），多 worker / 本脚本与应用同时启动时 DDL 串行化，避免竞争。
+    同样逐表建表：单表 DDL 错误（例如历史上 JSON 列写了非法默认值）只跳过该表，
+    其余表照常创建，并把失败表名汇总成一份清单，而不是第一张表失败就整体中断。
     """
+    from app.infrastructure.database.advisory_lock import acquire_advisory_lock, release_advisory_lock
+    from app.infrastructure.database.session import create_tables_individually
+
     engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
     try:
         async with engine.begin() as conn:
-            await conn.execute(text("SELECT GET_LOCK('ai_talent_platform:create_all', 30)"))
+            await acquire_advisory_lock(conn, "ai_talent_platform:create_all", 30)
             try:
                 if drop:
-                    print("      [警告] 正在删除 MySQL 所有表……")
+                    print("      [警告] 正在删除所有业务表……")
                     await conn.run_sync(Base.metadata.drop_all)
-                await conn.run_sync(Base.metadata.create_all)
+                failures = await conn.run_sync(create_tables_individually)
             finally:
-                await conn.execute(text("SELECT RELEASE_LOCK('ai_talent_platform:create_all')"))
+                await release_advisory_lock(conn, "ai_talent_platform:create_all")
         tables = sorted(Base.metadata.tables)
+        if failures:
+            print(f"[2/4] MySQL 建表部分失败：成功 {len(tables) - len(failures)}/{len(tables)} 张")
+            for name, reason in failures:
+                print(f"      失败表 {name}：{reason}")
+            raise RuntimeError(f"MySQL 建表失败 {len(failures)} 张：{[name for name, _ in failures]}")
         print(f"[2/4] MySQL 表结构创建完成，共 {len(tables)} 张表：{', '.join(tables)}")
     finally:
         await engine.dispose()

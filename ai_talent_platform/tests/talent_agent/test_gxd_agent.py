@@ -4,7 +4,7 @@ gxd-人才模块边界与链路测试；模型和向量外部调用使用明确�
 标签：[RAG组] [P2]（人才 Agent 联调用例，需外部服务）
 """
 import json
-from types import SimpleNamespace as Obj
+from types import SimpleNamespace, SimpleNamespace as Obj
 from unittest.mock import AsyncMock
 import pytest
 from pydantic import ValidationError
@@ -85,7 +85,8 @@ def test_scanned_pdf_requires_ocr(tmp_path, monkeypatch):
     """gxd-扫描页OCR未开启时明确失败，不能返回空的成功结果。"""
     import fitz
     from app.ai.rag.document_loader import load
-    monkeypatch.setattr(cfg, "ocr_enabled", False)
+    from app.config.settings import settings
+    monkeypatch.setattr(settings, "OCR_ENABLED", False)
     path = tmp_path / "scan.pdf"; doc=fitz.open();doc.new_page();doc.save(path);doc.close()
     with pytest.raises(FileError, match="OCR"):
         load(str(path))
@@ -111,8 +112,9 @@ async def test_resume_agent_rejects_hallucinated_fields(monkeypatch):
 async def test_resume_agent_enforces_permission():
     """gxd-Agent被直接调用时也必须具有解析权限。"""
     from app.ai.agents.resume_agent import ResumeAgent
-    with pytest.raises(PermissionDeniedError):
-        await ResumeAgent(context=AIContext(user_id=2,roles=["employee"])).run({"text":"简历"})
+    result = await ResumeAgent(context=AIContext(user_id=2,roles=["employee"])).run({"text":"简历"})
+    assert result["ok"] is False
+    assert result["error_code"] == PermissionDeniedError.code
 
 async def test_portrait_drops_fabricated_scores():
     """gxd-删除无证据标签和未经校准的潜力、素质打分。"""
@@ -126,11 +128,12 @@ async def test_portrait_drops_fabricated_scores():
 @pytest.mark.parametrize("vectors", [[[1]], [[float("nan"),1]], [[0,0]], []])
 async def test_embedding_checks_output_shape(monkeypatch, vectors):
     """gxd-拒绝维度、数量、有限值或零向量错误。"""
-    from app.ai.rag.embedding_service import EmbeddingService, llm_manager
-    monkeypatch.setattr(cfg,"embedding_dim",2)
-    monkeypatch.setattr(llm_manager,"embed",AsyncMock(return_value=vectors))
+    from app.ai.rag.embedding_service import EmbeddingService
+    from app.config.settings import settings
+    monkeypatch.setattr(settings, "EMBEDDING_DIM", 2)
+    embeddings = SimpleNamespace(aembed_documents=AsyncMock(return_value=vectors))
     with pytest.raises(AIError):
-        await EmbeddingService().embed_texts(["abc"])
+        await EmbeddingService(embeddings=embeddings).embed_texts(["abc"])
 
 async def test_vector_adapter_validates_existing_collection():
     """gxd-集合结构不兼容时失败，不自动删除或重建用户集合。

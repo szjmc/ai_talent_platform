@@ -64,6 +64,16 @@ async def _startup() -> None:
     else:
         logger.info("MySQL 连接成功 %s", mysql_report["target"])
 
+    # 1.5) 连接池预热：远程 MySQL 建连（TCP+鉴权）实测可达 5~19 秒，启动时并发
+    #      建立常驻连接，避免重启后首批请求现场建连导致 20s+ 超时（列表加载失败）。
+    if mysql_ok:
+        try:
+            from app.infrastructure.database.session import warm_up_pool
+
+            await warm_up_pool()
+        except Exception:  # noqa: BLE001 - 预热失败不阻塞启动
+            logger.exception("MySQL 连接池预热失败（首个请求将现场建连）")
+
     # 2) 自动建表：仅 dev/test 且 DB_AUTO_CREATE_TABLES=true（prod 恒为 False，走 Alembic）
     if mysql_ok and settings.db_auto_create_tables:
         try:

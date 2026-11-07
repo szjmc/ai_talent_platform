@@ -24,12 +24,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from app.config.settings import settings
 from app.infrastructure.database.mysql import (
     create_async_engine_from_settings,
     dispose_engine,
@@ -86,6 +89,32 @@ async def session_scope() -> AsyncGenerator[AsyncSession, None]:
             raise
 
 
+async def warm_up_pool(count: int | None = None) -> int:
+    """启动阶段连接池预热：并发建立常驻连接并归还池中。
+
+    背景：远程 MySQL 的 TCP+鉴权握手实测可达 5~19 秒（RTT 仅 50ms，慢在服务器端）。
+    不预热时，服务重启后的首批请求要现场建连，用户视角就是「列表加载失败 / 请求失败」。
+    预热后请求从池中直接取连接，只剩单次查询耗时。
+    """
+    from sqlalchemy import text
+
+    n = count or min(settings.DB_POOL_SIZE, 5)
+
+    async def _one() -> bool:
+        try:
+            async with get_session_factory()() as session:
+                await session.execute(text("SELECT 1"))
+            return True
+        except Exception:  # noqa: BLE001 - 单条预热失败不拖垮其余连接
+            logger.warning("连接池预热单连接失败", exc_info=True)
+            return False
+
+    results = await asyncio.gather(*(_one() for _ in range(n)))
+    ok = sum(1 for r in results if r)
+    logger.info("MySQL 连接池预热完成：%s/%s 条常驻连接", ok, n)
+    return ok
+
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """FastAPI 依赖：请求级 MySQL 会话（复用 session_scope 的事务策略）。
 
@@ -116,11 +145,39 @@ async def release_connection(session: AsyncSession) -> bool:
     return True
 
 
+def create_tables_individually(sync_conn: Any) -> list[tuple[str, str]]:
+    """逐个建表（在同步连接上执行），返回失败清单 [(表名, 错误摘要)]。
+
+    为什么不用一次性 `metadata.create_all()`：
+        它是「全有或全无」的语义 —— 第一张建表失败（例如 JSON 列写了非法默认值，
+        MySQL 直接报 ERR 1101）就中断，**后面所有表都不会被创建**，而 lifespan
+        只打印一条「自动建表失败（不影响服务启动）」，服务带病启动、接口一用就 500。
+        逐表执行可以把故障隔离到单张表，失败表名与原因一次性列出来，排障成本从
+        「翻一堆堆栈」降到「看一行日志」，且其余表照常可用。
+
+    幂等：checkfirst=True 已存在的表直接跳过，重复启动不会报错。
+    """
+    from app.models import Base  # 延迟导入，避免循环依赖
+    import app.models  # noqa: F401 - 触发所有模型模块的注册
+
+    failures: list[tuple[str, str]] = []
+    for table in Base.metadata.sorted_tables:
+        try:
+            Base.metadata.create_all(sync_conn, tables=[table], checkfirst=True)
+        except Exception as exc:  # noqa: BLE001 - 单表失败不阻断其余表
+            reason = str(getattr(exc, "orig", exc)).strip().splitlines()[0][:200]
+            failures.append((table.name, reason))
+            logger.error("建表失败：%s（%s）—— 其余表继续创建", table.name, reason)
+    return failures
+
+
 async def init_db() -> None:
     """建表（开发期快捷方式；生产请使用 Alembic）。
 
     导入 app.models 是为了让所有模型类注册到 Base.metadata；
-    通过 MySQL 命名锁 GET_LOCK 串行化多 worker / 多实例同时启动的 create_all。
+    通过 MySQL 命名锁 GET_LOCK 串行化多 worker / 多实例同时启动的建表；
+    逐表创建（见 create_tables_individually），单表 DDL 错误不会拖垮其余表。
+    SQLite 回退模式没有 GET_LOCK，单文件库本身由文件锁串行化，直接建表即可。
     """
     from sqlalchemy import text
 
@@ -128,13 +185,24 @@ async def init_db() -> None:
     import app.models  # noqa: F401 - 触发所有模型模块的注册
 
     engine = get_engine()
-    async with engine.begin() as conn:
-        await conn.execute(text("SELECT GET_LOCK('ai_talent_platform:create_all', 30)"))
-        try:
-            await conn.run_sync(Base.metadata.create_all)
-        finally:
-            await conn.execute(text("SELECT RELEASE_LOCK('ai_talent_platform:create_all')"))
-    logger.info("MySQL 表结构初始化完成，共 %s 张表", len(Base.metadata.tables))
+    if settings.is_sqlite:
+        async with engine.begin() as conn:
+            failures = await conn.run_sync(create_tables_individually)
+    else:
+        async with engine.begin() as conn:
+            await conn.execute(text("SELECT GET_LOCK('ai_talent_platform:create_all', 30)"))
+            try:
+                failures = await conn.run_sync(create_tables_individually)
+            finally:
+                await conn.execute(text("SELECT RELEASE_LOCK('ai_talent_platform:create_all')"))
+
+    total = len(Base.metadata.tables)
+    if failures:
+        detail = "；".join(f"{name}: {reason}" for name, reason in failures)
+        raise RuntimeError(
+            f"MySQL 建表部分失败（成功 {total - len(failures)}/{total} 张），失败表：{detail}"
+        )
+    logger.info("MySQL 表结构初始化完成，共 %s 张表", total)
 
 
 async def check_all_connections() -> dict:

@@ -1,4 +1,5 @@
 """
+标签：[Agent组] [P0]
 模块：app/routers/assessment_router.py
 职责：人才测评接口层（简历驱动 -> RAG组卷 -> 短信 -> 笔试 -> 面试 -> 代码直出综合报告）。
 
@@ -103,7 +104,7 @@ async def create_assessment(body: AssessmentCreateRequest, request: Request, db:
             "当前未配置 FRONTEND_URL / PUBLIC_BASE_URL，笔试链接基于请求 Host 生成，"
             "候选人可能无法从外网打开。请在 .env 配置 PUBLIC_BASE_URL（后端公网地址）。"
         )
-    return success(data=data, message="试卷已生成并推送")
+    return success(data=data, message="试卷已生成" if email_result.get("ok") else "试卷已生成，邮件未发送")
 
 
 # ------------------------------------------------------------------ 2. 列表
@@ -189,7 +190,16 @@ async def get_paper(assessment_id: int, db: DbSession = None):
     })
 
 
-# ------------------------------------------------------------------ 4. 提交笔试（达标自动邀约）
+# ------------------------------------------------------------------ 4. 开始测评（pending -> in_progress）
+@router.post("/{assessment_id}/start", summary="开始测评：状态置为作答中并下发试卷",
+             response_model=SuccessResponse[dict],
+             dependencies=[Depends(require_permission(P.ASSESSMENT_MANAGE))])
+async def start(assessment_id: int, db: DbSession = None):
+    data = await _svc(db).start_assessment(assessment_id)
+    return success(data=data, message="测评已开始")
+
+
+# ------------------------------------------------------------------ 5. 提交笔试（达标自动邀约）
 @router.post("/{assessment_id}/submit", summary="提交笔试答案；达标自动发面试邀约",
              response_model=SuccessResponse[dict],
              dependencies=[Depends(require_permission(P.ASSESSMENT_MANAGE))])
@@ -204,9 +214,9 @@ async def submit(assessment_id: int, body: AnswerSubmitRequest, db: DbSession = 
     if rule_total >= INTERVIEW_THRESHOLD:
         assessment = await service.repo.get_by_id_or_404(db, assessment_id)
         talent_email = getattr(assessment.talent, "email", "") if assessment.talent else ""
-        await send_email(talent_email or "", template="interview_invite",
-                         params={"name": f"候选人{assessment.talent_id}"})
-        invited = True
+        email_result = await send_email(talent_email or "", template="interview_invite",
+                                         params={"name": assessment.talent.name})
+        invited = bool(email_result.get("ok"))
     return success(data={**result, "interview_invited": invited,
                          "threshold": INTERVIEW_THRESHOLD},
                    message="笔试已提交")
@@ -271,7 +281,7 @@ async def interview_finish(assessment_id: int, session_id: int | None = None,
     # 可选：结束会话并回填面试总分（记录表已携带得分时可不传）
     if session_id:
         await service.repo.finish_interview_session(
-            db, session_id, interview_score or 0.0, summary={})
+            db, session_id, interview_score or 0.0, summary={}, assessment_id=assessment_id)
 
     # 生成综合报告（笔试 + 向量库面试记录 + 简历 -> 五维量化）
     report = await service.generate_report(assessment_id)

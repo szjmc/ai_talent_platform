@@ -283,15 +283,27 @@ class AgentService:
         messages: list[ChatMessage] = [ChatMessage(role="system", content=_DEGRADED_SYSTEM)]
         messages.extend(ChatMessage.from_any(item) for item in session.history)
         ctx = get_context()
-        async for text in llm_manager.stream(
-            messages,
-            purpose="chat",
-            user_id=ctx.user_id,
-            conversation_id=ctx.conversation_id,
-            trace_id=ctx.trace_id,
-        ):
-            if text:
-                yield str(text)
+        try:
+            async for text in llm_manager.stream(
+                messages,
+                purpose="chat",
+                user_id=ctx.user_id,
+                conversation_id=ctx.conversation_id,
+                trace_id=ctx.trace_id,
+            ):
+                if text:
+                    yield str(text)
+        except AIError as exc:
+            # LLM 未配置：流式入口同样给出可操作引导（与 supervisor 降级口径一致）
+            if getattr(exc, "data", None) and exc.data.get("reason") == "api_key_missing":
+                yield (
+                    "您好，我是本平台的 AI 助手。当前服务端尚未配置大模型"
+                    f"（{exc.data.get('provider') or 'LLM_PROVIDER'} 的 API Key 为空），"
+                    "暂时只能提供平台功能引导。请在 .env 中配置 LLM_API_KEY / LLM_BASE_URL "
+                    "（或使用本地 Ollama：LLM_PROVIDER=ollama）后重启后端。"
+                )
+                return
+            raise
 
     # ================================================================ 内部
     async def _open_chat(

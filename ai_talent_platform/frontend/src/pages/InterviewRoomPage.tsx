@@ -190,6 +190,17 @@ export default function InterviewRoomPage() {
   /* ------------------------------------------------------------------ 进房 */
   const enterRoom = useCallback(async () => {
     setSysNotice('');
+    // getUserMedia 仅在安全上下文（HTTPS 或 localhost）暴露；用局域网 IP 以 http 访问时
+    // navigator.mediaDevices 为 undefined，直接调用会抛
+    // "Cannot read properties of undefined (reading 'getUserMedia')"。
+    if (!navigator.mediaDevices?.getUserMedia) {
+      const insecure = window.isSecureContext === false;
+      setFailText(insecure
+        ? '当前页面通过 HTTP + 非 localhost 地址访问，浏览器已禁用摄像头/麦克风。请改用 http://localhost:5173 打开本页，或以 HTTPS 模式启动前端（前端目录执行 VITE_DEV_HTTPS=1 npm run dev 后访问 https://<地址>:5173，首次需信任自签名证书）。'
+        : '当前浏览器不支持媒体设备访问（navigator.mediaDevices 不可用）。请使用较新版本的 Chrome / Edge 并检查浏览器权限设置。');
+      setPhase('failed');
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: 1280, height: 720, facingMode: 'user' }, audio: { echoCancellation: true },

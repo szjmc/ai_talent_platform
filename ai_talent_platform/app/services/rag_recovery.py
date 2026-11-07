@@ -1,20 +1,25 @@
 # 恢复任务从持久日志判断待处理资源，通过命名锁避开进行中的请求，失败任务保留供后续扫描。
-"""恢复 MinIO 入库日志；不创建或改变数据库表。
-标签：[RAG组] [P0]。"""
+"""恢复入库补偿日志；不创建或改变数据库表。
+标签：[RAG组] [P0]。
+
+存储后端跟随 settings.STORAGE_BACKEND（与 rag_ingest_job 保持一致，
+不再硬编码 MinIO；本地后端时补偿日志以文件形式落在上传根目录）。
+"""
 import asyncio
 import json
 import time
 from sqlalchemy import select, func
-from app.repositories.rag_ingest_job import IngestJob, PREFIX, archive_completed_job
+from app.repositories.rag_ingest_job import IngestJob, PREFIX, archive_completed_job, list_job_keys
 from app.infrastructure.database.session import get_engine,get_session_factory,close_db
+from app.infrastructure.database.advisory_lock import acquire_advisory_lock
 from app.models.knowledge import KnowledgeDoc
 from app.adapters.storage.base_storage import get_storage
 from app.adapters.vector_store.milvus_adapter import MilvusAdapter
 from app.infrastructure.vector.milvus import close_milvus
 
 async def recover():
-    storage=get_storage('minio')
-    for path in await storage.client.list_keys(PREFIX):
+    storage=get_storage()
+    for path in await list_job_keys(storage, PREFIX):
         try:
             value=json.loads(await storage.read(path))
         except Exception:
@@ -32,7 +37,7 @@ async def recover():
         if value.get('not_before', 0) > time.time():
             continue
         async with get_engine().connect() as conn:
-            locked=await conn.scalar(select(func.GET_LOCK(value['lock_key'],0)))
+            locked=await acquire_advisory_lock(conn, value['lock_key'], 0)
             await conn.commit()
             if locked!=1:
                 continue  # 上传还在执行，不能按时间猜测已崩溃。

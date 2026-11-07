@@ -2,13 +2,11 @@ import type { ReactNode } from 'react';
 import ReactECharts from 'echarts-for-react';
 import type { EChartsOption } from 'echarts';
 import { Avatar as AntAvatar, Tag, Tooltip } from 'antd';
-import { InfoCircleOutlined } from '@ant-design/icons';
-
 export function Brand({ light = false }: { light?: boolean }) {
   return <div className="login-brand"><div className="brand-mark"><i/><i/><i/><i/></div><div><div className="brand-name" style={light ? { color: '#fff' } : undefined}>智才云</div><div className="brand-sub">TALENTOS · AI</div></div></div>;
 }
-export function PageHeader({ title, description, actions, demo }: { title: string; description?: string; actions?: ReactNode; demo?: boolean }) {
-  return <div className="page-header"><div><div className="breadcrumb-line">智才云 TalentOS <span style={{ margin: '0 7px' }}>/</span> {title}</div><h1 className="page-title">{title}{demo && <span className="demo-badge"><InfoCircleOutlined/> 演示数据</span>}</h1>{description && <p className="page-description">{description}</p>}</div>{actions && <div className="page-actions">{actions}</div>}</div>;
+export function PageHeader({ title, description, actions }: { title: string; description?: string; actions?: ReactNode }) {
+  return <div className="page-header"><div><div className="breadcrumb-line">智才云 TalentOS <span style={{ margin: '0 7px' }}>/</span> {title}</div><h1 className="page-title">{title}</h1>{description && <p className="page-description">{description}</p>}</div>{actions && <div className="page-actions">{actions}</div>}</div>;
 }
 export function Chart({ option, height = 280, style }: { option: EChartsOption; height?: number; style?: React.CSSProperties }) {
   return <ReactECharts option={option} style={{ height, width: '100%', ...style }} notMerge lazyUpdate opts={{ renderer: 'canvas' }} />;

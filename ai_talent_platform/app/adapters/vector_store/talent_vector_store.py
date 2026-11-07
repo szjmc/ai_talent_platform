@@ -150,7 +150,7 @@ class TalentVectorStore:
                 {"id": int(id_), "vector": list(vec), **(meta or {})}
                 for id_, vec, meta in zip(batch_ids, batch_vectors, batch_metas)
             ]
-            await _run(client.insert, collection_name=collection, data=rows)
+            await _run(client.upsert, collection_name=collection, data=rows)
             count += len(rows)
         return count
 

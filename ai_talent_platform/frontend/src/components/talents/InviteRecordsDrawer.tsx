@@ -29,7 +29,7 @@ const STATUS_TAG: Record<string, { label: string; color: string }> = {
 
 interface Props {
   open: boolean;
-  /** 打开时预填的关键字（如人才姓名，用于演示卡片无档案行时按标题检索） */
+  /** 打开时预填的关键字（如人才姓名，用于按标题检索） */
   initialKeyword?: string;
   onClose: () => void;
 }
@@ -133,8 +133,8 @@ export default function InviteRecordsDrawer({ open, initialKeyword = '', onClose
                     {item.send_results.length === 0
                       ? <Typography.Text type="secondary">未选发送渠道</Typography.Text>
                       : item.send_results.map((r, i) => (
-                        <Tag key={i} color={r.ok ? (r.mode === 'mock' ? 'orange' : 'green') : 'red'} style={{ marginInlineEnd: 4 }}>
-                          {r.channel === 'sms' ? '短信' : '邮件'}：{r.ok ? (r.mode === 'mock' ? '模拟发送' : '已发送') : `失败${r.error ? `（${r.error}）` : ''}`}
+                        <Tag key={i} color={r.ok ? 'green' : 'red'} style={{ marginInlineEnd: 4 }}>
+                          {r.channel === 'sms' ? '短信' : '邮件'}：{r.ok ? '已发送' : `失败${r.error ? `（${r.error}）` : ''}`}
                         </Tag>
                       ))}
                   </div>

@@ -14,10 +14,13 @@ from app.ai.rag.embedding_service import EmbeddingService
 from app.routers.knowledge_router import get_service
 from app.services.ingestion_service import IngestionService
 from fastapi import Query
-from pydantic import BaseModel,Field
 from app.core.rag_constants import CategoryLiteral
 # 最终路径为/api/v1/ingestion/...；tags用于Swagger中的接口分组。
-router=APIRouter(prefix='/ingestion',tags=['知识库'])
+# [接口分组治理] /ingestion/* 只剩「文件解析 -> 切片 -> 向量写入」的管线运维动作，
+# 独立为「知识入库」分组。此前它和 /knowledge/docs/* 一起挂在「知识库」下，
+# 联调方在知识库分组里看到一堆与文档检索无关的写口，无法判断归属。
+# 已迁走：/ingestion/delete -> /files/index/delete（删除的是文档索引，属文件管理）。
+router=APIRouter(prefix='/ingestion',tags=['知识入库'])
 
 # require_permission返回已认证用户；Service还会检查文件是否属于该用户。
 # scope='function'使提交/回滚在响应发送前完成，避免前端先收到成功再发生提交失败。
@@ -44,21 +47,8 @@ async def embed(request:EmbedQueryRequest,user=Depends(require_permission(Permis
     return success(data={'embedding':vector,'text':request.text,'dim':len(vector)})
 
 
-class DeleteRequest(BaseModel):
-    """删除请求：文件ID采用数字字符串，分类只允许平台约定的英文标识。"""
-    # 这里是files表主键，不是knowledge_docs主键，也不是任意UUID。
-    file_id:str=Field(pattern=r'^[1-9][0-9]*$')
-    category:CategoryLiteral
-
-@router.post('/delete',status_code=202, summary='删除知识文档索引', description='按文件ID和分类受理删除，先提交文档逻辑删除，再由恢复任务清理向量。需要知识库管理权限及文档归属权限；HTTP202和deletion_pending表示已受理，不代表立即清理完成。此接口不物理删除原始文件。')
-async def delete(request:DeleteRequest,user=Depends(require_permission(PermissionEnum.KNOWLEDGE_MANAGE)),service=Depends(get_service,scope='function')):
-    """受理逻辑删除；202表示已受理，不代表远程向量已立即清理完成。"""
-    bridge=IngestionService(service.db)
-    # Service先记录持久化任务，再逻辑删除；恢复worker确认事务结果后清理向量。
-    # 共享任务列表让外层get_service正确释放锁，并保留待补偿任务。
-    bridge.ingest_jobs=service.ingest_jobs
-    return success(data=await bridge.delete_document(request.file_id,request.category,user),code=202,message='删除已受理，向量由补偿任务清理')
-
+# [接口分组治理] 原 POST /ingestion/delete（删除文档索引）已迁至 POST /files/index/delete，
+# 同一条实现不再保留两个路径，避免联调方看到两条都能删、但归属不同的接口。
 @router.get('/chunks/fetch', summary='分页查看文档切片', description='按分类和可选文件ID查看当前用户可访问且已索引的切片，返回切片ID、原文、文件ID、来源、页码和匹配范围total。需要知识库读取权限；支持offset/limit分页，每页最多1000条，无可靠页码时page_number为0。')
 async def fetch(category:CategoryLiteral,offset:int=Query(0,ge=0),limit:int=Query(100,ge=1,le=1000),file_id:int|None=Query(None,ge=1),user=Depends(require_permission(PermissionEnum.KNOWLEDGE_READ)),service=Depends(get_service)):
     """分页查看切片原文：category必填；file_id可选；每页最多1000条。

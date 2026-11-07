@@ -1,11 +1,12 @@
 """
+标签：[Agent组] [P2]
 模块：scripts/smoke_assessment_integration.py
 职责：人才测评功能「集成测试」（连 MySQL，基于真实人才档案数据）。
 
 覆盖链路：
     1. 建表（补齐测评组缺失的 interview_* 三张表，幂等）
     2. 基于真实人才档案（talents 表）取 talent_id
-    3. 简历解析 -> 难度推断 -> RAG 组卷（RAG 组题库不可用时降级本地内置题库）
+    3. 简历解析 -> 难度推断 -> 授权数据库题库组卷（语义失败仍走数据库随机选题）
     4. 创建测评 + 落题（status=pending）
     5. 开始测评取试卷（验证不下发标准答案）
     6. 提交答案客观题规则判分（status=submitted）
@@ -94,7 +95,20 @@ async def _pick_talent() -> tuple[int, dict]:
     return int(row["id"]), info
 
 
-async def _assemble_paper(db, talent_id: int, info: dict) -> list[dict]:
+async def _pick_authorized_user(db):
+    from sqlalchemy import select
+    from app.core.permissions import PermissionEnum, has_permission
+    from app.models.user import User
+
+    rows = (await db.execute(select(User).where(User.is_deleted.is_(False), User.is_active.is_(True)))).scalars().all()
+    for user in rows:
+        if user.is_superuser or (has_permission(user.role_codes, PermissionEnum.KNOWLEDGE_READ)
+                                 and has_permission(user.role_codes, PermissionEnum.ASSESSMENT_MANAGE)):
+            return user
+    raise SystemExit("未找到具备题库读取与测评管理权限的活跃用户，无法执行数据库组卷")
+
+
+async def _assemble_paper(db, user, talent_id: int, info: dict) -> list[dict]:
     from app.ai.agents.resume_parser import (
         infer_difficulty,
         parse_resume,
@@ -106,10 +120,9 @@ async def _assemble_paper(db, talent_id: int, info: dict) -> list[dict]:
               "期望参与企业级 AI 数字化平台建设。")
     kw = parse_resume(resume)
     difficulty = infer_difficulty(kw)
-    # user=None：RAG 组题库检索因无身份而降级本地内置题库（验证降级链路）
     questions = await retrieve_questions_rag(
-        db, None, difficulty, kw.get("skills", []), count=5)
-    print("\n【3】简历解析 -> 难度 -> RAG 组卷（RAG 不可用时降级本地题库）")
+        db, user, difficulty, kw.get("skills", []), count=5)
+    print("\n【3】简历解析 -> 难度 -> 授权数据库题库组卷")
     print(f"    难度={difficulty} 技能={kw.get('skills')} 题数={len(questions)}")
     _check("组卷返回 5 题", len(questions) == 5)
     RESULT["difficulty"] = difficulty
@@ -195,6 +208,23 @@ async def _upload_interview_record(db, assessment_id: int, talent_id: int) -> di
     return result
 
 
+async def _score_objective_only(db, assessment_id: int, submit_result: dict) -> None:
+    """纯客观题冒烟：按数据库满分归一化后写入结果，不调用模型。"""
+    from app.services.assessment_service import AssessmentService
+
+    svc = AssessmentService(db)
+    state = await svc.load_analysis_state(assessment_id)
+    possible = sum(float(a["score"]) for a in state["answers"] if a["type"] in ("single", "multiple"))
+    if possible <= 0:
+        raise SystemExit("客观题满分为零，无法生成冒烟报告")
+    total = round(float(submit_result["rule_total_score"]) / possible * 100, 1)
+    await svc.save_ai_evaluation(assessment_id, {
+        "total_score": total, "dimension_scores": submit_result.get("dimension_rule_scores") or {},
+        "level": svc._level(total), "report": {"summary": f"客观题冒烟得分 {total}"},
+        "suggestions": [], "model_name": "objective-smoke", "prompt_version": "smoke",
+    })
+
+
 async def _generate_report(db, assessment_id: int) -> dict:
     from app.services.assessment_service import AssessmentService
 
@@ -224,12 +254,17 @@ async def main() -> None:
     talent_id, info = await _pick_talent()
 
     async with session_scope() as db:
-        questions = await _assemble_paper(db, talent_id, info)
+        user = await _pick_authorized_user(db)
+        questions = await _assemble_paper(db, user, talent_id, info)
         assessment_id = await _create_assessment(db, talent_id, questions)
-        await _start_and_submit(db, assessment_id)
+        submit_result = await _start_and_submit(db, assessment_id)
 
-        if interview_ready:
+        if submit_result.get("need_ai_score"):
+            print("\n[跳过] 综合报告：试卷含主观题，需要配置 Dify 语义评分后执行 Agent 全流程")
+            report = None
+        elif interview_ready:
             await _upload_interview_record(db, assessment_id, talent_id)
+            await _score_objective_only(db, assessment_id, submit_result)
             report = await _generate_report(db, assessment_id)
         else:
             report = None

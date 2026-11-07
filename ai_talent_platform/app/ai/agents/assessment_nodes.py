@@ -1,4 +1,5 @@
 """
+标签：[Agent组] [P0]
 模块：app/ai/agents/assessment_nodes.py
 职责：人才测评分析 Agent 的节点函数（纯函数：state 进、增量 dict 出）。
 
@@ -17,12 +18,13 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, TypedDict
 
-from app.ai.agents.assessment_dify_client import (
-    call_analyze_workflow,
-    call_assign_workflow,
-    call_score_workflow,
-)
-from app.ai.agents.resume_parser import infer_difficulty, parse_resume, retrieve_questions
+from pydantic import ValidationError
+
+from app.config.settings import settings
+from app.core.exceptions import AIError, BusinessRuleError
+from app.schemas.assessment import AnalyzeResult, LLMScoreResult
+
+from app.ai.agents.assessment_dify_client import call_analyze_workflow, call_score_workflow
 
 logger = logging.getLogger(__name__)
 
@@ -39,14 +41,19 @@ class AssessmentState(TypedDict, total=False):
     grade: str
     stage: str
     answers: list[dict]
+    questions: list[dict]
+    email_result: dict[str, Any]
+    objective_possible: float
+    subjective_possible: float
     # 新增：简历文本 / 候选人背景 / 联系方式
     resume_text: str
     email: str
+    candidate_name: str
+    dimension_rule_scores: dict[str, float]
     education: str
     work_years: float
     # ---- assign ----
     paper_id: str
-    questions: list[dict]
     resume_keywords: dict[str, Any]
     difficulty: str
     # ---- dispatch ----
@@ -104,67 +111,34 @@ FIT_INTERVIEW: float = 0.5
 
 # ================================================================ 1. assign 组卷
 async def node_assign(state: AssessmentState) -> dict[str, Any]:
-    """识别简历关键字 -> RAG 检索匹配难度试卷。
-
-    若 state 带 resume_text：解析岗位/学校/薪资/年限 -> 推断难度 -> 题库检索；
-    否则回退到 Dify 组卷（测试数据兜底）。
-    """
-    resume_text = state.get("resume_text")
-    if resume_text:
-        logger.info("[assign] 基于简历 RAG 组卷 talent_id=%s", state.get("talent_id"))
-        keywords = parse_resume(resume_text)
-        difficulty = infer_difficulty(keywords)
-        questions = retrieve_questions(
-            difficulty, keywords.get("skills", []), count=int(state.get("question_count") or 5)
-        )
-        return {
-            "paper_id": f"paper-{difficulty}-{state.get('talent_id', 0)}",
-            "questions": questions,
-            "resume_keywords": keywords,
-            "difficulty": difficulty,
-            "status": "assigned",
-        }
-
-    # 无简历文本：回退 Dify 组卷
-    logger.info("[assign] 无简历文本，走 Dify 组卷")
-    out = await call_assign_workflow({
-        "talent_id": state.get("talent_id"),
-        "position_id": state.get("position_id"),
-        "job_level": state.get("job_level"),
-        "profession": state.get("profession"),
-        "grade": state.get("grade"),
-        "question_count": 5,
-    })
-    return {
-        "paper_id": out.get("paper_id", ""),
-        "questions": out.get("questions", []),
-        "difficulty": state.get("job_level", "中级"),
-        "status": "assigned",
-    }
+    """读取已由 Service 从数据库装载的试卷；不再使用内置题或模拟试卷。"""
+    questions = state.get("questions")
+    if not questions:
+        raise BusinessRuleError("请先通过测评服务创建并读取数据库试卷")
+    return {"paper_id": str(state["assessment_id"]), "questions": questions,
+            "difficulty": state.get("job_level", "中级"), "status": "assigned"}
 
 
 # ================================================================ 2. dispatch 下发
 async def node_dispatch(state: AssessmentState) -> dict[str, Any]:
-    """测评任务下发 + 邮件推送。"""
-    logger.info("[dispatch] 下发测评任务 paper_id=%s email=%s",
-                state.get("paper_id"), state.get("email"))
+    """发送数据库任务对应的真实考试链接；未配置邮件时如实回传失败。"""
     from app.infrastructure.notify.email_client import send_email
+    from app.utils.exam_token import build_exam_url
 
-    email_result = await send_email(
-        state.get("email", ""),
-        template="assessment_invite",
-        params={
-            "name": f"候选人{state.get('talent_id', '')}",
-            "paper": state.get("difficulty", ""),
-            "url": "/exam/start",
-        },
-    )
-    return {
-        "dispatched_at": _now(),
-        "notify_channels": ["email"],
-        "email_result": email_result,
-        "status": "dispatched",
-    }
+    base_url = settings.FRONTEND_URL or settings.PUBLIC_BASE_URL
+    if not base_url:
+        email_result = {"ok": False, "channel": "email", "simulated": False,
+                        "msg": "未配置 FRONTEND_URL 或 PUBLIC_BASE_URL，未发送邮件"}
+    else:
+        email_result = await send_email(
+            state.get("email", ""), template="assessment_invite",
+            params={"name": state.get("candidate_name") or "您好",
+                    "paper": state.get("profession") or "人才测评",
+                    "url": build_exam_url(base_url, state["assessment_id"])},
+        )
+    return {"dispatched_at": _now(), "notify_channels": ["email"],
+            "email_result": email_result,
+            "status": "dispatched" if email_result.get("ok") else "assign_failed"}
 
 
 # ================================================================ 3. monitor 监控
@@ -183,111 +157,119 @@ async def node_monitor(state: AssessmentState) -> dict[str, Any]:
 
 # ================================================================ 4. stat（已剔除多维汇总模板）
 async def node_stat(state: AssessmentState) -> dict[str, Any]:
-    """客观题总分汇总（多维统计模板已按需求剔除）。"""
+    """仅对数据库装载的标准答案做客观题判分，不信任请求中的 rule_score。"""
+    from app.services.assessment_service import AssessmentService
+
     answers = state.get("answers") or []
     total = 0.0
-    for a in answers:
-        if a.get("scored_by") == "ai":
-            continue
-        total += float(a.get("rule_score") or 0.0)
-    return {"rule_total_score": round(total, 2), "status": "stat_done"}
+    objective_possible = 0.0
+    subjective_possible = 0.0
+    dimensions: dict[str, float] = {}
+    for answer in answers:
+        points = float(answer["score"])
+        if points < 0:
+            raise BusinessRuleError("数据库试卷存在负分值")
+        dimension = answer.get("dimension") or "未分类"
+        if answer.get("type") in ("single", "multiple"):
+            objective_possible += points
+            expected = AssessmentService._normalize_choice(answer.get("standard_answer"))
+            got = AssessmentService._normalize_choice(answer.get("answer"))
+            earned = points if expected and got == expected else 0.0
+            total += earned
+            dimensions[dimension] = round(dimensions.get(dimension, 0.0) + earned, 2)
+        else:
+            subjective_possible += points
+    return {"rule_total_score": round(total, 2), "dimension_rule_scores": dimensions,
+            "objective_possible": objective_possible, "subjective_possible": subjective_possible,
+            "status": "stat_done"}
 
 
-# ================================================================ 5. score 语义打分(Dify)
 async def node_score(state: AssessmentState) -> dict[str, Any]:
-    """大模型语义打分（Dify）。"""
+    """语义评分只使用已提交的主观题；无主观题时无需调用外部模型。"""
+    if not state.get("subjective_possible"):
+        return {"llm_scores": {}, "score_rationale": "本次试卷没有主观题", "status": "scored"}
     out = await call_score_workflow({
-        "talent_id": state.get("talent_id"),
-        "position_id": state.get("position_id"),
+        "talent_id": state.get("talent_id"), "position_id": state.get("position_id"),
         "job_level": state.get("job_level"),
-        "answers": state.get("answers", []),
+        "answers": [answer for answer in state.get("answers", []) if answer.get("type") == "text"],
         "rule_total_score": state.get("rule_total_score", 0.0),
     })
-    return {
-        "llm_scores": {
-            "comprehensive": out.get("comprehensive", 0.0),
-            "professional": out.get("professional", 0.0),
-            "position_fit": out.get("position_fit", 0.0),
-            "subjective_total": out.get("subjective_total", 0.0),
-        },
-        "score_rationale": out.get("rationale", ""),
-        "status": "scored",
-    }
+    try:
+        scores = LLMScoreResult.model_validate(out)
+        if not set(out).issuperset(LLMScoreResult.model_fields):
+            raise ValueError("missing score fields")
+        values = scores.model_dump()
+    except (ValidationError, ValueError, TypeError) as exc:
+        raise AIError("Dify 语义评分缺少必填字段或分值超出0到100") from exc
+    return {"llm_scores": {key: values[key] for key in
+                           ("comprehensive", "professional", "position_fit", "subjective_total")},
+            "score_rationale": values["rationale"], "status": "scored"}
 
 
-# ================================================================ 6. analyze 短板研判(Dify)
 async def node_analyze(state: AssessmentState) -> dict[str, Any]:
-    """短板研判、能力结构分析。"""
+    """把本次真实得分交给已配置的工作流，拒绝缺字段或非法数值。"""
     out = await call_analyze_workflow({
-        "talent_id": state.get("talent_id"),
-        "job_level": state.get("job_level"),
+        "talent_id": state.get("talent_id"), "job_level": state.get("job_level"),
+        "dimension_scores": state.get("dimension_rule_scores", {}),
         "llm_scores": state.get("llm_scores", {}),
     })
-    return {
-        "weakness": out.get("weakness", []),
-        "ability_structure": out.get("ability_structure", {}),
-        "level": out.get("level", state.get("grade", "中级")),
-        "growth_potential": out.get("growth_potential", ""),
-        "status": "analyzed",
-    }
+    try:
+        if not set(out).issuperset(AnalyzeResult.model_fields):
+            raise ValueError("missing analysis fields")
+        analyzed = AnalyzeResult.model_validate(out)
+        if any(not 0 <= float(value) <= 100 for value in analyzed.ability_structure.values()):
+            raise ValueError("invalid dimension score")
+    except (ValidationError, ValueError, TypeError) as exc:
+        raise AIError("Dify 短板研判结果结构不合法") from exc
+    return {"weakness": [item.model_dump() for item in analyzed.weakness],
+            "ability_structure": analyzed.ability_structure, "level": analyzed.level,
+            "growth_potential": analyzed.growth_potential, "status": "analyzed"}
 
 
 # ================================================================ 7. report 综合报告
 async def node_report(state: AssessmentState) -> dict[str, Any]:
-    """综合笔试 + 面试 + 学历 + 年限 -> 个性化报告。
-
-    输出：综合得分、优势、岗位匹配度、短板。
-    权重：笔试(客观+主观) 60% + 面试 30% + 背景(学历/年限) 10%。
-    """
+    """按真实题目满分归一化；缺失面试分不按零分处理，重新归一化可用权重。"""
+    objective_possible = float(state.get("objective_possible") or 0)
+    subjective_possible = float(state.get("subjective_possible") or 0)
+    possible = objective_possible + subjective_possible
+    if possible <= 0:
+        raise BusinessRuleError("试卷总分为零，无法生成评分报告")
     llm_scores = state.get("llm_scores") or {}
-    rule = float(state.get("rule_total_score") or 0.0)
-    subj = float(llm_scores.get("subjective_total") or 0.0)
-    written = round(rule * 0.4 + subj * 0.6, 1)
-
-    interview_score = float(state.get("interview_score") or 0.0)
-
-    # 背景分：学历 + 年限
-    edu_tier = {"博士": 95, "硕士": 88, "研究生": 88, "本科": 80, "大专": 70, "专科": 70}.get(
-        state.get("education", ""), 78)
-    years = float(state.get("work_years") or 0)
-    background = round(min(100, edu_tier * 0.7 + min(years * 3, 30)), 1)
-
-    total_score = round(written * WEIGHT_WRITTEN + interview_score * WEIGHT_INTERVIEW + background * WEIGHT_BACKGROUND, 1)
-
-    # 岗位匹配度：笔试专业分 + 面试分
-    job_fit = round(float(llm_scores.get("professional", 0)) * FIT_PROFESSIONAL + interview_score * FIT_INTERVIEW, 1)
-
-    # 优势：能力结构分 >=80 的维度
+    rule = float(state.get("rule_total_score") or 0)
+    subjective = float(llm_scores.get("subjective_total") or 0) / 100 * subjective_possible
+    written = round((rule + subjective) / possible * 100, 1)
+    interview = state.get("interview_score")
+    if interview is not None and not 0 <= float(interview) <= 100:
+        raise BusinessRuleError("面试得分必须在0到100之间")
+    education = state.get("education")
+    edu_tier = {"博士": 95, "硕士": 88, "研究生": 88, "本科": 80, "大专": 70, "专科": 70}.get(education)
+    background = None
+    if edu_tier is not None and state.get("work_years") is not None:
+        background = round(min(100, edu_tier * 0.7 + min(float(state["work_years"]) * 3, 30)), 1)
+    components = [(written, WEIGHT_WRITTEN)]
+    if interview is not None:
+        components.append((float(interview), WEIGHT_INTERVIEW))
+    if background is not None:
+        components.append((background, WEIGHT_BACKGROUND))
+    total_score = round(sum(value * weight for value, weight in components) / sum(weight for _, weight in components), 1)
+    job_fit = None
+    if "professional" in llm_scores:
+        job_fit = round(float(llm_scores["professional"]), 1)
+    elif state.get("dimension_rule_scores"):
+        job_fit = written
     ability = state.get("ability_structure") or {}
-    strengths = [f"{k}({v}分)" for k, v in ability.items() if float(v or 0) >= 80]
-
+    strengths = [f"{key}({value}分)" for key, value in ability.items() if float(value) >= 80]
     weakness = state.get("weakness") or []
-    suggestions = [w.get("suggestion") for w in weakness if w.get("suggestion")]
-
-    report = {
-        "summary": "",
-        "total_score": total_score,
-        "written_score": written,
-        "interview_score": interview_score,
-        "background_score": background,
-        "level": state.get("level", "中级"),
-        "job_fit": job_fit,
-        "strengths": strengths,
-        "weakness": weakness,
-        "suggestions": suggestions,
-        "growth_potential": state.get("growth_potential", ""),
-        "interview_records": state.get("interview_records", []),
-    }
-    return {
-        "report": report,
-        "dimension_scores": ability,
-        "total_score": total_score,
-        "job_fit": job_fit,
-        "strengths": strengths,
-        "suggestions": suggestions,
-        "status": "reported",
-        "finished_at": _now(),
-    }
+    suggestions = [item["suggestion"] for item in weakness if item.get("suggestion")]
+    report = {"summary": "", "total_score": total_score, "written_score": written,
+              "interview_score": interview, "background_score": background,
+              "level": state.get("level"), "job_fit": job_fit, "strengths": strengths,
+              "weakness": weakness, "suggestions": suggestions,
+              "growth_potential": state.get("growth_potential", ""),
+              "interview_records": state.get("interview_records", [])}
+    return {"report": report, "dimension_scores": ability, "total_score": total_score,
+            "job_fit": job_fit, "strengths": strengths, "suggestions": suggestions,
+            "level": state.get("level"), "status": "reported", "finished_at": _now()}
 
 
 # 节点注册表

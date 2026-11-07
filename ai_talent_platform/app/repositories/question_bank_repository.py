@@ -3,11 +3,34 @@
 标签：[RAG组] [P1]。
 """
 from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.sql.functions import FunctionElement
 
 from app.models.question_bank import QuestionBankQuestion
 from app.repositories.base import BaseRepository
 
 Q = QuestionBankQuestion
+
+
+class sql_random(FunctionElement):
+    """随机排序（跨方言）：MySQL 用 rand()，SQLite/Postgres 用 random()。
+
+    此前直接 func.rand()：SQLite 回退模式下报 no such function: rand，
+    「创建测评」组卷必现 500。
+    """
+
+    name = "sql_random"
+    inherit_cache = True
+
+
+@compiles(sql_random, "mysql")
+def _sql_random_mysql(element, compiler, **kw):  # noqa: ANN001, ARG001
+    return "rand()"
+
+
+@compiles(sql_random)
+def _sql_random_default(element, compiler, **kw):  # noqa: ANN001, ARG001
+    return "random()"
 
 
 class QuestionBankRepository(BaseRepository):
@@ -30,7 +53,7 @@ class QuestionBankRepository(BaseRepository):
         return stmt
 
     async def random_questions(self, db, request, user, question_type, count):
-        stmt = self.selection_query(request, user, question_type).order_by(func.rand()).limit(count)
+        stmt = self.selection_query(request, user, question_type).order_by(sql_random()).limit(count)
         return list((await db.scalars(stmt)).all())
 
     async def candidate_batches(self, db, request, user, question_type, signature, batch_size=500):

@@ -63,6 +63,13 @@ def offline_agents(monkeypatch):
     import app.ai.workflows.supervisor_workflow as supervisor
 
     monkeypatch.setattr(supervisor, "dispatch", _not_found)
+
+    async def _not_found_stream(*args, **kwargs):
+        raise NotFoundError("Agent 未注册：offline-test")
+        yield ""  # pragma: no cover - 使函数成为异步生成器
+
+    import app.services.agent_service as agent_service
+    monkeypatch.setattr(agent_service, "dispatch_stream", _not_found_stream)
     return _not_found
 
 
@@ -162,7 +169,7 @@ async def test_chat_rejects_unknown_conversation(fake_llm, offline_agents):
     assert resp.conversation_id.startswith("local-")
 
 
-async def test_chat_stream_events_sequence(fake_llm):
+async def test_chat_stream_events_sequence(fake_llm, offline_agents):
     """SSE 事件序列：start → delta* → done；delta 同时带 text 与 delta 键。"""
     service = AgentService(db=None)
     session = await service.prepare_chat(
@@ -372,7 +379,7 @@ async def test_endpoint_chat_and_stream_end_to_end(fake_llm, offline_agents):
                 )
                 events.append((lines.get("event"), json.loads(lines.get("data", "{}"))))
             kinds = [name for name, _ in events]
-            assert kinds[0] == "start" and kinds[-1] == "done"
+            assert kinds[0] == "start" and kinds[-1] == "done", events
             assert "delta" in kinds
             text = "".join(d["text"] for n, d in events if n == "delta")
             assert text
@@ -413,7 +420,7 @@ async def test_endpoint_chat_and_stream_end_to_end(fake_llm, offline_agents):
 
 
 async def test_router_mounted_and_stub_removed(client):
-    """真实 /agents 路由已挂载（未登录 401，而非占位 501）；其它占位保持 501。"""
+    """真实路由已挂载（未登录 401，而非占位 501）；位置管理也不再是占位。"""
     resp = await client.get("/api/v1/agents")
     assert resp.status_code == 401
     assert resp.json()["code"] == 2001
@@ -424,8 +431,10 @@ async def test_router_mounted_and_stub_removed(client):
     resp3 = await client.post("/api/v1/agents/chat", json={"message": "hi"})
     assert resp3.status_code == 401
 
+    # [接口分组治理] /positions 已由真实 CRUD 接管：未登录返回 401，不再是 501 占位。
     stub = await client.get("/api/v1/positions")
-    assert stub.status_code == 501
+    assert stub.status_code == 401
+    assert stub.status_code != 501
 
 
 def test_langgraph_is_used_for_supervisor():

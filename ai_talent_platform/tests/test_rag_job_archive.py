@@ -11,6 +11,11 @@ from app.services import rag_recovery as recovery
 
 
 class MemoryStorage:
+    """对象存储内存桩：client 接口与真实 S3/OSS 客户端一致
+    （put_object / get_object / delete_object / list_keys），
+    同时保留 BaseStorage 语义的 read / delete 供恢复任务直接调用。"""
+    name = 'memory'
+
     def __init__(self):
         self.objects = {}
         self.reads = []
@@ -19,9 +24,15 @@ class MemoryStorage:
     async def put_object(self, key, data, content_type):
         self.objects[key] = data
 
-    async def delete(self, key):
+    async def get_object(self, key):
+        return self.objects[key]
+
+    async def delete_object(self, key):
         self.objects.pop(key, None)
         return True
+
+    async def delete(self, key):
+        return await self.delete_object(key)
 
     async def list_keys(self, prefix):
         return [key for key in self.objects if key.startswith(prefix)]
@@ -65,11 +76,11 @@ async def test_archive_write_failure_keeps_active_record(monkeypatch):
     path = jobs.PREFIX + 'retry.json'
     storage.objects[path] = b'{"state":"done"}'
     storage.put_object = AsyncMock(side_effect=OSError('offline'))
-    storage.delete = AsyncMock()
+    storage.delete_object = AsyncMock()
     with pytest.raises(OSError):
         await jobs.archive_completed_job(storage, path, {'state': 'done'})
     assert path in storage.objects
-    storage.delete.assert_not_awaited()
+    storage.delete_object.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -77,13 +88,13 @@ async def test_archive_delete_failure_is_retryable(monkeypatch):
     storage = MemoryStorage()
     path = jobs.PREFIX + 'retry.json'
     storage.objects[path] = b'{"state":"done"}'
-    delete = storage.delete
-    storage.delete = AsyncMock(side_effect=OSError('offline'))
+    delete = storage.delete_object
+    storage.delete_object = AsyncMock(side_effect=OSError('offline'))
     with pytest.raises(OSError):
         await jobs.archive_completed_job(storage, path, {'state': 'done'})
     assert path in storage.objects
     assert jobs.ARCHIVE_PREFIX + 'retry.json' in storage.objects
-    storage.delete = delete
+    storage.delete_object = delete
     await jobs.archive_completed_job(storage, path, {'state': 'done'})
     assert path not in storage.objects
 

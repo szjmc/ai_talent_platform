@@ -1,12 +1,9 @@
-"""邀约通知发送：邮件（SMTP 配置则真发，否则 mock 记日志）+ 短信（mock）。
+"""邀约通知发送：真实 SMTP 发送与短信网关状态回传。
 
 标签：[Agent组] [P1]
 
-降级策略与 Dify 适配一致：默认配置即可离线运行——
-- email: settings.SMTP_HOST 为空 -> mode="mock"，正文与链接写入日志，返回 ok=True
-  （不阻断邀约创建；send_results 中回显 mode 供前端提示"演示发送"）；
-- sms: 仅日志（预留 SMS_PROVIDER 真实网关接入位）；
-真实 SMTP 异常也绝不向上抛：ok=False + error，由调用方落库记录。
+未启用或配置不完整时返回 ok=False，不输出包含链接令牌的模拟通知。
+真实 SMTP 异常不向上抛，由调用方持久化发送结果。
 """
 
 from __future__ import annotations
@@ -48,42 +45,41 @@ def build_invite_payload(
 
 
 async def send_email(to: str, subject: str, body: str) -> dict[str, Any]:
-    """发送邮件；SMTP 未配置走 mock，任何异常都降级为记录结果。"""
+    """真实 SMTP 发送；未启用或缺少配置时失败，不记录邀约令牌或模拟成功。"""
     if not to:
-        return {"channel": "email", "ok": False, "mode": "mock", "error": "无收件邮箱"}
-    if not settings.SMTP_HOST:
-        logger.info("[mock-email] to=%s subject=%s body=\n%s", to, subject, body)
-        return {"channel": "email", "ok": True, "mode": "mock", "error": None}
+        return {"channel": "email", "ok": False, "mode": "smtp", "error": "无收件邮箱"}
+    if not settings.EMAIL_ENABLED or not settings.SMTP_HOST or not settings.SMTP_USER or not settings.SMTP_PASSWORD:
+        return {"channel": "email", "ok": False, "mode": "smtp", "error": "邮件发送未启用或 SMTP 配置不完整"}
     try:
-
         def _sync_send() -> None:
             msg = EmailMessage()
-            msg["From"] = settings.SMTP_FROM or settings.SMTP_USER
+            msg["From"] = settings.SMTP_USER
             msg["To"] = to
             msg["Subject"] = subject
             msg.set_content(body)
-            if settings.SMTP_TLS:
-                with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as client:
-                    client.starttls()
-                    if settings.SMTP_USER:
-                        client.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            if settings.SMTP_USE_SSL:
+                import ssl
+                with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT,
+                                      timeout=10, context=ssl.create_default_context()) as client:
+                    client.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
                     client.send_message(msg)
             else:
                 with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as client:
-                    if settings.SMTP_USER:
-                        client.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+                    if not settings.SMTP_TLS:
+                        raise RuntimeError("SMTP 未启用 TLS/SSL，拒绝明文发送凭据")
+                    import ssl
+                    client.starttls(context=ssl.create_default_context())
+                    client.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
                     client.send_message(msg)
 
         await asyncio.to_thread(_sync_send)
         return {"channel": "email", "ok": True, "mode": "smtp", "error": None}
-    except Exception as exc:  # noqa: BLE001 —— 发送失败不阻断业务
-        logger.warning("邮件发送失败 to=%s: %s", to, exc)
-        return {"channel": "email", "ok": False, "mode": "smtp", "error": str(exc)}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("邮件发送失败 type=%s", type(exc).__name__)
+        return {"channel": "email", "ok": False, "mode": "smtp", "error": "邮件服务发送失败，请检查 SMTP 配置"}
 
 
 async def send_sms(to: str, body: str) -> dict[str, Any]:
-    """发送短信；当前默认 mock（记录日志），预留真实网关（SMS_PROVIDER）。"""
-    if not to:
-        return {"channel": "sms", "ok": False, "mode": "mock", "error": "无手机号"}
-    logger.info("[mock-sms] to=%s provider=%s body=\n%s", to, settings.SMS_PROVIDER, body)
-    return {"channel": "sms", "ok": True, "mode": "mock", "error": None}
+    """当前未接入真实短信网关，明确返回未发送，禁止 mock 成功。"""
+    return {"channel": "sms", "ok": False, "mode": "unconfigured",
+            "error": "无手机号" if not to else "短信网关尚未配置，未发送短信"}

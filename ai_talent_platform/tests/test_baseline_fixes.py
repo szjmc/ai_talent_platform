@@ -48,6 +48,7 @@ from app.ai.agents.base_agent import BaseAgent
 from app.ai.context import clear_context, get_context, set_context
 from app.config.logging_config import redact_sensitive, trace_id_ctx
 from app.config.settings import Settings, settings
+from app.core.application import create_application
 from app.core.exceptions import AuthError, DuplicateError
 from app.core.permissions import visible_organization_ids
 from app.core.security import (
@@ -464,9 +465,11 @@ def test_single_pagination_and_response_contract():
     if hasattr(schemas_common, "SuccessResponse"):
         from app.core.response import ApiResponse
 
-        assert schemas_common.SuccessResponse is ApiResponse, (
-            "SuccessResponse 必须是 ApiResponse 的同一对象别名，不允许独立定义"
-        )
+        # 合并期保留独立泛型类以稳定既有 OpenAPI 组件名；对外字段必须与 ApiResponse 一致。
+        assert set(schemas_common.SuccessResponse.model_fields) == set(ApiResponse.model_fields)
+        assert schemas_common.SuccessResponse(code=201, message="ok", data={"x": 1}).model_dump() == {
+            "code": 201, "message": "ok", "data": {"x": 1}, "trace_id": "-",
+        }
     for current in ("ApiResponse", "PageResult", "success", "error", "api_response"):
         assert hasattr(response_mod, current), f"core.response 缺少 {current}"
 
@@ -516,55 +519,76 @@ def test_get_db_delegates_to_session_scope():
 # ==================================================================== 15 501 占位统一
 # 说明：resumes / knowledge 已由真实 router 挂载（不再返回 501），
 # 因此骨架一致性只覆盖仍处于占位状态的四个模块。
-_SKELETON_ROUTERS = (
-    ("positions", "app.routers.position_router"),
-    ("assessments", "app.routers.assessment_router"),
-    ("trainings", "app.routers.training_router"),
-    ("matchings", "app.routers.matching_router"),
-)
+async def test_placeholder_returns_501_contract():
+    """占位工厂仍返回统一 501 契约（用合成前缀验证，不依赖清单里真有未实现模块）。
 
+    [接口分组治理] 原先断言 `GET /api/v1/files` 返回 501，那正是「文件管理只有占位接口」
+    的写照；本轮 files 已切换为真实实现，因此把契约验证移到占位工厂本身 ——
+    以后每实现一个模块就不必再改这条用例。
+    """
+    from app.routers._stub import placeholder_router
 
-@pytest.mark.asyncio
-async def test_mounted_stub_returns_501_contract(client):
-    """挂载的占位路由（router.py placeholder）：未登录也返回 501 + owner 提示。"""
-    resp = await client.get("/api/v1/positions")
+    app = FastAPI()
+    app.include_router(
+        placeholder_router(prefix="files", tag="文件管理", description="[架构组] 文件上传、下载、预览")
+    )
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
+                                 base_url="http://stub.test") as stub_client:
+        resp = await stub_client.get("/files")
     assert resp.status_code == 501
     body = resp.json()
     assert body["code"] == 501
-    assert body["data"]["module"] == "岗位管理"
-    assert body["data"]["owner"] == "Agent组"
+    assert body["data"]["module"] == "文件管理"
+    assert body["data"]["owner"] == "架构组"
     assert body["data"]["hint"]
 
 
 @pytest.mark.asyncio
-async def test_skeleton_routers_share_stub_contract(client):
-    """issue 15：7 个骨架路由占位端点与挂载占位同契约（501、结构一致、无权限拦截）。"""
-    import importlib
+async def test_implemented_files_module_no_longer_returns_501():
+    """文件管理已由真实路由接管：同路径不再返回 501，且归属「文件管理」分组。
 
+    不依赖 DB 版 `client` fixture：未带 Token 访问真实路由会先被鉴权拦下（401），
+    而占位路由是公开的、直接返回 501 —— 两者可区分，却能离线运行。
+    """
+    paths = create_application().openapi()["paths"]
+    assert paths["/api/v1/files/upload"]["post"]["tags"] == ["文件管理"]
+    # 文件列表由知识库文档接口承载（GET /knowledge/docs），文件模块的
+    # GET 路由为版本下载；此处断言真实 GET 路由存在且归属「文件管理」分组。
+    assert paths["/api/v1/files/revisions/{revision_id}/download"]["get"]["tags"] == ["文件管理"]
+
+    app = create_application()
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
+                                 base_url="http://test") as anon:
+        resp = await anon.post("/api/v1/files/upload")
+    assert resp.status_code == 401
+    assert resp.status_code != 501
+
+
+@pytest.mark.asyncio
+async def test_stub_registry_does_not_shadow_implemented_modules():
+    """占位清单与已实现清单不得重叠；清单清空后也不能有前缀被 501 抢占。
+
+    [接口分组治理] 曾出现「positions 既在 IMPLEMENTED_MODULES 又在 _STUB_MODULES」，
+    以及「files/audit 真实路由已 include，但 501 占位仍注册」——真实路由先注册所以占位
+    不可达，但 Swagger 同一分组里出现「（待实现）接口占位」，联调方无法判断哪个可用。
+    """
+    from app.routers._stub import placeholder_router
+    from app.routers.router import IMPLEMENTED_MODULES, _STUB_MODULES
+
+    overlap = {prefix for prefix, _, _ in _STUB_MODULES} & set(IMPLEMENTED_MODULES)
+    assert not overlap, f"以下模块既已实现又登记为占位：{sorted(overlap)}"
+
+    paths = create_application().openapi()["paths"]
+    for prefix, _tag, _desc in _STUB_MODULES:
+        assert f"/api/v1/{prefix}" not in paths, f"{prefix} 已实现，不应再挂 501 占位"
+
+    # 占位工厂本身仍可用：合成前缀确认 501 契约没有随清单清空而失效。
     skeleton_app = FastAPI()
-    prefixes: dict[str, str] = {}
-    for prefix, module_name in _SKELETON_ROUTERS:
-        router = importlib.import_module(module_name).router
-        skeleton_app.include_router(router)
-        prefixes[router.prefix] = prefix
-
-    async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=skeleton_app),
-        base_url="http://skeleton.test",
-    ) as skel_client:
-        for router_prefix, prefix in prefixes.items():
-            skel_resp = await skel_client.get(router_prefix)
-            assert skel_resp.status_code == 501, f"{router_prefix} 骨架占位未返回 501"
-            assert skel_resp.json()["code"] == 501
-
-            mount_resp = await client.get(f"/api/v1/{prefix}")
-            assert mount_resp.status_code == 501, f"/api/v1/{prefix} 挂载占位未返回 501"
-
-            skel_body, mount_body = skel_resp.json(), mount_resp.json()
-            # 同一模块两处占位的契约必须逐字段一致（防漂移）
-            assert skel_body["code"] == mount_body["code"]
-            assert skel_body["message"] == mount_body["message"]
-            assert skel_body["data"] == mount_body["data"]
+    skeleton_app.include_router(placeholder_router(prefix="demo", tag="演示", description="[架构组] 演示模块"))
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=skeleton_app),
+                                 base_url="http://skeleton.test") as skel_client:
+        resp = await skel_client.get("/demo")
+    assert resp.status_code == 501 and resp.json()["data"]["module"] == "演示"
 
 
 # ==================================================================== 16/17/18 死配置与删除
@@ -655,12 +679,14 @@ async def test_rate_limit_enabled_gate(client, monkeypatch):
 
     monkeypatch.setattr(settings, "RATE_LIMIT_ENABLED", False)
     resp = await client.get("/api/v1/positions")
-    assert resp.status_code == 501
+    # 岗位模块已由真实路由接管：匿名请求被鉴权拦截（401），
+    # 而非占位路由的 501；此处只关心限流开关是否触碰计数器。
+    assert resp.status_code == 401
     assert keys == [], "限流关闭时不应触碰计数器"
 
     monkeypatch.setattr(settings, "RATE_LIMIT_ENABLED", True)
     resp2 = await client.get("/api/v1/positions")
-    assert resp2.status_code == 501
+    assert resp2.status_code == 401
     assert keys, "限流开启后必须走 Redis 固定窗口计数"
     assert keys[0].startswith("ratelimit:"), f"key 格式应为 ratelimit:{{ip}}:{{window}}: {keys[0]}"
 

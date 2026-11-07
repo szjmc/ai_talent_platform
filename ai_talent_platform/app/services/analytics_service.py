@@ -51,15 +51,31 @@ class AnalyticsService:
 
     @asynccontextmanager
     async def _statistics(self, user, *, validate=None):
-        """从登录上下文重算数据范围，一个接口中的聚合共用只读事务。"""
+        """从登录上下文重算数据范围，一个接口中的聚合共用只读事务。
+
+        PgSQL 分析库启用时走只读分析会话（原路径，口径不变）；
+        PGSQL_ENABLED=False 时兑现「降级为仅统计业务库数据」的承诺：
+        改用业务库只读会话 + AnalyticsFallbackRepository 实时聚合，
+        人才驾驶舱 / 数据洞察不再整体报「分析库未启用」。
+        """
+        from app.repositories.analytics_mysql_repository import AnalyticsFallbackRepository
+        from app.infrastructure.database.session import get_session_factory
+
         roles = self._roles(user)
         with context_scope(user, roles=roles) as context:
             scope = checked_scope({"user_id": context.user_id, "roles": context.roles,
                                    "organization_id": context.organization_id})
             if validate is not None:
                 validate(AnalyticsStatisticsService(None, scope))
-            async with readonly_analytics_session() as db:
-                yield AnalyticsStatisticsService(db, scope)
+            if settings.PGSQL_ENABLED:
+                async with readonly_analytics_session() as db:
+                    yield AnalyticsStatisticsService(db, scope)
+            else:
+                factory = get_session_factory()
+                async with factory() as db:
+                    yield AnalyticsStatisticsService(
+                        db, scope, repository=AnalyticsFallbackRepository(db)
+                    )
 
     async def distribution(self, type_: str, filters: AnalyticsFilters, user):
         """分布统计公开门面，Router/其他模块不得直接调用Repository。"""

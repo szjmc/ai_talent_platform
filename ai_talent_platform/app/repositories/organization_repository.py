@@ -23,7 +23,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.organization import Organization
@@ -61,12 +61,16 @@ class OrganizationRepository(BaseRepository[Organization]):
         return list((await db.execute(stmt)).scalars().all())
 
     async def list_subtree(self, db: AsyncSession, path: str) -> list[Organization]:
-        """按 path 前缀取整棵子树（path 形如 /1/3/7/）。"""
+        """按完整自身前缀取子孙部门（不含自身）。
+
+        organizations.path 只含祖先：部门 3 在根 1 下时 path=/1/，
+        其子孙前缀必须是 /1/3/。传入 /1/ 会误含兄弟部门，调用方负责拼接自身 ID。
+        """
         stmt = (
             select(Organization)
             .where(
                 Organization.is_deleted.is_(False),
-                or_(Organization.path.like(f"{path}%"), Organization.path == path),
+                Organization.path.like(f"{path}%"),
             )
             .order_by(Organization.level.asc(), Organization.sort.asc())
         )
@@ -106,8 +110,8 @@ class OrganizationRepository(BaseRepository[Organization]):
             org = await self.get_by_id(db, organization_id)
             if org is None:
                 return 0
-            subtree = await self.list_subtree(db, org.path)
-            org_ids = [o.id for o in subtree]
+            subtree = await self.list_subtree(db, org.path + str(org.id) + "/")
+            org_ids = [organization_id] + [o.id for o in subtree]
         stmt = select(func.count()).select_from(User).where(
             User.organization_id.in_(org_ids),
             User.is_deleted.is_(False),

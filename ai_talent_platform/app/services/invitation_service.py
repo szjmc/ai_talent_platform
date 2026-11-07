@@ -7,7 +7,7 @@
   题目在**创建邀约时**从题库（assessment_questions，Vanna组）随机抽样快照进
   ExamSession.question_ids，此后题库增删不影响已发试卷。
 - 公开接口仅凭 token 访问（候选人无账号）；token 由 secrets 生成并查重。
-- 邮件/短信发送走 invite_notify（SMTP 未配置=mock 记日志，永不阻断）；
+- 邮件/短信发送走 invite_notify；未配置/失败返回 ok=False，不模拟成功；
 - 监考帧检测走 ai/proctoring（YOLO→Haar→disabled 三级降级）。
 - answer 字段在任何公开响应中都不序列化（题面只含 id/type/content/options）。
 """
@@ -139,7 +139,35 @@ def grade_answers(
 
 
 def build_invitation_link(token: str) -> str:
-    return f"{settings.INVITE_BASE_URL.rstrip('/')}/invite/{token}"
+    """生成候选人公开邀约链接。
+
+    取值优先级：
+        1. INVITE_BASE_URL   —— 专用前缀（生产推荐，形如 https://hr.example.com）
+        2. FRONTEND_URL      —— 前端站点地址（与邮件考试链接共用同一配置）
+        3. PUBLIC_BASE_URL   —— 后端内置公开页地址
+        4. 当前请求的 scheme://host —— 兜底，保证开发环境 / 未配配置时功能可用
+
+    第 4 级是本次修复：此前三级全空时直接抛 1002「未配置…无法生成邀约链接」，
+    开发环境新建邀约必然失败（前端只看到「业务异常 code=1002」）。兜底到请求 Host 后
+    功能立刻可用，同时打 WARNING 提醒生产必须显式配置 —— 反向代理或容器内网时
+    请求 Host 可能不是候选人能访问的地址，这种情况下链接会指向内网。
+    """
+    base = settings.INVITE_BASE_URL or settings.FRONTEND_URL or settings.PUBLIC_BASE_URL
+    if not base:
+        from app.core.middleware import request_base_url_ctx
+
+        base = request_base_url_ctx.get()
+        if base:
+            logger.warning(
+                "邀约链接回退到请求 Host（%s）：生产环境请显式配置 INVITE_BASE_URL，"
+                "否则反向代理下的链接可能指向内网地址", base,
+            )
+    if not base:
+        raise BusinessRuleError(
+            "未配置 INVITE_BASE_URL / FRONTEND_URL / PUBLIC_BASE_URL，且当前请求没有可用的 Host；"
+            "请在 .env 中配置 INVITE_BASE_URL（形如 https://hr.example.com）"
+        )
+    return f"{base.rstrip('/')}/invite/{token}"
 
 
 # --------------------------------------------------------------------------- 服务
@@ -258,7 +286,7 @@ class InvitationService:
             )
         await self.db.commit()
 
-        # 4) 通知（commit 后发送，链接已持久；mock 降级不阻断）
+        # 4) 通知（commit 后发送，链接已持久；失败结果如实落库）
         link = build_invitation_link(token)
         interview_time_iso = (
             body.interview_time.strftime("%Y-%m-%d %H:%M") if body.interview_time else None

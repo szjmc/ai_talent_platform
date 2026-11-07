@@ -23,7 +23,7 @@ from datetime import datetime
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, BigIntPrimaryKey, TimestampMixin
 
 
 class Role(TimestampMixin, Base):
@@ -33,7 +33,7 @@ class Role(TimestampMixin, Base):
     __table_args__ = {"comment": "角色表"}
 
     id: Mapped[int] = mapped_column(
-        BigInteger,
+        BigIntPrimaryKey,
         primary_key=True,
         autoincrement=True,
         comment="角色 ID",

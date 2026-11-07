@@ -4,11 +4,12 @@ import type { ApiResponse } from '../types';
 export const TOKEN_KEY = 'talentos_access_token';
 export const REFRESH_KEY = 'talentos_refresh_token';
 export const USER_KEY = 'talentos_user';
-export const isDemoFallback = import.meta.env.VITE_DEMO_FALLBACK !== 'false';
 
 const client = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
-  timeout: 30000,
+  // 远程 MySQL 场景下部分列表/统计接口实测可达 20~40s（启动预热后大幅缓解），
+  // 30s 超时会把这些「慢但会成功」的响应直接掐断，表现为列表加载失败。
+  timeout: 90000,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -50,7 +51,14 @@ export class ApiError extends Error {
   constructor(error: unknown) {
     const axiosError = error as AxiosError<ApiResponse<unknown>>;
     const data = axiosError.response?.data;
-    super(data?.message || (axiosError.code === 'ERR_NETWORK' ? '后端服务暂不可用' : '请求失败，请稍后重试'));
+    const reason =
+      data?.message ||
+      (axiosError.code === 'ERR_NETWORK'
+        ? '后端服务暂不可用'
+        : axiosError.code === 'ECONNABORTED' || axiosError.code === 'ETIMEDOUT'
+          ? '接口响应超时（后端耗时过长），请稍后重试'
+          : '请求失败，请稍后重试');
+    super(reason);
     this.code = data?.code || axiosError.response?.status || 0;
     this.status = axiosError.response?.status || 0;
     this.traceId = data?.trace_id;
@@ -58,23 +66,12 @@ export class ApiError extends Error {
   }
 }
 
+/** 统一接口契约：所有业务响应均为 { code, message, data, trace_id }，此处只返回 data。 */
 export async function request<T>(config: Parameters<typeof client.request>[0]): Promise<T> {
   try {
     const response = await client.request<ApiResponse<T>>(config);
     return response.data.data;
   } catch (error) { throw new ApiError(error); }
-}
-
-/** 未完成的 501 后端模块使用演示数据；网络错误仅在显式开启时回退。 */
-export async function requestWithFallback<T>(config: Parameters<typeof client.request>[0], fallback: T | (() => T)): Promise<{ data: T; demo: boolean }> {
-  try { return { data: await request<T>(config), demo: false }; }
-  catch (error) {
-    const e = error as ApiError;
-    if (isDemoFallback && (e.code === 501 || e.status === 501 || e.code === 0)) {
-      return { data: typeof fallback === 'function' ? (fallback as () => T)() : fallback, demo: true };
-    }
-    throw error;
-  }
 }
 
 export interface StreamEvent { event: string; data: Record<string, unknown> }
@@ -119,6 +116,26 @@ export function formatApiError(error: unknown): string {
     return error.message;
   }
   return error instanceof Error ? error.message : '操作失败，请稍后重试';
+}
+
+/** 带 Bearer Token 的文件下载。
+ *  下载类接口需要 Authorization 头，浏览器直接 window.open / <a href> 不携带该头，
+ *  会被后端 401 拦截（表现为「提示先登录」）。此处统一 fetch + blob 触发保存。 */
+export async function downloadWithToken(url: string, fileName: string): Promise<void> {
+  const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+  const full = /^https?:\/\//i.test(url) ? url : `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+  const token = localStorage.getItem(TOKEN_KEY);
+  const response = await fetch(full, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiError({ response: { status: response.status, data: body }, code: 'ERR_BAD_RESPONSE' });
+  }
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl; link.download = fileName;
+  document.body.appendChild(link); link.click(); link.remove();
+  URL.revokeObjectURL(objectUrl);
 }
 
 /* ======================= 人才邀约（笔试 / 测评 / 面试间）[Agent组] ======================= */
@@ -184,6 +201,6 @@ export function inviteWsUrl(token: string, role: 'candidate' | 'interviewer'): s
   const url = base.startsWith('http') ? new URL(base) : new URL(base, window.location.origin);
   url.protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   url.pathname = `${url.pathname.replace(/\/$/, '')}/invites/ws/${encodeURIComponent(token)}`;
-  url.search = `role=${role}`;
+  url.search = `?role=${role}`;
   return url.toString();
 }

@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Avatar, Badge, Dropdown, Input, Layout, Menu, Modal, Tooltip } from 'antd';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Avatar, Badge, Dropdown, Empty, Input, Layout, Menu, Modal, Spin, Tooltip } from 'antd';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
-  ApartmentOutlined, AuditOutlined, BarChartOutlined, BellOutlined, BookOutlined, CommentOutlined,
+  ApartmentOutlined, AuditOutlined, BarChartOutlined, BellOutlined, BookOutlined,
   DashboardOutlined, DatabaseOutlined, FileSearchOutlined, FileTextOutlined, FolderOpenOutlined,
   MenuFoldOutlined, MenuUnfoldOutlined, NodeIndexOutlined, QuestionCircleOutlined, RobotOutlined,
   SearchOutlined, SettingOutlined, SolutionOutlined, TeamOutlined, ThunderboltOutlined, UserOutlined,
   DownOutlined, LogoutOutlined, LockOutlined, CheckCircleFilled,
 } from '@ant-design/icons';
 import { useAuth } from '../store/AuthContext';
+import { trainingsApi } from '../services/platform';
+import type { TrainingNotification } from '../types';
+import { formatDate } from '../utils';
 
 const { Sider, Header, Content } = Layout;
 const menuGroups = [
@@ -47,15 +50,13 @@ const searchItems = [
   { title: '人才驾驶舱', path: '/dashboard', type: '页面' }, { title: '人才档案', path: '/talents', type: '页面' },
   { title: '岗位管理', path: '/positions', type: '页面' }, { title: '人岗匹配', path: '/matchings', type: '页面' },
   { title: '数据洞察', path: '/analytics', type: '页面' }, { title: '用户与权限', path: '/users', type: '页面' },
-  { title: '张明远 · 高级算法工程师', path: '/talents?keyword=张明远', type: '人才' },
-  { title: '高级后端工程师 · RD-BE-026', path: '/positions', type: '岗位' },
 ];
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const { user, logout, demo, hasPermission } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const location = useLocation(); const navigate = useNavigate();
   const visibleMenu = useMemo(() => menuGroups.map((group) => ({ ...group, children: group.children.filter((item) => !permissionByPath[item.key] || hasPermission(permissionByPath[item.key])) })).filter((group) => group.children.length), [hasPermission]);
   const selected = '/' + (location.pathname.split('/')[1] || 'dashboard');
@@ -64,16 +65,28 @@ export default function AppLayout() {
     window.addEventListener('keydown', handler); return () => window.removeEventListener('keydown', handler);
   }, []);
   const results = useMemo(() => searchItems.filter((x) => x.title.toLowerCase().includes(query.toLowerCase())), [query]);
-  const notifications = [
-    { title: '简历解析完成', text: '张明远的简历已成功解析，人才画像已更新。', time: '5 分钟前' },
-    { title: '关键岗位人才缺口提醒', text: 'AI 算法专家岗位当前仅有 3 位高匹配候选人。', time: '30 分钟前' },
-    { title: '测评即将截止', text: '管理者领导力综合测评将于 11 月 8 日截止。', time: '2 小时前' },
-  ];
+
+  const [notifications, setNotifications] = useState<TrainingNotification[]>([]);
+  const [unread, setUnread] = useState(0);
+  const [notificationLoading, setNotificationLoading] = useState(false);
+  const loadNotifications = useCallback(async () => {
+    setNotificationLoading(true);
+    try {
+      const data = await trainingsApi.notifications({ page: 1, page_size: 5 });
+      setNotifications(data.items || []); setUnread(data.unread || 0);
+    } catch { setNotifications([]); setUnread(0); }
+    finally { setNotificationLoading(false); }
+  }, []);
+  useEffect(() => { void loadNotifications(); }, [loadNotifications]);
+  const readAll = async () => {
+    try { await trainingsApi.readAllNotifications(); await loadNotifications(); } catch { /* 保持当前列表 */ }
+  };
+
   return <Layout className="app-layout">
     <Sider className="app-sider" width={232} collapsedWidth={80} collapsed={collapsed} trigger={null}>
       <div className="brand"><div className="brand-mark"><i/><i/><i/><i/></div>{!collapsed && <div><div className="brand-name">智才云</div><div className="brand-sub">TALENTOS · AI</div></div>}</div>
       <div className="side-menu-wrap"><Menu className="side-menu" mode="inline" items={visibleMenu} selectedKeys={[selected]} onClick={({ key }) => { if (key === '/talents') { if (location.pathname === '/talents') window.dispatchEvent(new Event('talentos:archive-fullscreen')); else navigate(key, { state: { fullscreen: true } }); } else navigate(key); }} inlineCollapsed={collapsed}/></div>
-      <div className="sider-bottom"><div className="system-status"><span className="status-dot"/>{demo ? '演示环境运行中' : '系统服务运行正常'}</div><small>版本 v1.0.0 · 安全连接</small></div>
+      <div className="sider-bottom"><div className="system-status"><span className="status-dot"/>系统服务运行正常</div><small>版本 v1.0.0 · 安全连接</small></div>
     </Sider>
     <Layout className={`main-shell ${collapsed ? 'collapsed' : ''}`}>
       <Header className="top-header">
@@ -83,8 +96,8 @@ export default function AppLayout() {
         <div className="header-right">
           <Tooltip title="打开 AI 智能助手"><button className="ant-btn ant-btn-primary ai-entry" onClick={() => navigate('/assistant')}><ThunderboltOutlined/> AI 智能助手</button></Tooltip>
           <Tooltip title="帮助中心"><button className="header-icon-btn"><QuestionCircleOutlined/></button></Tooltip>
-          <Dropdown trigger={['click']} placement="bottomRight" dropdownRender={() => <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 8px 30px rgba(30,45,80,.14)', padding: 15 }}><div className="flex justify-between items-center mb-16"><b>消息通知</b><span className="text-primary" style={{ fontSize: 11 }}>全部已读</span></div>{notifications.map((n) => <div className="notification-item" key={n.title}><div className="notification-title"><span>{n.title}</span><Badge status="processing"/></div><div className="notification-text">{n.text}</div><div className="notification-time">{n.time}</div></div>)}</div>}>
-            <Badge count={3} size="small" offset={[-3, 4]}><button className="header-icon-btn"><BellOutlined/></button></Badge>
+          <Dropdown trigger={['click']} placement="bottomRight" dropdownRender={() => <div style={{ background: '#fff', borderRadius: 10, boxShadow: '0 8px 30px rgba(30,45,80,.14)', padding: 15, width: 320 }}><div className="flex justify-between items-center mb-16"><b>消息通知</b><span className="text-primary" style={{ fontSize: 11, cursor: 'pointer' }} onClick={readAll}>全部已读</span></div>{notificationLoading ? <Spin/> : notifications.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无通知"/> : notifications.map((n) => <div className="notification-item" key={n.id} onClick={async () => { try { await trainingsApi.readNotification(n.id); await loadNotifications(); } catch { /* ignore */ } }}><div className="notification-title"><span>{n.title}</span>{!n.is_read && <Badge status="processing"/>}</div><div className="notification-text">{n.content}</div><div className="notification-time">{formatDate(n.created_at || n.notify_date, true)}</div></div>)}</div>}>
+            <Badge count={unread} size="small" offset={[-3, 4]}><button className="header-icon-btn"><BellOutlined/></button></Badge>
           </Dropdown>
           <Dropdown menu={{ items: [
             { key: 'profile', icon: <UserOutlined/>, label: '个人中心', onClick: () => navigate('/profile') },
@@ -93,7 +106,7 @@ export default function AppLayout() {
             { type: 'divider' },
             { key: 'logout', icon: <LogoutOutlined/>, label: '退出登录', danger: true, onClick: () => logout().then(() => navigate('/login')) },
           ] }} placement="bottomRight">
-            <div className="header-user"><Avatar size={34} style={{ background: '#e8edfb', color: '#3e5da9', fontWeight: 600 }}>{user?.real_name?.slice(-2) || '用户'}</Avatar><div><div className="header-user-name">{user?.real_name || user?.username}</div><div className="header-user-role">{user?.position_title || (demo ? '平台管理员' : user?.roles?.[0])}</div></div><DownOutlined style={{ fontSize: 9, color: '#9aa3b3' }}/></div>
+            <div className="header-user"><Avatar size={34} style={{ background: '#e8edfb', color: '#3e5da9', fontWeight: 600 }}>{user?.real_name?.slice(-2) || '用户'}</Avatar><div><div className="header-user-name">{user?.real_name || user?.username}</div><div className="header-user-role">{user?.position_title || user?.roles?.[0]}</div></div><DownOutlined style={{ fontSize: 9, color: '#9aa3b3' }}/></div>
           </Dropdown>
         </div>
       </Header>

@@ -25,7 +25,13 @@ pytestmark = pytest.mark.asyncio
 
 
 async def test_settings_use_mysql_and_pgsql_only():
-    """配置层面不允许出现 SQLite。"""
+    """配置层面：生产必须 MySQL/PgSQL；SQLite 仅为本地开发/演示回退。"""
+    if settings.is_sqlite:
+        # 回退模式（TEST_DB_DRIVER=sqlite / DB_DRIVER=sqlite）：
+        # 业务库必须是单文件 SQLite DSN，PgSQL 配置不受影响。
+        assert settings.DATABASE_URL.startswith("sqlite+aiosqlite:///")
+        assert settings.PGSQL_URL.startswith("postgresql+asyncpg://")
+        return
     assert settings.DATABASE_URL.startswith("mysql+aiomysql://")
     assert settings.MYSQL_SERVER_URL.startswith("mysql+aiomysql://")
     assert settings.PGSQL_URL.startswith("postgresql+asyncpg://")

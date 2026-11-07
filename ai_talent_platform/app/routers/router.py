@@ -34,6 +34,8 @@ from app.routers.assessment_router import router as assessment_router  # [合并
 from app.routers.auth_router import router as auth_router
 from app.routers.dify_router import router as dify_router
 from app.routers.exam_router import router as exam_router  # 候选人笔试公开入口（HMAC 令牌免登录）
+from app.routers.audit_router import router as audit_router  # [接口分组治理] 审计查询（替换 501 占位）
+from app.routers.file_router import router as file_router  # [接口分组治理] 文件中心（替换 501 占位）
 from app.routers.knowledge_router import router as knowledge_router  # [合并 lz] 知识库文档与检索
 from app.routers.matching_router import router as matching_router
 from app.routers.organization_router import router as organization_router
@@ -41,11 +43,11 @@ from app.routers.position_router import router as position_router
 from app.routers.rag_router import router as rag_router  # [合并 lz] 向量检索
 from app.routers.resume_router import router as resume_router  # [合并 lz] 简历解析
 from app.routers.talent_router import router as talent_router
-from app.routers.knowledge_router import router as knowledge_router
-from app.routers.resume_router import router as resume_router
 from app.routers.text2answer_router import router as text2answer_router
-from app.routers.a_rag_router import router as a_rag_router
-from app.routers.rag_router import router as rag_router
+from app.routers.training_router import router as training_router
+from app.routers.user_router import router as user_router
+# 人才邀约（笔试 / 测评 / 面试间）：接口早已实现，但历史上只 import 没有 include_router，
+# 导致 /api/v1/invites/* 全部 404，前端邀约弹窗、笔试页、面试间全部不可用。
 from app.routers.invite_router import router as invite_router
 
 logger = logging.getLogger(__name__)
@@ -77,6 +79,10 @@ api_router.include_router(text2answer_router)
 api_router.include_router(a_rag_router)
 api_router.include_router(rag_router)
 api_router.include_router(talent_router)
+# [接口分组治理] 之前漏挂 / 只挂占位的模块，此处补真实实现
+api_router.include_router(invite_router)  # 人才邀约（前端 InvitePage / InterviewRoomPage 依赖）
+api_router.include_router(file_router)    # 文件中心（原 /files 仅 501 占位）
+api_router.include_router(audit_router)   # 审计查询（原 /audit 仅 501 占位）
 
 # ------------------------------------------------------------------ 已实现模块清单
 # 说明：启动日志与 /system/info 的 implemented_modules 共用本清单，避免两处各写一份、
@@ -100,6 +106,10 @@ IMPLEMENTED_MODULES: list[str] = [
     "trainings",
     # [合并 origin/develop] 测评 Agent 上线后，assessments 由占位切换为真实路由
     "assessments",
+    # [接口分组治理] 以下模块已有真实实现，之前遗漏在清单外（对外表现为「未实现」）
+    "invites",   # 人才邀约：接口早已实现，但从未 include_router（/invites/* 一直 404）
+    "files",     # 文件中心：file_router（原为 501 占位）
+    "audit",     # 审计查询：audit_router（原为 501 占位）
 ]
 
 # ------------------------------------------------------------------ 待实现模块
@@ -109,16 +119,14 @@ IMPLEMENTED_MODULES: list[str] = [
 #          api_router.include_router(talent_router)
 # 已实现模块必须同时从本清单移除：同前缀「501 占位 + 真实接口」并存会让联调方看到
 # 自相矛盾的清单，且占位路由实际不可达（真实路由先注册）。test_router_stubs 会守这条。
-_STUB_MODULES: list[tuple[str, str, str]] = [
-    ("positions", "岗位管理", "[Agent组] 岗位 CRUD、岗位说明书 AI 解析、岗位向量化（见 routers/position_router.py）"),
-    ("assessments", "人才测评", "[Vanna组] 测评创建、答题、提交、结果分析（见 routers/assessment_router.py）"),
-    ("trainings", "培训管理", "[Dify组] 课程、培训计划、学习进度（见 routers/training_router.py）"),
-    ("matchings", "人岗匹配", "[Agent组] 执行匹配、匹配结果、匹配解释（见 routers/matching_router.py）"),
-    ("files", "文件管理", "[架构组] 文件上传、下载、预览（待新建 routers/file_router.py）"),
-    ("audit", "审计日志", "[架构组] 操作与 AI 调用审计查询、统计（待新建 routers/audit_router.py）"),
-]
+# [接口分组治理] 本轮清空：清单内 6 个模块都已有真实路由（positions/assessments/
+# trainings/matchings 早就是真实实现，files/audit 本轮补齐）。曾经「同前缀 501 占位 +
+# 真实接口并存」，Swagger 里同一分组既有「（待实现）接口占位」又有真实接口，
+# 联调方无法判断哪个可用 —— 这正是用户反馈的「接口分组混乱」的直接成因。
+# 保留空清单与循环：后续新增未实现模块时按同样方式登记，_stub.py 与契约测试继续有效。
+_STUB_MODULES: list[tuple[str, str, str]] = []
 
-for _prefix, _tag, _desc in _STUB_MODULES:
+for _prefix, _tag, _desc in _STUB_MODULES:  # pragma: no cover - 清单为空时不会进入循环
     api_router.include_router(placeholder_router(prefix=_prefix, tag=_tag, description=_desc))
 
 logger.info(

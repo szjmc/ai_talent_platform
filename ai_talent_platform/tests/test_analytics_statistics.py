@@ -441,6 +441,7 @@ def test_statistics_session_uses_readonly_account_and_cleans_up(fail, monkeypatc
 
 def test_statistics_facade_rebuilds_scope_and_restores_context(monkeypatch):
     from app.ai.context import get_context
+    from app.config.settings import settings
     from app.services import analytics_service
 
     opened = []
@@ -451,9 +452,14 @@ def test_statistics_facade_rebuilds_scope_and_restores_context(monkeypatch):
         opened.append(get_context().user_id)
         yield None
 
+    # 本用例验证 PgSQL 原路径的会话/上下文语义（readonly_analytics_session
+    # 已被替身）；强制走原路径，避免命中 PGSQL_ENABLED=False 的降级分支。
+    monkeypatch.setattr(settings, "PGSQL_ENABLED", True)
     monkeypatch.setattr(analytics_service, "readonly_analytics_session", read_session)
-    monkeypatch.setattr(analytics_service, "AnalyticsStatisticsService",
-                        lambda db, scope: AnalyticsStatisticsService(db, scope, repository=repo))
+    monkeypatch.setattr(
+        analytics_service, "AnalyticsStatisticsService",
+        lambda db, scope, repository=None: AnalyticsStatisticsService(db, scope, repository=repo))
+
     original = get_context()
     current_user = SimpleNamespace(id=5, role_codes=[], is_superuser=True, organization_id=8)
     result = asyncio.run(analytics_service.AnalyticsService().distribution("org", AnalyticsFilters(), current_user))

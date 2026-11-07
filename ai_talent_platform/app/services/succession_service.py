@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from app.adapters.nl2sql.sql_validator import checked_scope
 from app.ai.context import context_scope
+from app.config.settings import settings
 from app.core.exceptions import BusinessException
 from app.infrastructure.database.analytics_query import readonly_analytics_session
 from app.repositories.analytics_repository import AnalyticsRepository
@@ -59,10 +60,21 @@ class SuccessionService:
             if scope.get("data_scope") != "all":
                 raise BusinessException("继任方案需全量数据权限，当前账号权限不足")
 
-            async with readonly_analytics_session() as db:
-                repository = AnalyticsRepository(db)
-                wide = await repository.talent_wide_list()
-                pass_rate = await repository.assessment_pass_rate()
+            if settings.PGSQL_ENABLED:
+                async with readonly_analytics_session() as db:
+                    repository = AnalyticsRepository(db)
+                    wide = await repository.talent_wide_list()
+                    pass_rate = await repository.assessment_pass_rate()
+            else:
+                # PgSQL 分析库未启用：降级为业务库实时取数（口径见 AnalyticsFallbackRepository）
+                from app.infrastructure.database.session import get_session_factory
+                from app.repositories.analytics_mysql_repository import AnalyticsFallbackRepository
+
+                factory = get_session_factory()
+                async with factory() as db:
+                    repository = AnalyticsFallbackRepository(db)
+                    wide = await repository.talent_wide_list()
+                    pass_rate = await repository.assessment_pass_rate()
 
         # 组装候选数据（宽表 + 测评达标率），再定现任
         candidates = []

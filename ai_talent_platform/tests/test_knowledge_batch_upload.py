@@ -11,11 +11,12 @@ from app.services.knowledge_revision_service import KnowledgeRevisionService
 
 
 def test_swagger_file_is_array_and_category_is_one_required_enum():
-    from app.routers.knowledge_router import router
+    # 上传已迁到「文件管理」分组（/files/upload），契约校验跟着路由走。
+    from app.routers.file_router import router
     app = FastAPI()
     app.include_router(router, prefix='/api/v1')
     schema = app.openapi()
-    body = schema['paths']['/api/v1/knowledge/docs/upload']['post']['requestBody']['content']['multipart/form-data']['schema']
+    body = schema['paths']['/api/v1/files/upload']['post']['requestBody']['content']['multipart/form-data']['schema']
     model = schema['components']['schemas'][body['$ref'].split('/')[-1]]
     assert model['properties']['file']['type'] == 'array'
     item = model['properties']['file']['items']
@@ -26,7 +27,8 @@ def test_swagger_file_is_array_and_category_is_one_required_enum():
 
 @pytest.mark.asyncio
 async def test_batch_same_category_and_one_failure_does_not_stop_next():
-    from app.routers.knowledge_router import router, get_revision_service
+    from app.routers.file_router import router
+    from app.routers.knowledge_router import get_revision_service
     service = NS(upload=AsyncMock(), upload_and_publish=AsyncMock(side_effect=[
         FileError('坏文件'), {'status': 'published', 'doc_id': 2, 'revision_id': 3}]))
     user = NS(id=4)
@@ -36,7 +38,7 @@ async def test_batch_same_category_and_one_failure_does_not_stop_next():
     app.include_router(router, prefix='/api/v1')
     app.dependency_overrides[get_revision_service] = context
     async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
-        response = await client.post('/api/v1/knowledge/docs/upload', data={'category': 'training', 'doc_id': '9'},
+        response = await client.post('/api/v1/files/upload', data={'category': 'training', 'doc_id': '9'},
             files=[('file', ('bad.txt', b'bad', 'text/plain')), ('file', ('good.txt', b'good', 'text/plain'))])
         result = response.json()['data']
         assert response.status_code == 200
@@ -47,7 +49,7 @@ async def test_batch_same_category_and_one_failure_does_not_stop_next():
         assert [c.args[-1] for c in service.upload_and_publish.await_args_list] == [9, 9]
         service.upload.assert_not_awaited()
         for category in (None, 'unknown', 'training,resume'):
-            rejected = await client.post('/api/v1/knowledge/docs/upload',
+            rejected = await client.post('/api/v1/files/upload',
                 data={'category': category} if category else {},
                 files=[('file', ('a.txt', b'a')), ('file', ('b.txt', b'b'))])
             assert rejected.status_code == 422

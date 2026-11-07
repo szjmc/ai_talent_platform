@@ -34,7 +34,33 @@ def create_async_engine_from_settings() -> AsyncEngine:
     测试环境（APP_ENV=test）使用 NullPool，避免连接跨 pytest-asyncio 的
     函数级事件循环被复用（复用会撞上已关闭的 transport，Windows 下表现为
     `AttributeError: 'NoneType' object has no attribute 'send'`）。
+
+    DB_DRIVER=sqlite（本地开发/演示回退）时：
+    - 不传 MySQL 专属的 charset / autocommit 连接参数；
+    - aiosqlite 默认连接池即可，另加 busy_timeout（写并发下等待而不是立刻报
+      database is locked）与 WAL 日志模式，保证多请求并发读写稳定。
     """
+    if settings.is_sqlite:
+        engine = create_async_engine(
+            settings.DATABASE_URL,
+            echo=settings.DB_ECHO,
+            future=True,
+            connect_args={"timeout": 30, "check_same_thread": False},
+        )
+
+        from sqlalchemy import event
+
+        @event.listens_for(engine.sync_engine, "connect")
+        def _sqlite_pragma(dbapi_connection, _record):  # noqa: ANN001
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
+        logger.info("业务库引擎已创建（SQLite 回退模式）%s", settings.sqlite_path)
+        return engine
+
     if settings.is_test:
         engine = create_async_engine(
             settings.DATABASE_URL,

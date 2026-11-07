@@ -234,18 +234,24 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 | 认证 | `/auth` | ✅ | 6 | `[架构组]` |
 | 用户 | `/users` | ✅ | 8 | `[架构组]` |
 | 组织 | `/organizations` | ✅ | 7 | `[架构组]` |
-| 岗位 | `/positions` | 🚧 | 7 | `[Agent组]` |
-| 人才 | `/talents` | 🚧 | 9 | `[RAG组]` |
-| 简历 | `/resumes` | 🚧 | 6 | `[RAG组]` |
-| 测评 | `/assessments` | 🚧 | 6 | `[Vanna组]` |
-| 培训 | `/trainings` | 🚧 | 9 | `[Dify组]` |
-| 匹配 | `/matchings` | 🚧 | 5 | `[Agent组]` |
-| 知识库 | `/knowledge` | 🚧 | 7 | `[RAG组]` |
-| 分析 | `/analytics` | ✅ | 6 | `[Vanna组]` |
-| 智能体 | `/agents` | ✅ | 7 | `[Agent组]`（含 `[Dify组]` 双模分支） |
-| 文件 | `/files` | 🚧 | 5 | `[架构组]` |
-| 审计 | `/audit` | 🚧 | 3 | `[架构组]` |
+| 岗位 | `/positions` | ✅ | 9 | `[Agent组]` |
+| 人才 | `/talents` | ✅ | 12 | `[RAG组]` |
+| 简历 | `/resumes` | ✅ | 6 | `[RAG组]` |
+| 测评 | `/assessments` | ✅ | 9 | `[Vanna组]` |
+| 培训 | `/trainings` | ✅ | 16 | `[Dify组]` |
+| 匹配 | `/matchings` | ✅ | 15 | `[Agent组]` |
+| 知识库 | `/knowledge` | ✅ | 15 | `[RAG组]` |
+| 知识入库 | `/ingestion` | ✅ | 4 | `[RAG组]` |
+| 人才邀约 | `/invites` | ✅ | 8 | `[Agent组]` |
+| 分析 | `/analytics` | ✅ | 8 | `[Vanna组]` |
+| 智能体 | `/agents` | ✅ | 9 | `[Agent组]`（含 `[Dify组]` 双模分支） |
+| Dify 中台 | `/dify` | ✅ | 10 | `[Dify组]` |
+| 文件 | `/files` | ✅ | 7 | `[架构组]` |
+| 审计 | `/audit` | ✅ | 3 | `[架构组]` |
 | 系统 | `/system` + 探针 | ✅ | 4 | `[架构组]` |
+
+> 上表接口数由 `create_application().openapi()` 实际导出（`tests/test_api_grouping.py` 守门），
+> 不再手写维护。`/api/v1` 下当前共 **162** 个端点，**已无任何 501 占位分组**。
 
 ---
 
@@ -636,10 +642,10 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 <a id="api-positions"></a>
 
-## 九、岗位模块 Positions — 🚧 待实现
+## 九、岗位模块 Positions — ✅ 已实现
 
 > 主责组：`[Agent组]`（岗位管理垂直归口） ｜ 代码位置：`routers/position_router.py`、`services/position_service.py`、`models/position.py`
-> 当前访问返回 `501`，契约如下（前端可按此先联调 mock）。
+> CRUD 与上下架已实现（原先只有 501 占位），`headcount_filled` 由服务端统计后下发。
 
 ### 数据对象 `PositionResponse`
 
@@ -678,13 +684,15 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
-| POST | `/positions` | `position:manage` | 创建岗位 |
-| GET | `/positions` | `position:read` | 分页列表（`keyword` / `organization_id` / `level` / `status` / 排序） |
-| GET | `/positions/{id}` | `position:read` | 详情（含 `requirements`、`headcount_filled`） |
-| PUT | `/positions/{id}` | `position:manage` | 更新（`code` 不可改） |
-| PATCH | `/positions/{id}/status` | `position:manage` | 上架 / 暂停 / 关闭 |
-| DELETE | `/positions/{id}` | `position:manage` | 逻辑删除（有进行中的匹配任务时禁止） |
-| POST | `/positions/{id}/parse` | `position:manage` | 上传岗位说明书（JD）→ AI 解析出 `requirements`，异步返回任务号 |
+| POST | `/positions` | `position:manage` | 创建岗位；不传 `code` 时自动生成 `POS-{id}` |
+| GET | `/positions` | `position:read` | 分页列表（`keyword` 匹配名称/编码、`organization_id`、`level`、`status`）；部门名称与最新画像版本批量补齐，无 N+1 |
+| GET | `/positions/{id}` | `position:read` | 详情（含 `requirements`、`snapshot_version`） |
+| PUT | `/positions/{id}` | `position:manage` | 更新（只更新传入字段；状态变更走状态机校验） |
+| PATCH | `/positions/{id}/status` | `position:manage` | 上架 / 暂停 / 关闭（前端一键切换） |
+| DELETE | `/positions/{id}` | `position:manage` | 逻辑删除（历史匹配记录保留，可追溯） |
+| POST | `/positions/{id}/jd/parse` | `position:manage` | 粘贴 JD 文本 → AI 解析出 `requirements` 草稿 |
+| POST | `/positions/{id}/profile/confirm` | `position:manage` | 确认画像草稿，生成新版本（生效后可用于匹配） |
+| GET | `/positions/{id}/profile` | `position:read` | 查询当前画像与版本/确认状态 |
 
 **创建请求示例**
 
@@ -709,15 +717,15 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 }
 ```
 
-**错误约定**：`409/3002` 岗位编码重复；`404/3001` 部门不存在；`400/1002` `closed` 岗位不可直接改回 `open`（需重新发布）。
+**错误约定**：`409/3002` 岗位编码重复；`400/1000` 参数不合法（如 `salary_min > salary_max`、部门不存在）；`400/1002` 状态流转非法（如 `closed → paused`）。
 
-**状态机**：`open → paused ⇄ open`，`open/paused → closed`（单向）。关闭后不再参与匹配，历史匹配记录保留。
+**状态机**：`open ⇄ paused`，`open/paused → closed`，`closed → open`（重新发布需显式传 `status`）。关闭后不再参与匹配，历史匹配记录保留。
 
 ---
 
 <a id="api-talents"></a>
 
-## 十、人才模块 Talents — 🚧 待实现
+## 十、人才模块 Talents — ✅ 已实现
 
 > 主责组：`[RAG组]`（人才档案垂直归口） ｜ 代码位置：`routers/talent_router.py`、`models/talent.py`
 
@@ -819,7 +827,7 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 <a id="api-resumes"></a>
 
-## 十一、简历模块 Resumes — 🚧 待实现
+## 十一、简历模块 Resumes — ✅ 已实现
 
 ### 数据对象 `ResumeResponse`
 
@@ -887,7 +895,7 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 <a id="api-assessments"></a>
 
-## 十二、测评模块 Assessments — 🚧 待实现
+## 十二、测评模块 Assessments — ✅ 已实现
 
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
@@ -943,7 +951,7 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 <a id="api-trainings"></a>
 
-## 十三、培训模块 Trainings — 🚧 待实现
+## 十三、培训模块 Trainings — ✅ 已实现
 
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
@@ -988,7 +996,7 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 <a id="api-matchings"></a>
 
-## 十四、匹配模块 Matchings — 🚧 待实现
+## 十四、匹配模块 Matchings — ✅ 已实现
 
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
@@ -1045,17 +1053,24 @@ POST /api/v1/auth/logout           → 前端丢弃令牌（服务端无状态�
 
 <a id="api-knowledge"></a>
 
-## 十五、知识库模块 Knowledge — 🚧 待实现
+## 十五、知识库模块 Knowledge — ✅ 已实现
 
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
 | POST | `/knowledge/docs` | `knowledge:manage` | 新建文本型知识（`title` / `category` / `content` / 权限范围） |
-| POST | `/knowledge/docs/upload` | `knowledge:manage` | 上传文档（PDF/Word/Excel/TXT/图片），异步索引 |
-| GET | `/knowledge/docs` | `knowledge:read` | 文档列表（`status` / `category` / `keyword`） |
-| DELETE | `/knowledge/docs/{id}` | `knowledge:manage` | 删除文档（同步删除 Milvus 向量） |
+| GET | `/knowledge/docs` | `knowledge:manage` | 文档列表（含草稿；`category` 筛选，分页） |
+| GET | `/knowledge/docs/{doc_id}/revisions` | `knowledge:manage` | 文档版本列表（草稿/历史/当前生效，含 `file_id` 与乐观锁 `version`） |
+| GET | `/knowledge/revisions/{revision_id}` | `knowledge:manage` | 版本正文（`version` 用于编辑/发布并发校验） |
+| POST | `/knowledge/revisions/{revision_id}/preview` | `knowledge:manage` | 生成切片预览快照（不写 Milvus） |
+| GET | `/knowledge/revisions/{revision_id}/preview` | `knowledge:manage` | 查看已保存的切片预览（分页） |
+| POST | `/knowledge/questions/search` | `knowledge:read` | 按技术/等级/题型查笔试题库 |
 | POST | `/knowledge/retrieve` | `knowledge:read` | 向量检索（返回 chunk + 得分） |
 | POST | `/knowledge/ask` | `knowledge:read` | RAG 问答（答案 + 引用来源） |
 | GET | `/knowledge/retrieve-eval` | `knowledge:manage` | 检索效果自检（准确率 / 召回率） |
+
+> **上传与版本文件不在本分组**：`POST /knowledge/docs/upload`、版本编辑/发布/恢复/取消、
+> 题库上传、索引删除均已迁至「文件管理」分组（`/files/*`），见第十八节。
+> 本分组只保留「读语义内容」的接口：检索、文档与版本正文、切片预览、题库选题。
 
 **文档对象**：`id`、`title`、`category`、`source_type`（`file`/`text`）、`status`（`indexing`/`indexed`/`failed`）、`chunk_count`、`permission_scope`（`public`/`dept`/`role`）、`allowed_roles`、`organization_id`、`embedding_model`、`index_error`、`indexed_at`。
 
@@ -1214,41 +1229,51 @@ event: error   data: {"code":5002,"message":"模型调用失败"}
 
 <a id="api-files"></a>
 
-## 十八、文件模块 Files — 🚧 待实现
+## 十八、文件模块 Files — ✅ 已实现
+
+> 主责组：`[架构组]`（前缀与分组一致） ｜ 代码位置：`routers/file_router.py`
+>
+> **定位**：`/files` 管的是「文件本身」——上传、版本文件下载、版本流转、题库文件导入、
+> 索引删除。检索与切片预览仍属「知识库」（`/knowledge/retrieve`、`/knowledge/revisions/*`）。
+>
+> **重要**：这些接口**不是新写的实现**。上传、版本文件、索引维护在知识库链路上本就可用，
+> 原先只是挂在 `/knowledge/*` 与 `/ingestion/*` 路径下，导致 Swagger「文件管理」分组为空、
+> 知识库分组里塞满写操作。本轮把处理函数原样迁到 `/files`，逻辑与权限没有变。
 
 | 方法 | 路径 | 权限 | 说明 |
 | --- | --- | --- | --- |
-| POST | `/files/upload` | 登录即可 | `multipart/form-data`，字段 `file` + `biz_type`（`resume`/`knowledge`/`avatar`/`export`）；返回文件元数据 |
-| GET | `/files/{id}` | 登录即可 | 文件元数据（含下载地址） |
-| GET | `/files/{id}/download` | 登录即可 | 下载（`FileResponse`，校验 `biz_type` 与归属人） |
-| DELETE | `/files/{id}` | 登录即可 | 删除（软删元数据 + 延迟清理磁盘） |
-| POST | `/files/batch-upload` | 登录即可 | 批量上传，返回成功/失败明细 |
+| POST | `/files/upload` | `knowledge:manage` | 上传文件（multipart `file` 可多份 + `category` + 可选 `title`/`doc_id`）。**单份存为草稿**，需预览确认后发布；**多份逐份自动解析发布**，返回 `total`/`success_count`/`failed_count`/`items`，部分失败不撤销已成功项 |
+| POST | `/files/docs/{doc_id}/retry` | `knowledge:manage` | 重试失败索引（`doc_id` 是文档 ID，不是文件 ID） |
+| GET | `/files/revisions/{revision_id}/download` | `knowledge:manage` | 下载版本文件；`source=false` 取版本文件（编辑后为新生成 Word），`source=true` 取上传原件 |
+| POST | `/files/revisions/{revision_id}/edit` | `knowledge:manage` | 修改正文另存新版本（生成新 Word 文件，原版本保留） |
+| POST | `/files/revisions/{revision_id}/publish` | `knowledge:manage` | 确认发布版本，切换可检索内容 |
+| POST | `/files/revisions/{revision_id}/restore` | `knowledge:manage` | 从历史版本恢复为新草稿 |
+| POST | `/files/revisions/{revision_id}/discard` | `knowledge:manage` | 取消未发布草稿（已发布版本不可取消） |
+| POST | `/files/questions/upload` | `knowledge:manage` | 上传 JSON 题库文件并导入（1~10000 道，按 `bank_id`+`external_id` 幂等） |
+| POST | `/files/index/delete` | `knowledge:manage` | 删除文档索引（逻辑删除 + 补偿任务清理向量，HTTP 202 表示已受理，不代表立即完成；**不物理删除原始文件**） |
 
-**上传响应**
+### 与知识库的分工
 
-```json
-{
-  "id": 21,
-  "file_name": "张三-简历.pdf",
-  "stored_name": "9f2c1a7b8d3e4f50a1b2c3d4e5f60718.pdf",
-  "file_size": 348212,
-  "content_type": "application/pdf",
-  "extension": ".pdf",
-  "file_hash": "b1946ac92492d2347c6235b4d2611184…",
-  "storage_type": "local",
-  "biz_type": "resume",
-  "download_url": "/api/v1/files/21/download",
-  "duplicated": false
-}
-```
+| 关注点 | 文件管理 `/files` | 知识库 `/knowledge` |
+| --- | --- | --- |
+| 上传 / 下载文件 | ✅ | — |
+| 版本流转（编辑/发布/恢复/取消） | ✅ | — |
+| 题库文件导入 | ✅ | — |
+| 删除索引 | ✅ | — |
+| 文档与版本正文、版本列表 | — | ✅ `GET /knowledge/docs`、`/knowledge/revisions/{id}` |
+| 切片预览（生成 / 查看） | — | ✅ `POST`/`GET /knowledge/revisions/{id}/preview` |
+| 检索 / 题库选题 | — | ✅ `POST /knowledge/retrieve`、`/knowledge/questions/search` |
 
-**错误约定**：`5003` 类型不支持 / 超过 `MAX_UPLOAD_SIZE_MB`；`403/2004` 无权限下载他人文件；`404/3001`。
+> **为何 `/files` 没有「文件列表」**：文件按「文档 → 版本」维度查看才有业务含义
+> （入口是 `/knowledge/docs` 拿文档，再取版本列表）。后端从未提供
+> `/files` 列表、`/files/{id}` 详情、秒传、批量上传等元数据 CRUD —— 早期文档里的这套
+> 契约与实现不符，已删除，避免前端照着不存在的接口开发。
+
+**错误约定**：`5003` 文件类型不支持 / 为空 / 超过 `MAX_UPLOAD_SIZE_MB`；`422` `category` 缺失或不在七大分类内；`3001` 文档或版本不存在；`2004` 越权访问他人文档。
 
 ---
 
-<a id="api-audit"></a>
-
-## 十九、审计模块 Audit — 🚧 待实现
+## 十九、审计模块 Audit — ✅ 已实现
 
 > 审计日志**只增不改**，不提供写接口。仅管理员可查询。
 

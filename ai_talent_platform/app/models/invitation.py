@@ -124,8 +124,13 @@ class ExamSession(BaseModel):
     token: Mapped[str] = mapped_column(
         String(64), nullable=False, index=True, comment="邀约 token 冗余（公开接口直接查询）"
     )
+    # MySQL 禁止 JSON / TEXT / BLOB 列带「字面量默认值」（ERR 1101）：
+    #   DEFAULT '[]'         -> 建表失败（历史事故：自动建表在这里中断）
+    #   DEFAULT ('[]')       -> 仅 MySQL 8.0.13+ 支持，5.7 / MariaDB 仍不支持
+    # 因此这里只用 ORM 侧 default=list（INSERT 时由 SQLAlchemy 补值），
+    # 不声明 server_default；守门用例见 tests/test_mysql_ddl_defaults.py。
     question_ids: Mapped[list[Any]] = mapped_column(
-        JSON, nullable=False, default=list, server_default=text("'[]'"), comment="抽题快照（有序 question_id 列表）"
+        JSON, nullable=False, default=list, comment="抽题快照（有序 question_id 列表）"
     )
     answers: Mapped[dict[str, Any] | None] = mapped_column(
         JSON, nullable=True, comment="作答内容：{question_id: answer}；answer 结构见阅卷逻辑"
@@ -134,7 +139,6 @@ class ExamSession(BaseModel):
         JSON,
         nullable=True,
         default=list,
-        server_default=text("'[]'"),
         comment="作弊检测违规记录：[{ts, type, detail}]（YOLO/人脸回退检测）",
     )
     proctor_state: Mapped[dict[str, Any] | None] = mapped_column(

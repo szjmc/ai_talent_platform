@@ -1,4 +1,5 @@
 """
+标签：[Agent组] [P1]
 模块：app/adapters/vector_store/interview_vector_store.py
 职责：面试记录表向量库适配（测评组自有，独立集合 + 本地降级）。
 

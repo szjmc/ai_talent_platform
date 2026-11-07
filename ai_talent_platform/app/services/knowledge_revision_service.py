@@ -258,6 +258,28 @@ class KnowledgeRevisionService:
             created_by=user.id, status='draft'))
         return await self.detail(row.id, user)
 
+    async def edit_document(self, doc_id, request, user):
+        """以文档为入口编辑：后端确定修改所基于的版本。
+
+        修改基础固定为该文档「当前已发布且生效」的版本（publish 时旧版本会被标记
+        archived，因此 published 至多一条），绝不使用最新创建的版本或未发布草稿——
+        否则并发下的草稿互相覆盖、或基于不可检索内容产生新版本。
+        调用方无需查找 revision_id，也无需维护 expected_version 乐观锁（后端读取
+        生效版本时锁定该行，版本号取自同一事务，天然防并发漂移）。
+        """
+        # document() 校验文档存在性与归属权限；版本基线随后单独锁定。
+        await self.document(doc_id, user)
+        row = await self.repo.published(self.db, doc_id)
+        if row is None:
+            raise NotFoundError('该文档暂无已发布且生效的版本，请先上传并发布后再编辑')
+        from app.schemas.knowledge_revision import RevisionEdit
+        return await self.edit(row.id, RevisionEdit(
+            expected_version=row.version,
+            title=request.title if request.title else row.title,
+            category=request.category if request.category else row.category,
+            body=request.body,
+        ), user)
+
     async def detail(self, revision_id, user):
         _, row = await self.revision(revision_id, user)
         body = await self.read_json(row.body_file_id)

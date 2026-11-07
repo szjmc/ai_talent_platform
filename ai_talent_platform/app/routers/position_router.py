@@ -32,8 +32,9 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_db, require_permission
+from app.core.pagination import PageParams, build_page_result
 from app.core.permissions import PermissionEnum
-from app.core.response import success
+from app.core.response import PageResult, success
 from app.models.user import User
 from app.schemas.common import COMMON_ERROR_RESPONSES, SuccessResponse
 from app.schemas.position import (
@@ -41,9 +42,14 @@ from app.schemas.position import (
     JdParseResponse,
     JobProfileConfirmRequest,
     JobProfileView,
+    PositionCreate,
+    PositionResponse,
+    PositionStatusUpdate,
+    PositionUpdate,
 )
 from app.services.jd_parser import summarize_missing
 from app.services.position_profile_service import PositionProfileService
+from app.services.position_service import PositionService
 
 router = APIRouter(
     prefix="/positions",
@@ -113,3 +119,121 @@ async def get_profile(
     """查询岗位画像。"""
     view = await service.get_profile(position_id, version)
     return success(data=view, message="OK")
+
+
+# ============================================================================
+# [本轮接口对齐] 岗位 CRUD（替换原 501 占位）
+# 背景：/api/v1/positions 曾只挂 placeholder_router，前端岗位页拿不到列表，
+#      新建/编辑/上下架全部不可用。以下端点与前端 PositionsPage 一一对应。
+# 注意：这些端点必须声明在 /{position_id}/... 之前或之后都行（FastAPI 按注册顺序匹配，
+#      静态路径 /positions 与前缀不冲突），但 /{position_id} 详情要放在最后，避免吞掉 /stats。
+# ============================================================================
+
+
+def get_position_service(db: AsyncSession = Depends(get_db)) -> PositionService:
+    """岗位 CRUD 服务依赖。"""
+    return PositionService(db)
+
+
+@router.get(
+    "",
+    summary="岗位列表（分页）",
+    response_model=SuccessResponse[PageResult[PositionResponse]],
+)
+async def list_positions(
+    page: PageParams = Depends(),
+    keyword: str | None = Query(None, max_length=64, description="岗位名称 / 编码模糊搜索"),
+    organization_id: int | None = Query(None, gt=0, description="按部门筛选"),
+    level: str | None = Query(None, pattern="^(junior|middle|senior|expert)$", description="岗位层级"),
+    status: str | None = Query(None, pattern="^(open|paused|closed)$", description="岗位状态"),
+    service: PositionService = Depends(get_position_service),
+    _: User = Depends(require_permission(PermissionEnum.POSITION_READ)),
+):
+    """分页查询岗位（含部门名称与最新画像版本，列表页一次查询补齐）。"""
+    result = await service.page_list(
+        page, keyword=keyword, organization_id=organization_id, level=level, status=status
+    )
+    return success(
+        data=build_page_result(result.items, result.total, page), message="查询成功"
+    )
+
+
+@router.post(
+    "",
+    summary="新建岗位",
+    response_model=SuccessResponse[PositionResponse],
+)
+async def create_position(
+    payload: PositionCreate,
+    service: PositionService = Depends(get_position_service),
+    current_user: User = Depends(require_permission(PermissionEnum.POSITION_MANAGE)),
+):
+    """新建岗位；不传 code 时自动生成 POS-{id}。"""
+    return success(
+        data=await service.create(payload, user_id=current_user.id), message="岗位已创建"
+    )
+
+
+@router.get(
+    "/{position_id}",
+    summary="岗位详情",
+    response_model=SuccessResponse[PositionResponse],
+)
+async def get_position(
+    position_id: int,
+    service: PositionService = Depends(get_position_service),
+    _: User = Depends(require_permission(PermissionEnum.POSITION_READ)),
+):
+    """岗位详情（含部门名称与最新画像版本）。"""
+    return success(data=await service.get(position_id), message="OK")
+
+
+@router.put(
+    "/{position_id}",
+    summary="更新岗位",
+    response_model=SuccessResponse[PositionResponse],
+)
+async def update_position(
+    position_id: int,
+    payload: PositionUpdate,
+    service: PositionService = Depends(get_position_service),
+    current_user: User = Depends(require_permission(PermissionEnum.POSITION_MANAGE)),
+):
+    """更新岗位（只更新传入字段；状态变更按 open ⇄ paused / closed 单向流转校验）。"""
+    return success(
+        data=await service.update(position_id, payload, user_id=current_user.id),
+        message="岗位已更新",
+    )
+
+
+@router.patch(
+    "/{position_id}/status",
+    summary="岗位上下架",
+    response_model=SuccessResponse[PositionResponse],
+)
+async def set_position_status(
+    position_id: int,
+    payload: PositionStatusUpdate,
+    service: PositionService = Depends(get_position_service),
+    current_user: User = Depends(require_permission(PermissionEnum.POSITION_MANAGE)),
+):
+    """一键切换岗位状态（open / paused / closed）。"""
+    return success(
+        data=await service.set_status(position_id, payload, user_id=current_user.id),
+        message="岗位状态已更新",
+    )
+
+
+@router.delete(
+    "/{position_id}",
+    summary="删除岗位",
+    response_model=SuccessResponse[dict],
+)
+async def delete_position(
+    position_id: int,
+    service: PositionService = Depends(get_position_service),
+    current_user: User = Depends(require_permission(PermissionEnum.POSITION_MANAGE)),
+):
+    """逻辑删除岗位（历史匹配记录保留可追溯）。"""
+    await service.delete(position_id, user_id=current_user.id)
+    return success(data={"id": position_id, "deleted": True}, message="岗位已删除")

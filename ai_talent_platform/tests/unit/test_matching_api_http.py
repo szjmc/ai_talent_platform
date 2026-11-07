@@ -22,7 +22,7 @@
     - 422：请求体字段非法（talent_ids 少于 2 人、状态值不在枚举内、limit 越界）；
     - 400：所选人才全部不在批次结果中。
 
-标签：*kwq* 新增（QA-003 接口质量收尾）。
+标签：[Agent组] [P1]（*kwq* 新增，QA-003 接口质量收尾）
 """
 
 from __future__ import annotations

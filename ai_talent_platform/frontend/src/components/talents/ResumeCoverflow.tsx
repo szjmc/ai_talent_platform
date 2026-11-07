@@ -73,7 +73,7 @@ export default function ResumeCoverflow({ talents, province, fullscreen, onFulls
     setPickedId(current => (current === talent.id ? null : talent.id));
   };
 
-  /** 打开邀约记录抽屉（keyword 预填人才姓名，便于演示档案无库行时检索）。 */
+  /** 打开邀约记录抽屉（keyword 预填人才姓名，便于按人才检索）。 */
   const openRecords = (keyword: string) => {
     setRecordsKeyword(keyword);
     setRecordsOpen(true);
