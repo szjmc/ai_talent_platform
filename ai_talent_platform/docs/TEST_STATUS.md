@@ -38,7 +38,7 @@
 
 ---
 
-## 3. 非集成测试明细（231 个用例）
+## 3. 非集成测试明细（231 个用例 + 本轮新增 5 个建表守门用例）
 
 ### 3.1 按文件统计（来自 JUnit XML，非估算）
 
@@ -58,6 +58,7 @@
 | `tests/test_orm_mapping.py` | 7 | 7 | 0 | 表映射（本次 25→26 张表） |
 | `tests/test_pgsql_schema.py` | 6 | 6 | 0 | PgSQL 分析库 DDL |
 | `tests/test_database_health.py` | 5 | 5 | 0 | 数据库连通性 |
+| `tests/test_mysql_ddl_defaults.py` | 5 | 5 | 0 | **MySQL 建表 DDL 守门**（ERR 1101 非法默认值 + 逐表建表故障隔离，离线） |
 | **`tests/test_common_layer.py`** | **8** | **5** | **3** | **公共层（认证/健康检查），既有问题** |
 | **合计** | **231** | **228** | **3** | 通过率 98.70% |
 
