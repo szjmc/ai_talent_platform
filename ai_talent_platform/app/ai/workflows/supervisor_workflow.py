@@ -244,6 +244,34 @@ async def _fallback_answer(state: SupervisorState, *, note: str) -> dict[str, An
             conversation_id=ctx.conversation_id,
             trace_id=ctx.trace_id,
         )
+    except AIError as exc:
+        # LLM 未配置：给出可操作的引导而不是报错，保证助手入口可用
+        if getattr(exc, "data", None) and exc.data.get("reason") == "api_key_missing":
+            return {
+                "status": "done",
+                "degraded": True,
+                "result": {
+                    "ok": True,
+                    "degraded": True,
+                    "answer": (
+                        "您好，我是本平台的 AI 助手。当前服务端尚未配置大模型"
+                        f"（{exc.data.get('provider') or 'LLM_PROVIDER'} 的 API Key 为空），"
+                        "暂时只能提供平台功能引导。\n\n"
+                        "配置方法：编辑项目根目录 .env，设置 LLM_API_KEY 与 LLM_BASE_URL"
+                        "（如阿里云百炼 / DeepSeek / OpenAI 兼容接口），重启后端即可启用完整问答；"
+                        "也可以使用本地 Ollama（LLM_PROVIDER=ollama）。\n\n"
+                        "目前可以直接使用的功能：人才档案、岗位管理、简历解析、人岗匹配、"
+                        "智能测评、培训发展、知识库检索、数据洞察等页面的全部接口。"
+                    ),
+                    "tokens": {"prompt": 0, "completion": 0, "model": "offline-notice"},
+                },
+            }
+        logger.warning("降级通用应答失败（%s）：%s", note, exc)
+        return {
+            "status": "failed",
+            "errors": [*(state.get("errors") or []), str(exc)],
+            "result": {"ok": False, "error": str(exc), "error_code": 5002},
+        }
     except Exception as exc:  # noqa: BLE001 - LLM 不可用 → 结构化业务错误
         logger.warning("降级通用应答失败（%s）：%s", note, exc)
         return {

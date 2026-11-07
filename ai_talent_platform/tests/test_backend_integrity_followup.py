@@ -108,6 +108,7 @@ async def test_submit_locks_assessment_before_state_transition():
     get = AsyncMock(return_value=SimpleNamespace(status="in_progress", deadline=None))
     service.repo = SimpleNamespace(
         get_by_id_or_404=get, list_questions=AsyncMock(return_value=[question]),
+        list_answers=AsyncMock(return_value=[]),
         save_answer=AsyncMock(), update_status=AsyncMock(),
     )
     await service.submit_answers(7, [{"question_id": 1, "answer": "A"}])

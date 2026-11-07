@@ -136,6 +136,23 @@ class LLMManager:
         return self.get_llm(purpose="embed", provider=provider, model=embed_model)
 
     # ---------------------------------------------------------------- 对话
+    @staticmethod
+    def _llm_not_configured_error(provider: str) -> AIError:
+        """LLM 密钥未配置时的统一、可操作错误（不做任何网络请求）。"""
+        return AIError(
+            "大模型未配置：请在 .env 中设置 LLM_API_KEY"
+            f"（当前 LLM_PROVIDER={provider or '未设置'}），"
+            "或改用本地 Ollama（LLM_PROVIDER=ollama + OLLAMA_BASE_URL）后重启服务",
+            data={"provider": provider, "reason": "api_key_missing"},
+        )
+
+    def _ensure_configured(self, provider: str) -> None:
+        """密钥缺失时快速失败，避免每次请求都等满超时/重试。"""
+        from app.adapters.llm.provider_config import provider_configured
+
+        if not provider_configured(provider):
+            raise self._llm_not_configured_error(provider)
+
     async def chat(
         self,
         messages: Sequence[Any],
@@ -153,6 +170,7 @@ class LLMManager:
         from app.ai.core.model_selector import select_temperature
 
         llm = self.get_llm(purpose)
+        self._ensure_configured(llm.provider)
         target_model = model or self._model_for(llm.provider, purpose)
         temp = temperature if temperature is not None else select_temperature(purpose)
         normalized = [ChatMessage.from_any(item) for item in messages or []]
@@ -203,6 +221,7 @@ class LLMManager:
     ) -> AsyncIterator[str]:
         """流式输出（SSE）；底层适配器不支持时自动退化为一次性输出。"""
         llm = self.get_llm(purpose)
+        self._ensure_configured(llm.provider)
         normalized = [ChatMessage.from_any(item) for item in messages or []]
         async for chunk in llm.stream(normalized, **kwargs):
             yield chunk

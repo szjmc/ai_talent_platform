@@ -552,12 +552,14 @@ async def test_implemented_files_module_no_longer_returns_501():
     """
     paths = create_application().openapi()["paths"]
     assert paths["/api/v1/files/upload"]["post"]["tags"] == ["文件管理"]
-    assert paths["/api/v1/files"]["get"]["tags"] == ["文件管理"]
+    # 文件列表由知识库文档接口承载（GET /knowledge/docs），文件模块的
+    # GET 路由为版本下载；此处断言真实 GET 路由存在且归属「文件管理」分组。
+    assert paths["/api/v1/files/revisions/{revision_id}/download"]["get"]["tags"] == ["文件管理"]
 
     app = create_application()
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
                                  base_url="http://test") as anon:
-        resp = await anon.get("/api/v1/files")
+        resp = await anon.post("/api/v1/files/upload")
     assert resp.status_code == 401
     assert resp.status_code != 501
 
@@ -677,12 +679,14 @@ async def test_rate_limit_enabled_gate(client, monkeypatch):
 
     monkeypatch.setattr(settings, "RATE_LIMIT_ENABLED", False)
     resp = await client.get("/api/v1/positions")
-    assert resp.status_code == 501
+    # 岗位模块已由真实路由接管：匿名请求被鉴权拦截（401），
+    # 而非占位路由的 501；此处只关心限流开关是否触碰计数器。
+    assert resp.status_code == 401
     assert keys == [], "限流关闭时不应触碰计数器"
 
     monkeypatch.setattr(settings, "RATE_LIMIT_ENABLED", True)
     resp2 = await client.get("/api/v1/positions")
-    assert resp2.status_code == 501
+    assert resp2.status_code == 401
     assert keys, "限流开启后必须走 Redis 固定窗口计数"
     assert keys[0].startswith("ratelimit:"), f"key 格式应为 ratelimit:{{ip}}:{{window}}: {keys[0]}"
 

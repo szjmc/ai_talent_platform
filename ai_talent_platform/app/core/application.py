@@ -165,7 +165,8 @@ def create_application() -> FastAPI:
         payload = {
             **report,
             "drivers": {
-                "mysql": "mysql+aiomysql",
+                # SQLite 回退模式下如实呈现实际驱动（本地开发/演示）
+                "mysql": "sqlite+aiosqlite" if settings.is_sqlite else "mysql+aiomysql",
                 "pgsql": "postgresql+asyncpg" if settings.PGSQL_ENABLED else "disabled",
             },
         }

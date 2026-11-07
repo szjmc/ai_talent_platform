@@ -34,6 +34,11 @@ NAMING_CONVENTION = {
     "pk": "pk_%(table_name)s",
 }
 
+# 自增主键类型：MySQL 保持 BIGINT；SQLite 回退模式（DB_DRIVER=sqlite）必须是
+# INTEGER 才是 rowid 别名、才能自增（BIGINT PRIMARY KEY 插入会报 NOT NULL 约束失败）。
+# 本地开发与单测早已跑 SQLite（见 talent_profile_repository 的方言钩子），此处统一收敛。
+BigIntPrimaryKey = BigInteger().with_variant(Integer, "sqlite")
+
 
 class Base(DeclarativeBase):
     """所有 ORM 模型的根基类。"""
@@ -130,7 +135,7 @@ class BaseModel(Base, TimestampMixin, SoftDeleteMixin, OperatorMixin):
     __abstract__ = True
 
     id: Mapped[int] = mapped_column(
-        BigInteger,
+        BigIntPrimaryKey,
         primary_key=True,
         autoincrement=True,
         comment="主键 ID（BIGINT，主键索引由 PK 提供）",

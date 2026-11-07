@@ -101,13 +101,17 @@ class Settings(BaseSettings):
 
     # ================================================================== MySQL（业务主库）
     # 驱动固定为 mysql+aiomysql（异步）。本地默认：127.0.0.1:3306 / root。
-    DB_DRIVER: Literal["mysql"] = "mysql"
+    # DB_DRIVER=sqlite 时为「本地开发/演示回退」：业务库落到单文件 SQLite（aiosqlite），
+    # 便于没有 MySQL 的环境（沙箱 / 快速体验）一键跑通全部页面；生产仍然只用 MySQL。
+    DB_DRIVER: Literal["mysql", "sqlite"] = "mysql"
     DB_HOST: str = "127.0.0.1"
     DB_PORT: int = 3306
     DB_USER: str = "root"
     DB_PASSWORD: str = "root"
     DB_NAME: str = "ai_talent_platform"
     DB_CHARSET: str = "utf8mb4"
+    # SQLite 模式下的库文件位置（相对项目根目录；目录不存在会自动创建）
+    DB_SQLITE_FILE: str = "data/talent_platform.db"
 
     DB_POOL_SIZE: int = 10               # 连接池常驻连接数
     DB_MAX_OVERFLOW: int = 20            # 峰值可额外申请的连接数
@@ -351,11 +355,33 @@ class Settings(BaseSettings):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def DATABASE_URL(self) -> str:
-        """MySQL 异步驱动 DSN（业务运行时使用）。"""
+        """MySQL 异步驱动 DSN（业务运行时使用）。
+
+        DB_DRIVER=sqlite 时返回单文件 SQLite DSN（本地开发/演示回退，
+        见 DB_DRIVER 注释）；此时 MySQL 连接参数全部被忽略。
+        """
+        if self.DB_DRIVER == "sqlite":
+            return f"sqlite+aiosqlite:///{self.sqlite_path}"
         return (
             f"mysql+aiomysql://{self.DB_USER}:{self.DB_PASSWORD}"
             f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset={self.DB_CHARSET}"
         )
+
+    @property
+    def is_sqlite(self) -> bool:
+        """业务主库是否运行在 SQLite 回退模式（本地开发/演示专用）。"""
+        return self.DB_DRIVER == "sqlite"
+
+    @property
+    def sqlite_path(self) -> str:
+        """SQLite 库文件绝对路径（相对路径一律相对项目根目录解析）。"""
+        import os as _os
+
+        path = _os.path.expanduser(self.DB_SQLITE_FILE)
+        if not _os.path.isabs(path):
+            path = _os.path.join(BASE_DIR, path)
+        return path
+
 
     @property
     def MYSQL_SERVER_URL(self) -> str:
@@ -434,7 +460,11 @@ class Settings(BaseSettings):
     def database_summary(self) -> dict[str, str]:
         """数据库连接摘要（脱敏，供日志 / 自检接口展示）。"""
         return {
-            "mysql": f"{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}",
+            "mysql": (
+                f"sqlite://{self.sqlite_path}"
+                if self.is_sqlite
+                else f"{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+            ),
             "pgsql": (
                 f"{self.PGSQL_HOST}:{self.PGSQL_PORT}/{self.PGSQL_DB}"
                 if self.PGSQL_ENABLED
@@ -459,7 +489,11 @@ class Settings(BaseSettings):
         return {"backend": backend, "target": target}
 
     def ensure_dirs(self) -> None:
-        """创建运行期需要的目录（日志、上传）。"""
+        """创建运行期需要的目录（日志、上传、SQLite 库文件目录）。"""
+        import os as _os
+
+        if self.is_sqlite:
+            _os.makedirs(_os.path.dirname(self.sqlite_path) or ".", exist_ok=True)
         for path in (self.LOG_DIR, self.UPLOAD_DIR):
             if path:
                 os.makedirs(path, exist_ok=True)

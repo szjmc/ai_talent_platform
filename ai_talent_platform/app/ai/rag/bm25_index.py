@@ -1,19 +1,24 @@
 # 缓存键绑定文档版本，缓存内容是分词后的语料。每个问题仍重新计算排名，发布时从当前事务重建快照。
-"""按文档版本增量构建 BM25 语料快照，MinIO 持久化。
-标签：[RAG组] [P0]。"""
+"""按文档版本增量构建 BM25 语料快照，跨存储后端持久化。
+标签：[RAG组] [P0]。
+
+快照存储跟随 settings.STORAGE_BACKEND（原先硬编码 MinIO：本地后端没有
+client.put_object，严格发布路径直接 AttributeError）。
+"""
 import asyncio
 import hashlib
 import json
 from collections import OrderedDict
 from types import SimpleNamespace
 from app.adapters.storage.base_storage import get_storage
+from app.repositories.rag_ingest_job import put_job_object
 from app.ai.rag.lexical_search import bm25_rank, tokenize
 
 _cache=OrderedDict()
 
 async def search_index(db, repo, docs, query, limit, strict=False):
     rows=[]
-    storage=get_storage('minio')
+    storage=get_storage()
     # 调用方传入的 docs 必须已经完成权限和分类过滤；从不加载不可见文档快照。
     for doc in docs:
         version=hashlib.sha256(str((doc.id,doc.version,doc.indexed_at,doc.chunk_count)).encode()).hexdigest()[:24]
@@ -32,7 +37,7 @@ async def search_index(db, repo, docs, query, limit, strict=False):
                 chunks=await repo.lexical_corpus(db,[doc.id])
                 payload=await asyncio.to_thread(lambda:[{'id':c.id,'content':c.content,'tokens':tokenize(c.content)} for c in chunks])
                 try:
-                    await storage.client.put_object(key,json.dumps(payload,ensure_ascii=False).encode(),'application/json')
+                    await put_job_object(storage, key, json.dumps(payload,ensure_ascii=False).encode())
                 except Exception:
                     if strict:
                         raise

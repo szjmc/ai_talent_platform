@@ -86,7 +86,12 @@ def _extract_email(text: str) -> str:
 
 
 def _extract_name(text: str) -> str:
-    """正则抽取姓名（优先「姓名：」显式标注，其次首行 2-4 个汉字）。"""
+    """正则抽取姓名（优先「姓名：」显式标注，其次首行 2-4 个汉字）。
+
+    兼容常见简历首页写法：「张伟 的个人简历」「张伟-后端工程师」「张伟简历」
+    （此前只认「姓名：」与整行纯姓名，这两种写法都抽不出名字，
+    离线规则解析下创建测评会报「简历未识别出姓名」）。
+    """
     m = re.search(r"姓名[:：]\s*([\u4e00-\u9fa5]{2,4})", text or "")
     if m:
         return m.group(1)
@@ -94,6 +99,13 @@ def _extract_name(text: str) -> str:
         line = line.strip()
         if re.fullmatch(r"[\u4e00-\u9fa5]{2,4}", line):
             return line
+    # 「张伟 的个人简历 / 张伟简历 / 张伟-后端工程师」等首行写法
+    m = re.match(r"^([\u4e00-\u9fa5]{2,4})(?:\s*的)?(?:个人)?简历\b", (text or "").strip())
+    if m:
+        return m.group(1)
+    m = re.match(r"^([\u4e00-\u9fa5]{2,4})\s*[-—|｜]\s*[\u4e00-\u9fa5A-Za-z]{2,}", (text or "").strip())
+    if m:
+        return m.group(1)
     return ""
 
 

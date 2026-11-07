@@ -81,17 +81,20 @@ class AnalyticsStatisticsService:
         """分类统计只聚合授权数据；limit截分类展示，不拿截断结果算总体比例。"""
         self.validate_distribution(type_, filters)
         warnings = []
+        fallback = not settings.PGSQL_ENABLED
+        if fallback:
+            warnings.append("PgSQL 分析库未启用：统计为业务库实时数据，口径与月度快照可能存在差异")
         if filters.limit > settings.NL2SQL_MAX_ROWS:
             filters = filters.model_copy(update={"limit": settings.NL2SQL_MAX_ROWS})
             warnings.append("分类展示上限已按服务端NL2SQL_MAX_ROWS收紧")
         month = None
         if type_ == "skill":
             rows = await self.repository.skill_distribution(filters)
-            source = "dim_talent_wide"
+            source = getattr(self.repository, "source_name", "dim_talent_wide")
             warnings.append("每个人的每项技能只计一次；同一个人可计入多个技能，分类计数之和不等于人才总数")
         else:
             month = filters.month or await self.repository.latest_month(self.scope, filters)
-            source = "fact_talent_snapshot"
+            source = getattr(self.repository, "snapshot_source", "fact_talent_snapshot")
             rows = [] if month is None else await self.repository.snapshot_distribution(type_, month, self.scope, filters)
             if month is None or not rows:
                 warnings.append("指定授权范围/月份/筛选下没有快照数据，不能据此认定实际人数为0")
@@ -132,8 +135,9 @@ class AnalyticsStatisticsService:
             items.append(item)
             year, month = (year + 1, 1) if month == 12 else (year, month + 1)
         return {"metric": "talent_total", "granularity": "month", "comparison": data.comparison,
-                "source": "fact_talent_snapshot", "items": items,
-                "warnings": ["人数为各月存量，不等于新增/流失；缺期不补0；同比/环比缺期或零分母返回无法计算"]}
+                "source": getattr(self.repository, "trend_source", "fact_talent_snapshot"), "items": items,
+                "warnings": ["人数为各月存量，不等于新增/流失；缺期不补0；同比/环比缺期或零分母返回无法计算"
+                             + ("；PgSQL 分析库未启用，趋势按业务库 created_at 实时累计" if not settings.PGSQL_ENABLED else "")]}
 
     @staticmethod
     def _shift_month(value: date, offset: int) -> date | None:

@@ -317,6 +317,12 @@ def fake_provider(monkeypatch):
     monkeypatch.setattr(settings, "LLM_PROVIDER", "fake")
     monkeypatch.setattr("app.ai.core.llm_manager.select_model", lambda purpose=None: "fake-model")
     monkeypatch.setattr("app.ai.core.llm_manager.select_embedding_model", lambda *args, **kwargs: "fake-embed")
+    # fake 是测试替身供应商（不在真实供应商目录内，无凭据）：
+    # 豁免「密钥缺失快速失败」检查，仅在本 fixture 作用域内生效。
+    monkeypatch.setattr(
+        "app.adapters.llm.provider_config.provider_configured",
+        lambda provider: True if provider == "fake" else bool(provider),
+    )
     llm_manager.clear_instances()
     yield
     llm_manager.clear_instances()

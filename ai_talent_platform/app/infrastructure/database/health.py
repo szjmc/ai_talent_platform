@@ -124,9 +124,31 @@ async def _probe_database(
 
 
 async def check_mysql() -> dict[str, Any]:
-    """MySQL（业务主库）健康检查。"""
-    target = f"{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"
+    """MySQL（业务主库）健康检查。SQLite 回退模式下改为检查库文件可读写。"""
     started = time.perf_counter()
+
+    if settings.is_sqlite:
+        target = f"sqlite://{settings.sqlite_path}"
+        try:
+            import sqlite3
+
+            conn = sqlite3.connect(settings.sqlite_path)
+            try:
+                conn.execute("SELECT 1")
+            finally:
+                conn.close()
+            return _result(
+                target, "up", "ok", "SQLite 业务库连接正常（本地开发/演示回退模式）",
+                (time.perf_counter() - started) * 1000,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return _result(
+                target, "down", "unknown",
+                f"SQLite 库文件不可用（{settings.sqlite_path}）：{exc}",
+                (time.perf_counter() - started) * 1000,
+            )
+
+    target = f"{settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}"
 
     if not await _tcp_check(settings.DB_HOST, settings.DB_PORT):
         return _result(

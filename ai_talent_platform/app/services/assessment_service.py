@@ -108,7 +108,8 @@ class AssessmentService:
         from app.services.file_service import FileService
 
         record = await FileRepository().get_by_id_or_404(self.db, file_id, message="简历文件不存在")
-        data = await FileService(self.db).read(record)
+        # FileService.read 返回 (file, content) 二元组，这里只需要文件内容
+        _, data = await FileService(self.db).read(record)
         with tempfile.TemporaryDirectory(prefix="assess-resume-") as temp:
             path = Path(temp) / record.stored_name
             await asyncio.to_thread(path.write_bytes, data)
@@ -344,14 +345,48 @@ class AssessmentService:
         await self.repo.update_status(
             self.db, assessment_id, "submitted", submitted_at=datetime.now()
         )
+        # 纯客观题试卷：规则判分已完整，直接定稿为 scored（免 AI 评分环节）
+        final_status = "submitted"
+        need_ai = sum(1 for q in questions.values() if q.type == "text")
+        if need_ai == 0:
+            total = await self._finalize_rule_score(assessment_id)
+            final_status = "scored" if total is not None else "submitted"
         return {
             "assessment_id": assessment_id,
+            "status": final_status,
             "rule_total_score": round(rule_total, 2),
             "dimension_rule_scores": dimension_scores,
             "answered": len(submitted_ids),
             # 主观题数量提示 Agent 走语义打分
-            "need_ai_score": sum(1 for q in questions.values() if q.type == "text"),
+            "need_ai_score": need_ai,
         }
+
+    async def _finalize_rule_score(self, assessment_id: int) -> float | None:
+        """按客观题规则得分率定稿评分（0-100），返回总分；无法定稿返回 None。
+
+        适用场景：纯客观题试卷（规则判分已完整），或未配置大模型、主观题
+        无法语义打分时的降级路径。主观题不计入分子与分母——绝不捏造分数，
+        仅按已判分的客观题计算得分率，并在日志中注明降级原因。
+        """
+        questions = await self.repo.list_questions(self.db, assessment_id)
+        answers = {a.question_id: a for a in await self.repo.list_answers(self.db, assessment_id)}
+        full = 0.0
+        got = 0.0
+        for q in questions:
+            if q.type in ("single", "multiple"):
+                full += float(q.score or 0)
+                answer = answers.get(q.id)
+                got += float(answer.score or 0) if answer is not None else 0.0
+        if full <= 0:
+            return None
+        total = round(got / full * 100, 1)
+        await self.repo.update_status(self.db, assessment_id, "scored", total_score=total)
+        unscored = sum(1 for q in questions if q.type == "text")
+        logger.warning(
+            "测评 %s 以客观题规则得分率定稿 %.1f（主观题 %d 道未做 AI 语义评分）",
+            assessment_id, total, unscored,
+        )
+        return total
 
     async def load_analysis_state(self, assessment_id: int) -> dict[str, Any]:
         """从数据库读取已提交试卷和答案，禁止用调用方提供的分数替代事实。"""
@@ -527,6 +562,12 @@ class AssessmentService:
         """汇总笔试 + 面试记录（向量库召回）+ 简历，生成五维量化报告。"""
         assessment = await self.repo.get_by_id_or_404(self.db, assessment_id, message="测评不存在")
 
+        # 已提交但尚未 AI 评分（模型未配置/纯客观题）：按客观题规则得分率定稿
+        if assessment.status == "submitted":
+            if await self._finalize_rule_score(assessment_id) is None:
+                raise BusinessRuleError("请先完成笔试评分，再生成综合报告")
+            assessment = await self.repo.get_by_id_or_404(
+                self.db, assessment_id, message="测评不存在")
         if assessment.status != "scored" or assessment.total_score is None:
             raise BusinessRuleError("请先完成笔试评分，再生成综合报告")
         written_score = float(assessment.total_score)
