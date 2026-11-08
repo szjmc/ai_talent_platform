@@ -70,6 +70,8 @@ python main.py                # http://127.0.0.1:8000/docs
 | [docs/database_design.md](docs/database_design.md) | **数据库设计（完整明确）**：内联 SVG ER 图 + 25 张表字段字典 + 可直接执行的 MySQL 8 DDL + PgSQL/Milvus/Redis 设计 |
 | [docs/orm_mapping.md](docs/orm_mapping.md) | **全局 ORM 映射字典**：MySQL 25 张表 + PgSQL 6 张表自动导出清单 |
 | [docs/已实现功能清单.md](docs/已实现功能清单.md) | 平台当前实际已落地能力与待开发骨架逐项对照清单 |
+| [docs/权限控制架构与流程图.md](docs/权限控制架构与流程图.md) | 权限模型、身份到数据行过滤流程图、当前源码实现核验与 12 项验收清单 |
+| [docs/AI数字化人才平台_项目答辩重点文档.docx](docs/AI数字化人才平台_项目答辩重点文档.docx) | 项目答辩材料：架构、技术栈、业务/数据流、Bug 复盘、权限控制图及答辩问答 |
 | [docs/team_sprint_plan.md](docs/team_sprint_plan.md) | **5 组协同开发总计划**：职责划分、里程碑、跨组契约、验收清单、站会节奏 |
 | [docs/plan/](docs/plan/) 各组独立计划 | [00 架构组](docs/plan/00-架构组.md) ｜ [01 RAG 组](docs/plan/01-RAG组.md) ｜ [02 Agent 组](docs/plan/02-Agent组.md) ｜ [03 Vanna 组](docs/plan/03-Vanna组.md) ｜ [04 Dify 组](docs/plan/04-Dify组.md) ｜ [05 代码标签总表](docs/plan/05-代码标签与优先级总表.md) |
 | [docs/team_code_spec.md](docs/team_code_spec.md) | **分组代码实现规范**：每个文件的方法签名、返回结构、代码骨架、验收命令、文件唯一所有权表 |
