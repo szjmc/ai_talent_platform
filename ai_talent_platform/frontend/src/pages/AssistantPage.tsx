@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { App, Button, Empty, Input, Tag } from 'antd';
-import { BarChartOutlined, BookOutlined, FileSearchOutlined, HistoryOutlined, PlusOutlined, RobotOutlined, SendOutlined, SolutionOutlined, ThunderboltOutlined, UserOutlined } from '@ant-design/icons';
+import { App, Button, Empty, Input, Popconfirm, Tag, Tooltip } from 'antd';
+import { BarChartOutlined, BookOutlined, FileSearchOutlined, HistoryOutlined, PlusOutlined, RobotOutlined, SendOutlined, SolutionOutlined, ThunderboltOutlined, UserOutlined, BarsOutlined } from '@ant-design/icons';
 import { PageHeader } from '../components/Common';
 import { agentsApi } from '../services/platform';
 import { formatApiError, streamAgentChat } from '../services/api';
@@ -12,12 +12,25 @@ const agents = [{ icon: <FileSearchOutlined/>, name: '人才档案解析', color
 export default function AssistantPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]); const [input, setInput] = useState(''); const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string>(); const [conversations, setConversations] = useState<AgentConversation[]>([]);
+  const [sidebarHidden, setSidebarHidden] = useState(false);
   const { message } = App.useApp();
   const loadConversations = useCallback(async () => {
     try { const res = await agentsApi.conversations({ page: 1, page_size: 10 }); setConversations(res.items || []); }
     catch { setConversations([]); }
   }, []);
   useEffect(() => { void loadConversations(); }, [loadConversations]);
+
+  const handleDelete = async (item: AgentConversation) => {
+    try {
+      await agentsApi.deleteConversation(item.conversation_id);
+      message.success('会话已删除');
+      if (String(item.conversation_id) === conversationId) {
+        setConversationId(undefined);
+        setMessages([]);
+      }
+      void loadConversations();
+    } catch (e) { message.error(formatApiError(e)); }
+  };
 
   const send = async (text = input) => {
     if (!text.trim() || loading) return; setMessages((old) => [...old, { role: 'user', text }]); setInput(''); setLoading(true);
@@ -41,9 +54,14 @@ export default function AssistantPage() {
 
   return <>
     <PageHeader title="AI 智能助手" description="一个入口，协同六大专属智能体与八大业务技能，让人才工作自然发生" actions={<Button icon={<PlusOutlined/>} onClick={() => { setMessages([]); setConversationId(undefined); }}>新建对话</Button>}/>
-    <div className="assistant-layout" style={{ display: 'grid', gridTemplateColumns: '240px minmax(0,1fr)', gap: 18 }}>
-      <aside><div className="card" style={{ padding: 15, marginBottom: 16 }}><div className="section-card-title mb-16">专属智能体</div>{agents.map((a) => <div key={a.name} className="flex items-center gap-12" style={{ padding: '10px 2px', cursor: 'pointer' }}><span className="activity-icon" style={{ background: `${a.color}16`, color: a.color }}>{a.icon}</span><span style={{ fontSize: 12 }}>{a.name}</span></div>)}</div><div className="card" style={{ padding: 15 }}><div className="flex justify-between items-center mb-16"><div className="section-card-title">最近对话</div><HistoryOutlined className="muted"/></div>{conversations.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无对话"/> : conversations.map((x, i) => <div key={String(x.conversation_id)} onClick={() => openConversation(x)} style={{ fontSize: 11, color: i === 0 ? '#315efb' : '#6f7b8e', padding: '10px 7px', background: i === 0 ? '#f1f5ff' : 'transparent', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{x.title || `会话 ${x.conversation_id}`}</div>)}</div></aside>
-      <section className="card chat-panel" style={{ minHeight: 710 }}><div className="chat-header"><div className="ai-logo"><RobotOutlined/></div><div style={{ flex: 1 }}><div className="chat-title">TalentOS Copilot</div><div className="chat-subtitle">● 在线 · 多智能体协同</div></div><Tag color="purple">多智能体协同</Tag></div><div className="chat-body" style={{ maxHeight: 570 }}>{messages.length === 0 ? <div className="chat-welcome"><div className="ai-logo"><ThunderboltOutlined/></div><h3>今天想一起完成什么工作？</h3><p>我可以查人才、算匹配、找制度、分析数据，也可以为您自动执行复杂任务</p><div className="suggestion-grid">{['帮我分析最新人才画像','为当前岗位推荐候选人','分析一下技术团队的人才结构','查询高级工程师的晋升条件'].map((s) => <button className="suggestion-item" key={s} onClick={() => send(s)}>{s}</button>)}</div><div className="flex justify-between" style={{ maxWidth: 570, margin: '30px auto 0', padding: 15, background: '#f8f9fc', borderRadius: 9 }}>{['查人才','找岗位','算匹配','问制度','析数据'].map((x) => <Button type="text" size="small" key={x}>{x}</Button>)}</div></div> : <>{messages.map((m, i) => <div className={`message ${m.role}`} key={i}><div className="message-avatar" style={m.role === 'assistant' ? { background: '#eaf0ff', color: '#496ce0' } : { background: '#5273df', color: '#fff' }}>{m.role === 'assistant' ? <RobotOutlined/> : <UserOutlined/>}</div><div className="message-content"><div className="message-bubble">{m.text}</div></div></div>)}{loading && <div className="message"><div className="message-avatar" style={{ background: '#eaf0ff', color: '#496ce0' }}><RobotOutlined/></div><div className="message-bubble">正在调度智能体并查询相关业务数据…</div></div>}</>}</div><div className="chat-composer"><div className="composer-box"><textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} placeholder="输入任务或问题，AI 将自动选择智能体与技能…"/><div className="composer-bottom"><span className="composer-hint">内容由 AI 生成，重要决策请结合业务实际</span><Button type="primary" size="small" icon={<SendOutlined/>} loading={loading} onClick={() => send()}>发送</Button></div></div></div></section>
+    <div className="assistant-layout" style={{ display: 'grid', gridTemplateColumns: sidebarHidden ? 'minmax(0,1fr)' : '240px minmax(0,1fr)', gap: 18 }}>
+      {!sidebarHidden && <aside><div className="card" style={{ padding: 15, marginBottom: 16 }}><div className="section-card-title mb-16">专属智能体</div>{agents.map((a) => <div key={a.name} className="flex items-center gap-12" style={{ padding: '10px 2px', cursor: 'pointer' }}><span className="activity-icon" style={{ background: `${a.color}16`, color: a.color }}>{a.icon}</span><span style={{ fontSize: 12 }}>{a.name}</span></div>)}</div><div className="card" style={{ padding: 15 }}><div className="flex justify-between items-center mb-16"><div className="section-card-title">最近对话</div><HistoryOutlined className="muted"/></div>{conversations.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无对话"/> : conversations.map((x, i) => <div key={String(x.conversation_id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, fontSize: 11, color: i === 0 ? '#315efb' : '#6f7b8e', padding: '10px 7px', background: i === 0 ? '#f1f5ff' : 'transparent', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }} onClick={() => openConversation(x)}>{x.title || `会话 ${x.conversation_id}`}</span>
+          <Popconfirm title="确定删除该会话？" okText="删除" cancelText="取消" onConfirm={() => handleDelete(x)}>
+            <Button type="text" size="small" danger style={{ flexShrink: 0, fontSize: 10, padding: '0 4px' }}>删除</Button>
+          </Popconfirm>
+        </div>)}</div></aside>}
+      <section className="card chat-panel" style={{ minHeight: 710 }}><div className="chat-header"><div className="ai-logo"><RobotOutlined/></div><div style={{ flex: 1 }}><div className="chat-title">TalentOS Copilot</div><div className="chat-subtitle">● 在线 · 多智能体协同</div></div><Tooltip title={sidebarHidden ? '显示侧栏' : '隐藏侧栏'}><Button type="text" size="small" icon={<BarsOutlined/>} onClick={() => setSidebarHidden(!sidebarHidden)} style={{ marginRight: 8 }}/></Tooltip><Tag color="purple">多智能体协同</Tag></div><div className="chat-body" style={{ maxHeight: 570 }}>{messages.length === 0 ? <div className="chat-welcome"><div className="ai-logo"><ThunderboltOutlined/></div><h3>今天想一起完成什么工作？</h3><p>我可以查人才、算匹配、找制度、分析数据，也可以为您自动执行复杂任务</p><div className="suggestion-grid">{['帮我分析最新人才画像','为当前岗位推荐候选人','分析一下技术团队的人才结构','查询高级工程师的晋升条件'].map((s) => <button className="suggestion-item" key={s} onClick={() => send(s)}>{s}</button>)}</div><div className="flex justify-between" style={{ maxWidth: 570, margin: '30px auto 0', padding: 15, background: '#f8f9fc', borderRadius: 9 }}>{['查人才','找岗位','算匹配','问制度','析数据'].map((x) => <Button type="text" size="small" key={x}>{x}</Button>)}</div></div> : <>{messages.map((m, i) => <div className={`message ${m.role}`} key={i}><div className="message-avatar" style={m.role === 'assistant' ? { background: '#eaf0ff', color: '#496ce0' } : { background: '#5273df', color: '#fff' }}>{m.role === 'assistant' ? <RobotOutlined/> : <UserOutlined/>}</div><div className="message-content"><div className="message-bubble">{m.text}</div></div></div>)}{loading && <div className="message"><div className="message-avatar" style={{ background: '#eaf0ff', color: '#496ce0' }}><RobotOutlined/></div><div className="message-bubble">正在调度智能体并查询相关业务数据…</div></div>}</>}</div><div className="chat-composer"><div className="composer-box"><textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} placeholder="输入任务或问题，AI 将自动选择智能体与技能…"/><div className="composer-bottom"><span className="composer-hint">内容由 AI 生成，重要决策请结合业务实际</span><Button type="primary" size="small" icon={<SendOutlined/>} loading={loading} onClick={() => send()}>发送</Button></div></div></div></section>
     </div>
   </>;
 }

@@ -17,6 +17,9 @@ type GeoFeature = { properties?: { name?: string }; geometry: { type: string; co
 const countries = (feature(worldTopology as never, worldTopology.objects.countries as never) as unknown as { features: GeoFeature[] }).features;
 const countryNames: Record<string, string> = { China: '中国', 'United States of America': '美国', Singapore: '新加坡', Germany: '德国', 'United Kingdom': '英国', Japan: '日本', France: '法国', Canada: '加拿大', Australia: '澳大利亚' };
 const displayCountry = (name: string) => countryNames[name] || name;
+// 反向映射：中文国名 -> GeoJSON 英文名（world-atlas 使用英文）
+const countryToEnglish: Record<string, string> = { '中国': 'China', '美国': 'United States of America', '新加坡': 'Singapore', '德国': 'Germany', '英国': 'United Kingdom', '日本': 'Japan', '法国': 'France', '加拿大': 'Canada', '澳大利亚': 'Australia' };
+const normalizeCountry = (name: string) => countryToEnglish[name] || name;
 
 function eachPolygon(item: GeoFeature, callback: (polygon: number[][][]) => void) {
   if (item.geometry.type === 'Polygon') callback(item.geometry.coordinates as number[][][]);
@@ -69,12 +72,12 @@ function CountryDetailMap({ country, talents, filters, onFilterChange }: { count
   const chartRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!chartRef.current) return;
-    const isChina = country === 'China'; const mapName = isChina ? 'china' : `country-${country}`;
+    const isChina = normalizeCountry(country) === 'China'; const mapName = isChina ? 'china' : `country-${country}`;
     if (!isChina) {
-      const selected = countries.find(item => item.properties?.name === country);
+      const selected = countries.find(item => item.properties?.name === normalizeCountry(country));
       if (selected) echarts.registerMap(mapName, { type: 'FeatureCollection', features: [selected] } as never);
     }
-    const data = isChina ? Object.entries(talents.filter(item => item.country === 'China').reduce<Record<string, number>>((result, talent) => { if (talent.province) result[talent.province] = (result[talent.province] || 0) + 1; return result; }, {})).map(([name, value]) => ({ name, value })) : [{ name: country, value: talents.filter(item => item.country === country).length }];
+    const data = isChina ? Object.entries(talents.filter(item => normalizeCountry(item.country || '') === 'China').reduce<Record<string, number>>((result, talent) => { if (talent.province) result[talent.province] = (result[talent.province] || 0) + 1; return result; }, {})).map(([name, value]) => ({ name, value })) : [{ name: country, value: talents.filter(item => normalizeCountry(item.country || '') === country).length }];
     const max = Math.max(1, ...data.map(item => item.value));
     const chart = echarts.init(chartRef.current);
     chart.setOption({
@@ -94,10 +97,10 @@ export default function TalentMap({ talents, resultCount, filters, onFilterChang
   const mountRef = useRef<HTMLDivElement>(null); const tooltipRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<'globe' | 'country'>(filters.country ? 'country' : 'globe');
   const filterCallback = useRef(onFilterChange); filterCallback.current = onFilterChange;
-  const counts = useMemo(() => { const result: Record<string, number> = {}; talents.forEach(talent => { if (talent.country) result[talent.country] = (result[talent.country] || 0) + 1; }); return result; }, [talents]);
+  const counts = useMemo(() => { const result: Record<string, number> = {}; talents.forEach(talent => { if (talent.country) { const en = normalizeCountry(talent.country); result[en] = (result[en] || 0) + 1; } }); return result; }, [talents]);
   const countryStats = useMemo(() => Object.entries(counts).sort((a, b) => b[1] - a[1]), [counts]);
   useEffect(() => { setView(filters.country ? 'country' : 'globe'); }, [filters.country]);
-  const selectCountry = (name: string) => { onFilterChange({ country: name, province: undefined }); setView('country'); };
+  const selectCountry = (name: string) => { onFilterChange({ country: displayCountry(name), province: undefined }); setView('country'); };
   const backToGlobe = () => { setView('globe'); onFilterChange({ country: undefined, province: undefined }); };
 
   useEffect(() => {
@@ -131,7 +134,7 @@ export default function TalentMap({ talents, resultCount, filters, onFilterChang
       if (dragging && moved < 6) {
         const hit = hitAt(event); let name = hit?.object.userData.country as string | undefined;
         if (!name && hit?.object === earth && hit.uv) name = countryAtPoint(hit.uv.x * 360 - 180, hit.uv.y * 180 - 90);
-        if (name) { filterCallback.current({ country: name, province: undefined }); setView('country'); }
+        if (name) { filterCallback.current({ country: displayCountry(name), province: undefined }); setView('country'); }
       }
       dragging = false; renderer.domElement.style.cursor = 'grab'; if (renderer.domElement.hasPointerCapture(event.pointerId)) renderer.domElement.releasePointerCapture(event.pointerId);
     };
@@ -143,8 +146,8 @@ export default function TalentMap({ talents, resultCount, filters, onFilterChang
   }, [counts, view]);
 
   return <section className="talent-map-panel talent-globe-panel">
-    <div className="map-panel-heading"><div><div className="section-eyebrow">{view === 'globe' ? 'GLOBAL TALENT FOOTPRINT' : 'COUNTRY TALENT DETAIL'}</div><h2>{view === 'globe' ? '全球人才地图' : `${displayCountry(filters.country || '')}${filters.country === 'China' ? '省级' : ''}人才地图`}</h2></div><div className="map-location-stat"><b>{view === 'globe' ? countryStats.length : resultCount}</b><span>{view === 'globe' ? '国家 / 地区' : '位匹配人才'}</span></div></div>
-    <div className="map-breadcrumb"><button className={view === 'globe' ? 'active' : ''} onClick={backToGlobe}>全球球体</button>{view === 'country' && filters.country && <><span>/</span><b>{displayCountry(filters.country)}</b></>}<span className="map-breadcrumb-hint">{view === 'globe' ? '拖拽旋转 · 点击国家直接进入对应地图' : filters.country === 'China' ? '点击省份联动筛选 · 滚轮缩放' : '拖拽移动 · 滚轮缩放'}</span></div>
+    <div className="map-panel-heading"><div><div className="section-eyebrow">{view === 'globe' ? 'GLOBAL TALENT FOOTPRINT' : 'COUNTRY TALENT DETAIL'}</div><h2>{view === 'globe' ? '全球人才地图' : `${displayCountry(filters.country || '')}${normalizeCountry(filters.country || '') === 'China' ? '省级' : ''}人才地图`}</h2></div><div className="map-location-stat"><b>{view === 'globe' ? countryStats.length : resultCount}</b><span>{view === 'globe' ? '国家 / 地区' : '位匹配人才'}</span></div></div>
+    <div className="map-breadcrumb"><button className={view === 'globe' ? 'active' : ''} onClick={backToGlobe}>全球球体</button>{view === 'country' && filters.country && <><span>/</span><b>{displayCountry(filters.country)}</b></>}<span className="map-breadcrumb-hint">{view === 'globe' ? '拖拽旋转 · 点击国家直接进入对应地图' : normalizeCountry(filters.country || '') === 'China' ? '点击省份联动筛选 · 滚轮缩放' : '拖拽移动 · 滚轮缩放'}</span></div>
     {view === 'globe' ? <div className="talent-globe-stage"><div className="talent-globe-canvas" ref={mountRef} /><div className="globe-tooltip" ref={tooltipRef} /><div className="globe-axis-label">GLOBAL VIEW · 360°</div></div> : filters.country && <CountryDetailMap country={filters.country} talents={talents} filters={filters} onFilterChange={onFilterChange} />}
     <div className="globe-country-chips">{countryStats.map(([name, count]) => <button key={name} className={filters.country === name ? 'active' : ''} onClick={() => filters.country === name ? backToGlobe() : selectCountry(name)}><i />{displayCountry(name)}<b>{count}</b></button>)}</div>
     <div className="map-filter-footer"><span>{filters.country ? displayCountry(filters.country) : '全球'} · {resultCount} 位人才</span>{filters.country && <button onClick={backToGlobe}>返回全球球体</button>}</div>

@@ -28,6 +28,11 @@ class TalentCreate(ResumeBasicInfo):
     organization_id: int | None = Field(None, gt=0)
     skill_tags: list[str] = Field(default_factory=list, max_length=100)
     self_evaluation: str | None = Field(None, max_length=6000)
+    country: str | None = Field(None, max_length=64, description="国家")
+    country_code: str | None = Field(None, max_length=8, description="国家代码")
+    province: str | None = Field(None, max_length=64, description="省份/州")
+    work_city: str | None = Field(None, max_length=64, description="工作城市")
+    job_level: str | None = Field(None, max_length=32, description="职级")
     @field_validator("name")
     @classmethod
     def valid_name(cls, value):
@@ -45,6 +50,11 @@ class TalentUpdate(ResumeBasicInfo):
     organization_id: int | None = Field(None, gt=0)
     skill_tags: list[str] | None = Field(None, max_length=100)
     self_evaluation: str | None = Field(None, max_length=6000)
+    country: str | None = Field(None, max_length=64, description="国家")
+    country_code: str | None = Field(None, max_length=8, description="国家代码")
+    province: str | None = Field(None, max_length=64, description="省份/州")
+    work_city: str | None = Field(None, max_length=64, description="工作城市")
+    job_level: str | None = Field(None, max_length=32, description="职级")
     version: int | None = Field(None, ge=1, description="乐观锁版本号（不传则跳过版本校验）")
     @field_validator("skill_tags")
     @classmethod

@@ -143,11 +143,13 @@ export const analyticsApi = {
   /** 报告下载：接口需要 Authorization，不能用 window.open 直接打开（会 401 提示登录）。 */
   downloadReport: (item: ReportItem) =>
     downloadWithToken(item.url || `/analytics/reports/${item.report_id}/download`, `${item.title || '分析报告'}.${(item.format || 'pdf').replace(/^\./, '')}`),
+  talentGeo: () => request<{ talent_id: number; country: string; country_code?: string; province?: string; work_city?: string }[]>({ url: '/analytics/talents/geo' }),
 };
 
 export const agentsApi = {
   conversations: (params?: Record<string, unknown>) => request<PageResult<AgentConversation>>({ url: '/agents/conversations', params }),
   messages: (conversationId: string | number) => request<unknown[]>({ url: `/agents/conversations/${conversationId}/messages` }),
+  deleteConversation: (conversationId: string | number) => request<{ deleted: boolean }>({ url: `/agents/conversations/${conversationId}`, method: 'DELETE' }),
 };
 
 /* ======================= 文件管理 [架构组] ======================= */

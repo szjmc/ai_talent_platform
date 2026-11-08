@@ -117,6 +117,22 @@ class Talent(BaseModel):
     resume_id: Mapped[int | None] = mapped_column(
         BigInteger, nullable=True, comment="来源简历 ID（逻辑外键 -> resumes.id）"
     )
+    # 地域与职级信息（人才地图 / 分布统计使用；为空时地图按「未知」处理）
+    country: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, comment="国家（如：中国、美国、新加坡）"
+    )
+    country_code: Mapped[str | None] = mapped_column(
+        String(8), nullable=True, comment="国家代码（ISO 3166-1 alpha-2，如 CN/US/SG）"
+    )
+    province: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, comment="省份/州（如：浙江省、加利福尼亚州）"
+    )
+    work_city: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, comment="工作城市（如：杭州、深圳）"
+    )
+    job_level: Mapped[str | None] = mapped_column(
+        String(32), nullable=True, comment="职级（如：P6、高级工程师）"
+    )
 
     # ------------------------------------------------------------------ 关系
     organization: Mapped["Organization | None"] = relationship(  # noqa: F821

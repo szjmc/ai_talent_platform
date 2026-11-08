@@ -31,6 +31,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from sqlalchemy import update
+
 from app.ai.agent import AGENT_TYPES, dispatch_stream
 from app.ai.context import get_context, set_context, update_context
 from app.ai.core.llm_manager import llm_manager
@@ -476,6 +478,30 @@ class AgentService:
         return await self.repo.paginate_messages(
             self.db, conversation_id, page_params, user_id=getattr(current_user, "id", None)
         )
+
+    async def delete_conversation(
+        self,
+        conversation_id: Any,
+        current_user: Any,
+    ) -> bool:
+        """删除会话（逻辑删除会话 + 其消息；越权/不存在由 Repository 校验）。"""
+        if self.db is None:
+            return False
+        conv = await self.repo.owned(
+            self.db, conversation_id, getattr(current_user, "id", None)
+        )
+        if conv is None:
+            raise NotFoundError("会话不存在")
+        await self.repo.delete(self.db, conv, soft=True)
+        # 级联软删除消息，避免历史消息残留在已删除会话下
+        from app.models.conversation import ChatMessage as ChatMessageModel
+        await self.db.execute(
+            update(ChatMessageModel)
+            .where(ChatMessageModel.conversation_id == conv.id)
+            .values(is_deleted=True, updated_at=datetime.now())
+        )
+        await self.db.flush()
+        return True
 
     async def describe_routes(self) -> dict[str, Any]:
         """智能体清单与总路由表（GET /agents）。"""

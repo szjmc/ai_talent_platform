@@ -361,6 +361,75 @@ class AnalyticsAgent(BaseAgent):
             text = text[start:end + 1]
         return text.strip()
 
+    @staticmethod
+    def _safe_str_list(value: Any) -> list[str]:
+        """安全提取字符串列表：兼容 list[str]、str（整串而非逐字符）、dict[str,str]。
+
+        防止 LLM 返回字符串时被逐字符迭代成乱码。
+        """
+        if value is None:
+            return []
+        if isinstance(value, str):
+            text = value.strip()
+            return [text] if text else []
+        if isinstance(value, list):
+            result: list[str] = []
+            for item in value:
+                if isinstance(item, str):
+                    text = item.strip()
+                    if text:
+                        result.append(text)
+                elif isinstance(item, dict):
+                    # 取首个非空字符串字段（兼容 {text: "..."} / {content: "..."}）
+                    for key in ("text", "content", "summary", "value", "description"):
+                        if isinstance(item.get(key), str) and item[key].strip():
+                            result.append(item[key].strip())
+                            break
+            return result
+        if isinstance(value, dict):
+            return [f"{k}: {v}" for k, v in value.items() if str(v).strip()]
+        return []
+
+    @staticmethod
+    def _build_answer_text(
+        conclusions: list[str],
+        suggestions: list[str],
+        risk_list: list[dict[str, Any]],
+        group_summaries: dict[str, str],
+        key_talent_top3: list[str],
+        appendix_note: str,
+    ) -> str:
+        """从结构化数据构建人类可读的文本摘要，绝不输出原始 JSON。
+
+        前端据此渲染报告正文（核心结论、行动建议、风险提示）。
+        """
+        parts: list[str] = []
+        if conclusions:
+            parts.append("【核心结论】\n" + "\n".join(f"• {c}" for c in conclusions))
+        if group_summaries:
+            parts.append("【分组概览】\n" + "\n".join(
+                f"• {k}：{v}" for k, v in group_summaries.items()
+            ))
+        if suggestions:
+            parts.append("【建议行动项】\n" + "\n".join(
+                f"• {s}" for s in suggestions
+            ))
+        if risk_list:
+            risks_text = "\n".join(
+                f"• [{r.get('priority', '?')}] {r.get('name', '')}：{r.get('phenomenon', '')}"
+                for r in risk_list
+            )
+            parts.append("【风险提示】\n" + risks_text)
+        if key_talent_top3:
+            parts.append("【重点人才】\n" + "\n".join(
+                f"• {t}" for t in key_talent_top3
+            ))
+        if appendix_note:
+            parts.append(appendix_note)
+        if not parts:
+            parts.append("报告已生成，请查看下方图表与结构化数据。")
+        return "\n\n".join(parts)
+
     async def parse_output(self, raw: str) -> dict[str, Any]:
         """解析基座返回的结构化 JSON 输出（conclusions + suggestions）。
 
@@ -369,6 +438,7 @@ class AnalyticsAgent(BaseAgent):
         传出：{answered, question, answer, conclusions, suggestions, ...}
         """
         report = getattr(self, "_report", {})
+        raw_passed = raw
 
         # 多轮追问路径：直接返回 LLM 的文字回答，不做结构化解析
         if getattr(self, "_followup", False):
@@ -414,7 +484,7 @@ class AnalyticsAgent(BaseAgent):
         try:
             parsed = json.loads(raw)
             if isinstance(parsed, dict):
-                conclusions = [str(x) for x in (parsed.get("conclusions") or [])]
+                conclusions = self._safe_str_list(parsed.get("conclusions"))
 
                 # meta 元信息：报告用途 / 数据截止 / 数据范围 / 样本提示 / 阈值说明 / KPI 目标
                 raw_meta = parsed.get("meta")
@@ -424,12 +494,12 @@ class AnalyticsAgent(BaseAgent):
                 # suggestions 兼容两种结构：旧的["字符串"] 与 新的{p0/p1/warn}
                 raw_sug = parsed.get("suggestions")
                 if isinstance(raw_sug, dict):
-                    suggestion_p0 = [str(x) for x in (raw_sug.get("p0") or [])]
-                    suggestion_p1 = [str(x) for x in (raw_sug.get("p1") or [])]
+                    suggestion_p0 = self._safe_str_list(raw_sug.get("p0"))
+                    suggestion_p1 = self._safe_str_list(raw_sug.get("p1"))
                     warn_if_no_action = str(raw_sug.get("warn_if_no_action") or "")
                     suggestions = suggestion_p0 + suggestion_p1
                 elif isinstance(raw_sug, list):
-                    suggestions = [str(x) for x in raw_sug]
+                    suggestions = self._safe_str_list(raw_sug)
 
                 gs = parsed.get("group_summaries")
                 if isinstance(gs, dict):
@@ -453,8 +523,7 @@ class AnalyticsAgent(BaseAgent):
                     chart_display = {str(k): str(v) for k, v in cd.items()}
 
                 kt = parsed.get("key_talent_top3")
-                if isinstance(kt, list):
-                    key_talent_top3 = [str(x) for x in kt]
+                key_talent_top3 = self._safe_str_list(kt)
 
                 if isinstance(parsed.get("report_audience"), str):
                     report_audience = parsed["report_audience"]
@@ -464,10 +533,20 @@ class AnalyticsAgent(BaseAgent):
         except (json.JSONDecodeError, TypeError):
             pass
 
+        # 构建人类可读的 answer：绝不输出原始 JSON（避免乱码）
+        answer = self._build_answer_text(
+            conclusions=conclusions,
+            suggestions=suggestions,
+            risk_list=risk_list,
+            group_summaries=group_summaries,
+            key_talent_top3=key_talent_top3,
+            appendix_note=appendix_note,
+        )
+
         result: dict[str, Any] = {
             "answered": True,
             "question": report.get("question", ""),
-            "answer": raw or "",
+            "answer": answer,
             "conclusions": conclusions,
             "suggestions": suggestions,
             "suggestion_p0": suggestion_p0,
