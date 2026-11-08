@@ -68,7 +68,7 @@ class TalentService:
 
     def public_data(self, obj):
         """gxd-组织人才响应并脱敏联系方式，身份证不返回。"""
-        data = {key: getattr(obj, key) for key in ("id", "name", "education", "school", "major", "work_years", "current_company", "current_position", "organization_id", "skill_tags", "portrait_summary", "potential_level", "status", "version", "created_at")}
+        data = {key: getattr(obj, key) for key in ("id", "name", "education", "school", "major", "work_years", "current_company", "current_position", "organization_id", "skill_tags", "portrait_summary", "potential_level", "status", "version", "created_at", "country", "country_code", "province", "work_city", "job_level")}
         mobile = obj.mobile or ""
         data["mobile"] = mobile[:3] + "****" + mobile[-4:] if len(mobile) >= 7 else None
         email = obj.email or ""

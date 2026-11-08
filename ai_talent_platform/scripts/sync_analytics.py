@@ -283,6 +283,12 @@ def build_dim_talent_wide_rows(
                 ),
                 "potential_level": talent.get("potential_level"),
                 "match_avg_score": match_scores.get(int(talent["id"])),
+                # 优先使用 talents 表地域字段；字段为空时从 current_company 推导
+                "country": talent.get("country") or derive_location(talent.get("current_company"))["country"],
+                "country_code": talent.get("country_code") or derive_location(talent.get("current_company"))["country_code"],
+                "province": talent.get("province") or derive_location(talent.get("current_company"))["province"],
+                "work_city": talent.get("work_city") or derive_location(talent.get("current_company"))["work_city"],
+                "job_level": talent.get("job_level"),
             }
         )
     return rows

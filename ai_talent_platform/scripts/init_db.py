@@ -141,6 +141,47 @@ async def init_roles() -> None:
         await engine.dispose()
 
 
+# ============================================================== 列迁移
+async def migrate_talent_location_columns() -> None:
+    """MySQL：为已有 talents 表补充地域/职级列（幂等，列已存在则跳过）。
+
+    原因：talents 表最初未定义 country/province/work_city 等字段，
+    导致人才地图无法按国家聚合人数。新部署由 create_all 直接建好；
+    已有数据库需在此补列。
+    """
+    from sqlalchemy import inspect, text
+
+    engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
+    try:
+        async with engine.begin() as conn:
+            existing_cols = await conn.run_sync(
+                lambda sync_conn: {
+                    col["name"]
+                    for col in inspect(sync_conn).get_columns("talents")
+                }
+            )
+            additions = [
+                ("country", "VARCHAR(64) NULL COMMENT '国家'"),
+                ("country_code", "VARCHAR(8) NULL COMMENT '国家代码'"),
+                ("province", "VARCHAR(64) NULL COMMENT '省份/州'"),
+                ("work_city", "VARCHAR(64) NULL COMMENT '工作城市'"),
+                ("job_level", "VARCHAR(32) NULL COMMENT '职级'"),
+            ]
+            added = []
+            for col, ddl in additions:
+                if col not in existing_cols:
+                    await conn.execute(
+                        text(f"ALTER TABLE talents ADD COLUMN `{col}` {ddl}")
+                    )
+                    added.append(col)
+        if added:
+            print(f"[2/4] talents 表补充地域列：{', '.join(added)}")
+        else:
+            print("[2/4] talents 表地域列已存在，无需迁移")
+    finally:
+        await engine.dispose()
+
+
 # ============================================================== PgSQL
 async def create_pgsql_database() -> None:
     """PgSQL：确保分析库、schema、分析表及默认分区存在（兼容旧函数名）。"""
@@ -171,6 +212,7 @@ async def main(drop: bool = False, tables_only: bool = False) -> None:
     if not tables_only:
         await create_mysql_database()
     await create_mysql_tables(drop=drop)
+    await migrate_talent_location_columns()
     if not tables_only:
         await init_roles()
         await create_pgsql_database()
