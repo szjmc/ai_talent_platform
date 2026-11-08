@@ -1,0 +1,10 @@
+# Python bytecode / local documentation virtualenvs
+__pycache__/
+*.py[cod]
+.venv/
+.venv-docs/
+.docx_env/
+.perf_env/
+
+# Generated project-documentation artifacts (reproducible via tools/project_docs)
+deliverables/
