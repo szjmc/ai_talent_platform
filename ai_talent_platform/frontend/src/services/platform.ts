@@ -1,6 +1,6 @@
-import { downloadWithToken, request } from './api';
+import { downloadApiFile, request } from './api';
 import type {
-  Assessment, AssessmentReport, AssessmentSummary, AgentConversation, AuditEntry, Course,
+  DecisionReport, Assessment, AssessmentReport, AssessmentSummary, AgentConversation, AuditEntry, Course,
   DistributionResult, KnowledgeDoc, MatchingRunResult, NL2SQLResult, OrgNode, PageResult,
   Position, ReportItem, Resume, ResumeParseResult, Talent, TalentPortrait, TrainingNotification,
   TrainingPlan, TrainingRecommendation, TrendResult, User,
@@ -51,9 +51,10 @@ export const resumesApi = {
 
 export const assessmentsApi = {
   list: (params?: Record<string, unknown>) => request<PageResult<Assessment>>({ url: '/assessments', params }),
-  create: (data: { file_id: number; question_count?: number; title?: string }) => request<{ id: number; talent_id: number; question_count: number; exam_url: string; email?: Record<string, unknown> }>({ url: '/assessments', method: 'POST', data }),
+  create: (data: { file_id: number; question_count?: number; title?: string; deadline?: string }) => request<{ id: number; talent_id: number; question_count: number; exam_url: string; email?: Record<string, unknown> }>({ url: '/assessments', method: 'POST', data }),
   detail: (id: number) => request<Assessment & { resume_keywords?: Record<string, unknown>; exam_url?: string }>({ url: `/assessments/${id}` }),
-  report: (id: number) => request<AssessmentReport>({ url: `/assessments/${id}/report` }),
+  report: (id: number) => request<{ report?: AssessmentReport | null }>({ url: `/assessments/${id}/report` }),
+  generateReport: (id: number) => request<AssessmentReport>({ url: `/assessments/${id}/interview/finish`, method: 'POST' }),
   paper: (id: number) => request<{ assessment_id: number; questions: unknown[] }>({ url: `/assessments/${id}/paper` }),
   start: (id: number) => request<{ assessment_id: number; questions: unknown[] }>({ url: `/assessments/${id}/start`, method: 'POST' }),
   submit: (id: number, answers: { question_id: number; answer: unknown }[]) => request<Record<string, unknown>>({ url: `/assessments/${id}/submit`, method: 'POST', data: { answers } }),
@@ -119,15 +120,8 @@ export const knowledgeApi = {
     request<{ total: number; items: RevisionItem[] }>({ url: `/knowledge/docs/${docId}/revisions`, params }),
   /** 版本正文（version 用于编辑/发布时的并发校验）。 */
   revision: (revisionId: number) => request<RevisionItem & { body?: string; content?: string }>({ url: `/knowledge/revisions/${revisionId}` }),
-  /** 生成切片预览：发布前必须先预览。
-   *  返回的 version 是预览后**新的**乐观锁版本（发布时要用它，不能用列表里的旧 version），
-   *  chunks 供人工确认切片是否符合预期。 */
-  revisionPreview: (revisionId: number, expectedVersion: number) =>
-    request<RevisionItem & { version: number; chunks: { content: string; metadata?: Record<string, unknown> }[]; chunk_count?: number }>({
-      url: `/knowledge/revisions/${revisionId}/preview`, method: 'POST', data: { expected_version: expectedVersion },
-    }),
   ask: (data: { question: string; session_id?: string | null; category?: string | null; top_k?: number; use_rerank?: boolean; suggest?: boolean }) =>
-    request<{ answer: string; session_id: string; intent: string; answer_mode?: 'model' | 'extractive'; sources: { doc_id?: number; chunk_id?: number; file_id?: number; source?: string; page?: number | null; score?: number }[]; suggestions: string[] }>({ url: '/text2answer', method: 'POST', data }),
+    request<{ answer: string; session_id: string; intent: string; sources: { doc_id?: number; chunk_id?: number; file_id?: number; source?: string; page?: number | null; score?: number }[]; suggestions: string[] }>({ url: '/text2answer', method: 'POST', data }),
   conversations: (params?: Record<string, unknown>) => request<PageResult<{ session_id: string; title: string; message_count: number; last_message_at?: string | null }>>({ url: '/conversations', params }),
   messages: (sessionId: string | number) => request<{ id: number; role: string; content: string; citations?: unknown[]; created_at?: string | null }[]>({ url: `/conversations/${sessionId}/messages` }),
 };
@@ -137,17 +131,18 @@ export const analyticsApi = {
   distribution: (type: 'education'|'age'|'skill'|'org', params?: AnalyticsFilterParams) => request<DistributionResult>({ url: '/analytics/distribution', params: { type, ...params } }),
   trend: (params: { start_month: string; end_month: string; comparison?: 'none'|'mom'|'yoy'|'both' } & AnalyticsFilterParams) => request<TrendResult>({ url: '/analytics/trend', params }),
   assessmentSummary: (params?: AnalyticsFilterParams & { start_at?: string; end_at?: string; min_score?: number; max_score?: number }) => request<AssessmentSummary>({ url: '/analytics/assessment/summary', params }),
-  nl2sql: (data: { question: string; max_rows?: number; with_insight?: boolean; chart_type?: string }) => request<NL2SQLResult>({ url: '/analytics/nl2sql', method: 'POST', data }),
-  createReport: (data: { query_id?: string; question?: string; title?: string; format?: string }) => request<ReportItem>({ url: '/analytics/report', method: 'POST', data }),
+  nl2sql: (data: { question: string; max_rows?: number; with_insight?: boolean; chart_type?: string }) => request<NL2SQLResult>({ url: '/analytics/nl2sql', method: 'POST', data, timeout: 180000 }),
+  createReport: (data: { query_id?: string; question?: string; title?: string; format?: string }) => request<ReportItem>({ url: '/analytics/report', method: 'POST', data, timeout: 180000 }),
   reports: (params?: Record<string, unknown>) => request<PageResult<ReportItem>>({ url: '/analytics/reports', params }),
-  /** 报告下载：接口需要 Authorization，不能用 window.open 直接打开（会 401 提示登录）。 */
-  downloadReport: (item: ReportItem) =>
-    downloadWithToken(item.url || `/analytics/reports/${item.report_id}/download`, `${item.title || '分析报告'}.${(item.format || 'pdf').replace(/^\./, '')}`),
+  downloadReport: (item: ReportItem) => downloadApiFile(`/analytics/reports/${encodeURIComponent(item.report_id)}/download`, `${item.title.replace(/[\\/:*?"<>|]/g, '_')}.${item.format}`),
 };
 
 export const agentsApi = {
   conversations: (params?: Record<string, unknown>) => request<PageResult<AgentConversation>>({ url: '/agents/conversations', params }),
-  messages: (conversationId: string | number) => request<unknown[]>({ url: `/agents/conversations/${conversationId}/messages` }),
+  decisionReport: (question: string) => request<DecisionReport>({ url: '/agents/report/analysis', method: 'POST', data: { question }, timeout: 300000 }),
+  periodReport: (report_type: 'weekly' | 'monthly' | 'yearly', force = false) => request<DecisionReport>({ url: '/agents/report/period', method: 'POST', data: { report_type, force }, timeout: 300000 }),
+  messages: (conversationId: string | number, params?: Record<string, unknown>) => request<PageResult<{ id: number; role: string; content: string }>>({ url: `/agents/conversations/${conversationId}/messages`, params }),
+  deleteConversation: (conversationId: string | number) => request<{ deleted: boolean }>({ url: `/agents/conversations/${conversationId}`, method: 'DELETE' }),
 };
 
 /* ======================= 文件管理 [架构组] ======================= */
@@ -167,20 +162,6 @@ export interface RevisionItem {
   status?: string; title?: string; category?: string; file_id?: number | null;
   source_revision_id?: number | null; created_at?: string | null; updated_at?: string | null;
 }
-
-/** 按文档读取编辑基线：正文来自「当前已发布且生效」的版本，不含 revision_id 选择负担。 */
-export interface DocumentEditable {
-  doc_id: number;
-  revision_id: number;
-  revision_no: number;
-  title: string;
-  category: string;
-  status: string;
-  published_at?: string | null;
-  body: string;
-  base_version: number;
-}
-
 export interface QuestionImportResult { imported_count: number; failed_count: number; pending_count: number; sync_error?: string | null; [key: string]: unknown }
 
 export const filesApi = {
@@ -196,8 +177,20 @@ export const filesApi = {
   /** 重试失败索引（doc_id 是文档 ID，不是文件 ID）。 */
   retry: (docId: number) => request<unknown>({ url: `/files/docs/${docId}/retry`, method: 'POST' }),
   /** 下载版本文件（source=true 取上传原件，false 取编辑后生成的版本文件）。 */
-  downloadRevision: async (revisionId: number, fileName: string, source = false) =>
-    downloadWithToken(`/files/revisions/${revisionId}/download?source=${source}`, fileName),
+  downloadRevision: async (revisionId: number, fileName: string, source = false) => {
+    const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+    const token = localStorage.getItem('talentos_access_token');
+    const response = await fetch(`${base}/files/revisions/${revisionId}/download?source=${source}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : ({} as Record<string, string>),
+    });
+    if (!response.ok) throw new Error('下载失败：无权限或文件不存在');
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = fileName;
+    document.body.appendChild(link); link.click(); link.remove();
+    URL.revokeObjectURL(url);
+  },
   /** 上传并导入笔试题库（JSON）。 */
   uploadQuestions: (file: File, syncIndex = true) => {
     const form = new FormData();
@@ -206,14 +199,6 @@ export const filesApi = {
     return request<QuestionImportResult>({ url: '/files/questions/upload', method: 'POST', data: form, headers: { 'Content-Type': 'multipart/form-data' } });
   },
   /** 版本流转：编辑正文另存 / 发布 / 历史恢复 / 取消草稿（都作用在文件版本上）。 */
-  /** 正文编辑以「文档」为入口（doc_id）：后端基于当前已发布生效版本另存新草稿，
-   *  调用方无需查找 revision_id，也无需维护 expected_version 乐观锁。 */
-  /** 读取「编辑基线」：只需 doc_id，返回当前生效版本正文/标题/分类，用于填充编辑器。 */
-  documentEditable: (docId: number) =>
-    request<DocumentEditable>({ url: `/files/docs/${docId}/editable`, method: 'GET' }),
-  editDocument: (docId: number, data: { body: string; title?: string; category?: string }) =>
-    request<RevisionItem>({ url: `/files/docs/${docId}/edit`, method: 'POST', data }),
-  /** @deprecated 旧版按 revision_id 编辑，保留供历史版本恢复等特殊场景使用。 */
   editRevision: (revisionId: number, data: { content: string; title?: string; category?: string; expected_version: number }) =>
     request<RevisionItem>({ url: `/files/revisions/${revisionId}/edit`, method: 'POST', data }),
   publishRevision: (revisionId: number, expectedVersion: number) =>

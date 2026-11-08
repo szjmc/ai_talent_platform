@@ -201,6 +201,11 @@ class DimTalentWide(AnalyticsBase):
     skill_tags: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list, server_default=text("'{}'::text[]"), comment="技能标签")
     potential_level: Mapped[str | None] = mapped_column(String(32), nullable=True, comment="潜力等级")
     match_avg_score: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True, comment="平均匹配分")
+    country: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="国家")
+    country_code: Mapped[str | None] = mapped_column(String(8), nullable=True, comment="国家代码")
+    province: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="省份/州")
+    work_city: Mapped[str | None] = mapped_column(String(64), nullable=True, comment="工作城市")
+    job_level: Mapped[str | None] = mapped_column(String(32), nullable=True, comment="职级")
     synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now(), comment="最近同步时间")
 
 

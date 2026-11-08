@@ -164,6 +164,22 @@ async def list_messages(
     return success(data=result, message="查询成功")
 
 
+@router.delete(
+    "/conversations/{conversation_id}",
+    summary="删除会话",
+    response_model=ApiResponse[dict],
+    dependencies=_AGENT_USE,
+)
+async def delete_conversation(
+    conversation_id: str,
+    user: CurrentUser,
+    service: AgentService = Depends(get_service),
+):
+    """逻辑删除会话及其消息（越权 → 403/2004；不存在 → 404/3001）。"""
+    await service.delete_conversation(conversation_id, user)
+    return success(data={"deleted": True, "conversation_id": conversation_id}, message="会话已删除")
+
+
 # ---------------------------------------------------------------- 任务
 @router.post(
     "/tasks",
