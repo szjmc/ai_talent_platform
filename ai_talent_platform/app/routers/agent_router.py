@@ -268,10 +268,10 @@ async def period_report(
 
     cache_key = f"period_v2:{report_type}"
     if not req.force:
-        cached = cache_get(cache_key)
+        cached = await cache_get(cache_key)
         if cached is not None:
             cached["from_cache"] = True
-            cached["period_updated_at"] = cache_time(cache_key)
+            cached["period_updated_at"] = await cache_time(cache_key)
             return success(data=cached)
 
     # 通过 analytics Agent 生成：完成取数->出图->LLM业务推理->结构化洞察
@@ -320,7 +320,7 @@ async def period_report(
     if is_employee(user.role_codes):
         result = sanitize_for_employee(result)
 
-    result["period_updated_at"] = cache_set(cache_key, result)
+    result["period_updated_at"] = await cache_set(cache_key, result)
     return success(data=result)
 
 
@@ -342,7 +342,7 @@ async def succession(
 
     cache_key = f"succession:{post_name}"
     if not req.force:
-        cached = cache_get(cache_key)
+        cached = await cache_get(cache_key)
         if cached is not None:
             cached["from_cache"] = True
             return success(data=cached)
@@ -357,6 +357,6 @@ async def succession(
 
     if isinstance(result, dict):
         result["from_cache"] = False
-        cache_set(cache_key, result)
+        await cache_set(cache_key, result)
 
     return success(data=result)

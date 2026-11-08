@@ -144,9 +144,19 @@ class Settings(BaseSettings):
     ANALYTICS_SYNC_RETRY: int = 3            # 失败重试次数（指数退避）
 
     # ------------------------------------------------------------------ Redis
-    REDIS_ENABLED: bool = False          # 未部署 Redis 时自动降级为进程内缓存
+    # 缓存/会话/限流/NL2SQL查询缓存/分布式锁统一使用此配置。
+    # 部署时只需修改 REDIS_URL（格式：redis://[:password@]host:port/db 或 rediss://... for SSL）。
+    # 连接失败时会自动降级到 fakeredis（开发/单实例）/内存缓存，业务无感；启动日志会打印实际后端 kind=redis|fakeredis|memory。
+    REDIS_ENABLED: bool = True                 # 设为 False 强制只用进程内内存缓存（不推荐生产）
     REDIS_URL: str = "redis://127.0.0.1:6379/0"
-    REDIS_DEFAULT_TTL: int = 300
+    REDIS_PASSWORD: str = ""                   # 如 URL 已带密码可留空；会合并到 URL 覆盖
+    REDIS_DB: int = 0                          # 默认 DB，URL 中的 /db 优先级更高
+    REDIS_DEFAULT_TTL: int = 300               # 默认缓存 TTL（秒）
+    REDIS_KEY_PREFIX: str = "aitp:"            # 所有业务 key 统一前缀，避免与其他应用冲突
+    REDIS_MAX_CONNECTIONS: int = 50            # 连接池上限
+    REDIS_SOCKET_CONNECT_TIMEOUT: float = 3.0  # 连接超时（秒）；防止启动时卡住
+    REDIS_SOCKET_TIMEOUT: float = 5.0          # 读写超时（秒）
+    REDIS_SSL: bool = False                    # 云 Redis（如阿里云/腾讯云 TLS）设为 True
 
     # ------------------------------------------------------------------ Milvus
     MILVUS_ENABLED: bool = False
