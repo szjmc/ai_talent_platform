@@ -133,4 +133,13 @@ export interface NL2SQLResult {
   elapsed_ms: number; cached: boolean; warnings: string[];
 }
 export interface ReportItem { report_id: string; title: string; format: string; url: string; size: number; created_at: string }
-export interface AgentConversation { conversation_id: string | number; title?: string | null; agent_type?: string | null; updated_at?: string | null; created_at?: string | null }
+export interface AgentConversation { id: number; title?: string | null; agent_type?: string | null; updated_at?: string | null; created_at?: string | null }
+
+export interface DecisionReport {
+  answered: boolean; message?: string; question?: string; answer?: string; report_type?: string; period_label?: string;
+  from_cache?: boolean; period_updated_at?: string; meta?: Record<string, unknown>;
+  conclusions?: string[]; suggestion_p0?: string[]; suggestion_p1?: string[]; warnings?: string[];
+  warn_if_no_action?: string; missing?: string[]; key_talent_top3?: string[];
+  risk_list?: { name?: string; priority?: string; phenomenon?: string; business_impact?: string; drill_hint?: string }[];
+  risks?: Record<string, unknown>[]; charts?: AnalyticsChart[]; group_summaries?: Record<string, string>;
+}

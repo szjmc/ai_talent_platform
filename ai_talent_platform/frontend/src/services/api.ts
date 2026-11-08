@@ -83,7 +83,7 @@ export async function downloadApiFile(path: string, fileName: string): Promise<v
 export interface StreamEvent { event: string; data: Record<string, unknown> }
 /** FastAPI /agents/chat/stream SSE 客户端，兼容 start/delta/citation/done/error 标准事件。 */
 export async function streamAgentChat(
-  payload: { agent_type: string; conversation_id?: string; message: string; stream: boolean },
+  payload: { agent_type: string; conversation_id?: string; talent_id?: number; message: string; stream: boolean },
   onEvent: (event: StreamEvent) => void,
   signal?: AbortSignal,
 ) {

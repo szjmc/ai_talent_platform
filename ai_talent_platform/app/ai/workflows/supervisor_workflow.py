@@ -75,6 +75,7 @@ ROUTE_KEYWORDS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("matching", ("匹配", "人岗", "推荐候选", "候选人", "竞聘", "岗位要求", "matching")),
     ("assessment", ("测评", "考试", "评分", "评估", "assessment")),
     ("training", ("培训", "课程", "学习计划", "能力提升", "training")),
+    ("analytics", ("人才结构", "人才分布", "数据分析", "决策报告", "数据洞察", "人才统计")),
     ("talent", ("人才", "画像", "盘点", "档案", "talent")),
 )
 

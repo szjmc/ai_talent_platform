@@ -198,6 +198,18 @@ async def get_task_status(
 # ========================================================================
 
 
+class DecisionReportRequest(BaseSchema):
+    question: str = Field(..., min_length=1, max_length=500, description="单次人才决策分析需求")
+
+
+@router.post("/report/analysis", summary="单次人才决策分析报告",
+             dependencies=[Depends(require_roles("super_admin", "admin", "hr", "manager")),
+                           Depends(require_permission(PermissionEnum.ANALYTICS_READ))])
+async def decision_report(req: DecisionReportRequest, user: CurrentUser):
+    from app.services.talent_decision_service import generate_decision_report
+    return success(data=await generate_decision_report(user, req.question))
+
+
 class PeriodReportRequest(BaseSchema):
     """周期报告请求：只指定周期类型，系统按固定模板定时生成，不接受用户自然语言提问。"""
 
@@ -223,7 +235,8 @@ class SuccessionRequest(BaseSchema):
 @router.post(
     "/report/period",
     summary="周期报告（周报/月报/年报）",
-    dependencies=[Depends(require_roles("super_admin", "admin", "hr", "manager"))],
+    dependencies=[Depends(require_roles("super_admin", "admin", "hr", "manager")),
+                  Depends(require_permission(PermissionEnum.ANALYTICS_READ))],
 )
 async def period_report(
     req: PeriodReportRequest,
@@ -247,7 +260,12 @@ async def period_report(
             f"不支持的周期类型：{report_type}，可选：weekly / monthly / yearly"
         )
 
-    cache_key = f"period:{report_type}"
+    # 缓存按用户、当前角色/部门及周期隔离，不能复用旧的全局结果。
+    import hashlib
+    from app.ai.workflows.talent_decision_report import period_label
+    identity = f"{user.id}:{getattr(user, 'organization_id', None)}:{','.join(sorted(user.role_codes))}"
+    scope_key = hashlib.sha256(identity.encode()).hexdigest()[:20]
+    cache_key = f"period-v2:{report_type}:{period_label(report_type)}:{scope_key}"
     if not req.force:
         cached = cache_get(cache_key)
         if cached is not None:
@@ -255,25 +273,9 @@ async def period_report(
             cached["period_updated_at"] = cache_time(cache_key)
             return success(data=cached)
 
-    # 直接调规则引擎生成周期报告（不经过 AgentService.chat，与 develop 新版 chat 解耦）
-    from app.ai.context import set_context
-    from app.ai.workflows.talent_decision_report import run_analysis
-    from app.core.permissions import get_data_scope
-
-    set_context(user=user)
-    result = await run_analysis(
-        "周期报告",
-        data_scope=get_data_scope(user.role_codes),
-        report_type=report_type,
-    )
-
-    # 员工端输出脱敏
-    from app.services.desensitize import is_employee, sanitize_for_employee
-
-    if is_employee(user.role_codes):
-        result = sanitize_for_employee(result)
-
-    if isinstance(result, dict) and result.get("answered"):
+    from app.services.talent_decision_service import generate_decision_report
+    result = await generate_decision_report(user, "周期报告", report_type=report_type)
+    if result.get("answered"):
         result["from_cache"] = False
         result["period_updated_at"] = cache_set(cache_key, result)
 

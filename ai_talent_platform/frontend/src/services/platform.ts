@@ -1,6 +1,6 @@
 import { downloadApiFile, request } from './api';
 import type {
-  Assessment, AssessmentReport, AssessmentSummary, AgentConversation, AuditEntry, Course,
+  DecisionReport, Assessment, AssessmentReport, AssessmentSummary, AgentConversation, AuditEntry, Course,
   DistributionResult, KnowledgeDoc, MatchingRunResult, NL2SQLResult, OrgNode, PageResult,
   Position, ReportItem, Resume, ResumeParseResult, Talent, TalentPortrait, TrainingNotification,
   TrainingPlan, TrainingRecommendation, TrendResult, User,
@@ -139,7 +139,9 @@ export const analyticsApi = {
 
 export const agentsApi = {
   conversations: (params?: Record<string, unknown>) => request<PageResult<AgentConversation>>({ url: '/agents/conversations', params }),
-  messages: (conversationId: string | number) => request<unknown[]>({ url: `/agents/conversations/${conversationId}/messages` }),
+  decisionReport: (question: string) => request<DecisionReport>({ url: '/agents/report/analysis', method: 'POST', data: { question }, timeout: 300000 }),
+  periodReport: (report_type: 'weekly' | 'monthly' | 'yearly', force = false) => request<DecisionReport>({ url: '/agents/report/period', method: 'POST', data: { report_type, force }, timeout: 300000 }),
+  messages: (conversationId: string | number, params?: Record<string, unknown>) => request<PageResult<{ id: number; role: string; content: string }>>({ url: `/agents/conversations/${conversationId}/messages`, params }),
 };
 
 /* ======================= 文件管理 [架构组] ======================= */

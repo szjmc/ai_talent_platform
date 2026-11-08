@@ -984,7 +984,11 @@ async def run_analysis(
 
     # 防幻觉闸门：一组数据都没取到，直接拒答，不进 LLM
     if not data.get("has_data"):
-        return build_reject_message({"question": question})
+        collected = data.get("collected") or {}
+        error_type = "no_permission" if not collected else (
+            "query_error" if all(item.get("error") for item in collected.values() if isinstance(item, dict)) else None
+        )
+        return build_reject_message({"question": question, "error_type": error_type})
 
     data["charts"] = build_charts(data)
     data["risks"] = detect_risks(data)
