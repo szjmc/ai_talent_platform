@@ -4,6 +4,7 @@ import type {
   DistributionResult, KnowledgeDoc, MatchingRunResult, NL2SQLResult, OrgNode, PageResult,
   Position, ReportItem, Resume, ResumeParseResult, Talent, TalentPortrait, TrainingNotification,
   TrainingPlan, TrainingRecommendation, TrendResult, User,
+  AnalyticsAgentResponse, PeriodReportResponse,
 } from '../types';
 
 /** 与后端 OpenAPI 对齐的业务接口封装；不在前端构造任何模拟业务数据。 */
@@ -150,6 +151,17 @@ export const agentsApi = {
   conversations: (params?: Record<string, unknown>) => request<PageResult<AgentConversation>>({ url: '/agents/conversations', params }),
   messages: (conversationId: string | number) => request<unknown[]>({ url: `/agents/conversations/${conversationId}/messages` }),
   deleteConversation: (conversationId: string | number) => request<{ deleted: boolean }>({ url: `/agents/conversations/${conversationId}`, method: 'DELETE' }),
+  /** 单次分析报告：analytics Agent 完整推理，返回结构化 report（含 charts/risks/conclusions）。 */
+  analyticsChat: (data: { message: string; conversation_id?: string | null; report_type?: string }) =>
+    request<AnalyticsAgentResponse>({ url: '/agents/chat', method: 'POST', data: { agent_type: 'analytics', ...data } }),
+  /** 周期报告（周报/月报/年报）：固定模板，可命中缓存；force=true 强制重算。 */
+  periodReport: (report_type: 'weekly' | 'monthly' | 'yearly', force = false) =>
+    request<PeriodReportResponse>({ url: '/agents/report/period', method: 'POST', data: { report_type, force } }),
+  /** 评估分数汇总（用于刷新左栏 KPI 的测评均分）。 */
+  assessmentSummary: () => request<AssessmentSummary>({ url: '/analytics/assessment/summary' }),
+  /** 智能问答：自然语言问数 + 文字解读。 */
+  nl2sqlAsk: (question: string) =>
+    request<NL2SQLResult>({ url: '/analytics/nl2sql', method: 'POST', data: { question, with_insight: true } }),
 };
 
 /* ======================= 文件管理 [架构组] ======================= */

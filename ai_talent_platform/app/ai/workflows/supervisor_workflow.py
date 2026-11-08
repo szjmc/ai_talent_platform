@@ -411,6 +411,14 @@ async def node_respond(state: SupervisorState) -> dict[str, Any]:
         or (inner.get("citations") if isinstance(inner, dict) else None)
         or []
     )
+    # 结构化报告透传：analytics Agent 返回完整报告（含 charts/risk_list/conclusions 等）
+    # 其它 Agent 没有 report 字段则为 None，前端按 agent 类型决定是否渲染
+    report_payload = None
+    if isinstance(inner, dict):
+        # analytics agent parse_output 返回的 dict 中包含 charts/conclusions/risk_list 等字段
+        has_report_keys = any(k in inner for k in ("charts", "conclusions", "risk_list", "suggestion_p0"))
+        if has_report_keys:
+            report_payload = inner
     return {
         "status": status,
         "answer": _extract_answer(result),
@@ -419,6 +427,7 @@ async def node_respond(state: SupervisorState) -> dict[str, Any]:
         "degraded": bool(result.get("degraded")),
         "errors": errors,
         "elapsed_ms": round(elapsed, 2),
+        "report": report_payload,
     }
 
 

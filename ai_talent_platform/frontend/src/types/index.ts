@@ -127,3 +127,43 @@ export interface NL2SQLResult {
 }
 export interface ReportItem { report_id: string; title: string; format: string; url: string; size: number; created_at: string }
 export interface AgentConversation { conversation_id: string | number; title?: string | null; agent_type?: string | null; updated_at?: string | null; created_at?: string | null }
+
+/* ──────────────── 人才决策报告（analytics Agent 结构化输出） ──────────────── */
+export interface ChartDataPoint { name: string; value: number }
+export interface ChartSeries { name: string; data: ChartDataPoint[] }
+export interface AnalyticsChart {
+  type: string; title: string;
+  x_field?: string; y_field?: string; value_field?: string | null;
+  series?: ChartSeries[]; indicators?: unknown; x_labels?: string[]; y_labels?: unknown;
+  values?: unknown; style?: unknown; size?: unknown; theme?: unknown; group?: string;
+}
+export interface RiskItem {
+  name: string; priority: string; phenomenon: string;
+  business_impact: string; drill_hint?: string;
+}
+export interface ReportMeta {
+  report_purpose?: string; data_cutoff?: string; data_scope?: string; sample_tip?: string;
+  threshold_desc?: string; kpi_goal?: Record<string, string>;
+}
+export interface InsightReport {
+  conclusions?: string[]; suggestions?: string[] | { p0?: string[]; p1?: string[]; warn_if_no_action?: string };
+  suggestion_p0?: string[]; suggestion_p1?: string[]; warn_if_no_action?: string;
+  group_summaries?: Record<string, string>; risk_list?: RiskItem[];
+  chart_display?: Record<string, string>; key_talent_top3?: string[];
+  report_audience?: string; meta?: ReportMeta; appendix_note?: string;
+  answer?: string;
+}
+export interface AnalyticsAgentResponse {
+  conversation_id: string; answer: string; agent: string; elapsed_ms: number;
+  report?: (InsightReport & {
+    charts?: AnalyticsChart[]; risks?: unknown[]; tenure?: { labels: string[]; data: number[] };
+    kpi?: { avg?: number; talent?: number; bad?: number; train_rate?: number };
+    data_scope?: string; period_label?: string; report_type?: string;
+  }) | null;
+}
+export interface PeriodReportResponse {
+  insight: InsightReport;
+  data: { charts?: AnalyticsChart[]; risks?: unknown[]; row_count?: number; [k: string]: unknown };
+  report_type: string; period_label: string; from_cache: boolean; period_updated_at?: string;
+  source?: string;
+}

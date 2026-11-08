@@ -7,6 +7,9 @@
 
 from app.infrastructure.cache.redis import (
     acquire_lock,
+    cache_get_or_set,
+    cache_kind,
+    clear_namespace,
     close_redis,
     delete_keys,
     get_json,
@@ -27,4 +30,7 @@ __all__ = [
     "incr_with_ttl",
     "acquire_lock",
     "release_lock",
+    "cache_get_or_set",
+    "clear_namespace",
+    "cache_kind",
 ]

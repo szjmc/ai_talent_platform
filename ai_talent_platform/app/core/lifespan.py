@@ -119,14 +119,14 @@ async def _startup() -> None:
     except Exception:  # noqa: BLE001 - 订阅失败不应阻塞服务启动
         logger.exception("培训站内信订阅注册失败（不影响服务启动，推送将只发事件不落库）")
 
-    # 5) 可选基础设施（默认关闭，需要时打开）
-    if settings.REDIS_ENABLED:
-        try:
-            from app.infrastructure.cache.redis import init_redis
+    # 5) 缓存基础设施：Redis 优先，不可用时自动降级 fakeredis/内存缓存，永不返回 None
+    try:
+        from app.infrastructure.cache.redis import init_redis, cache_kind
 
-            await init_redis()
-        except Exception:  # noqa: BLE001
-            logger.exception("Redis 初始化失败")
+        await init_redis()
+        logger.info("缓存后端就绪：kind=%s", cache_kind())
+    except Exception:  # noqa: BLE001
+        logger.exception("缓存初始化失败（将使用极简内存兜底）")
 
     # 6) 进程内定时任务（分析库增量同步；放在 Redis 之后，确保分布式锁可用）
     try:
@@ -165,14 +165,13 @@ async def _shutdown() -> None:
     except Exception:  # noqa: BLE001
         logger.exception("事件总线收尾失败（忽略）")
 
-    # 3) 关闭可选基础设施
-    if settings.REDIS_ENABLED:
-        try:
-            from app.infrastructure.cache.redis import close_redis
+    # 3) 关闭缓存（Redis/fakeredis/内存统一入口）
+    try:
+        from app.infrastructure.cache.redis import close_redis
 
-            await close_redis()
-        except Exception:  # noqa: BLE001
-            logger.exception("Redis 关闭失败")
+        await close_redis()
+    except Exception:  # noqa: BLE001
+        logger.exception("缓存关闭失败")
 
     # 4) 释放连接池（同时重置 MySQL 与 PgSQL 引擎单例）
     await close_db()

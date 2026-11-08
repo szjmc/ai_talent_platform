@@ -409,6 +409,9 @@ class AgentService:
         if session.memory is not None:
             await session.memory.summarize_if_needed()
 
+        # 结构化报告透传：analytics 等 Agent 返回完整数据，前端据此渲染报告
+        report = final.get("report") if isinstance(final.get("report"), dict) else None
+
         return AgentChatResponse(
             conversation_id=session.conversation_key,
             message_id=message_id,
@@ -419,6 +422,7 @@ class AgentService:
             usage=usage,
             degraded=bool(final.get("degraded")),
             elapsed_ms=round((time.perf_counter() - started) * 1000, 2),
+            report=report,
         )
 
     async def _persist_assistant(

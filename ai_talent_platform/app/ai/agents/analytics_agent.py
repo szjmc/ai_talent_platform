@@ -77,7 +77,14 @@ class AnalyticsAgent(BaseAgent):
               再调 _build_business_meta 做第二次业务推理，结果暂存 _report_meta
         传出：交给基座调 LLM 的 messages 列表
         """
-        question = str((payload or {}).get("question", "") or "").strip()
+        # 同时支持 message（AgentChatRequest 标准字段）与 question（历史兼容/旧调用）两种入参。
+        # 直接只取 question 会导致 /agents/chat {agent_type:'analytics', message:'...'} 进来的用户提问
+        # 永远是空串，进而在下方触发 "question 不能为空" 的 ParamError。
+        question = str(
+            (payload or {}).get("question")
+            or (payload or {}).get("message")
+            or ""
+        ).strip()
 
         # 周期报告类型：weekly / monthly / yearly；非法值一律当作普通分析
         report_type = str((payload or {}).get("report_type") or "").strip() or None

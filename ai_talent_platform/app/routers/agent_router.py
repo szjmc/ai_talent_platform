@@ -250,8 +250,11 @@ async def period_report(
     业务说明：周期报告与「单次分析报告」是两类不同产物——
     单次分析由用户提问驱动（/agents/chat），周期报告由系统定时触发，
     板块骨架固定，取数问题由模板写死，与用户输入无关。
+
+    返回结构：{insight: {...LLM业务推理结论...}, data: {charts, ...}, report_type, period_label, ...}
+    与前端 analytics 页渲染契约一致。
     """
-    from app.ai.workflows.talent_decision_report import PERIOD_REPORT_TEMPLATE
+    from app.ai.workflows.talent_decision_report import PERIOD_REPORT_TEMPLATE, period_label
     from app.core.exceptions import ParamError
     from app.services.report_cache import get as cache_get
     from app.services.report_cache import set as cache_set
@@ -263,25 +266,53 @@ async def period_report(
             f"不支持的周期类型：{report_type}，可选：weekly / monthly / yearly"
         )
 
-    cache_key = f"period:{report_type}"
+    cache_key = f"period_v2:{report_type}"
     if not req.force:
-        cached = cache_get(cache_key)
+        cached = await cache_get(cache_key)
         if cached is not None:
             cached["from_cache"] = True
-            cached["period_updated_at"] = cache_time(cache_key)
+            cached["period_updated_at"] = await cache_time(cache_key)
             return success(data=cached)
 
-    # 直接调规则引擎生成周期报告（不经过 AgentService.chat，与 develop 新版 chat 解耦）
+    # 通过 analytics Agent 生成：完成取数->出图->LLM业务推理->结构化洞察
+    from app.ai.agent import dispatch
     from app.ai.context import set_context
-    from app.ai.workflows.talent_decision_report import run_analysis
     from app.core.permissions import get_data_scope
 
     set_context(user=user)
-    result = await run_analysis(
-        "周期报告",
-        data_scope=get_data_scope(user.role_codes),
-        report_type=report_type,
+    label = period_label(report_type)
+    dispatch_result = await dispatch(
+        "analytics",
+        payload={
+            "question": f"生成人才决策{PERIOD_REPORT_TEMPLATE[report_type]['label']}（{label}）",
+            "report_type": report_type,
+        },
+        user=user,
     )
+
+    insight = {}
+    data = {}
+    if isinstance(dispatch_result, dict) and dispatch_result.get("ok"):
+        inner = dispatch_result.get("result") or {}
+        # analytics parse_output 返回的结构化结果作为 insight
+        insight = {k: v for k, v in inner.items() if k != "answer"}
+        # data.report 是 run_analysis 里 build_report 产出的含 charts 的原始报告
+        data = inner.get("data") or {}
+        if isinstance(data, dict) and "report" in data:
+            # 把 report 里的 charts/risks 等提升到 data 顶层，便于前端读取
+            report = data.get("report") or {}
+            for k in ("charts", "chart_count", "chart_groups", "risks", "risk_count",
+                     "missing", "row_count", "analysis_type"):
+                if k in report and k not in data:
+                    data[k] = report[k]
+
+    result: dict[str, Any] = {
+        "insight": insight,
+        "data": data,
+        "report_type": report_type,
+        "period_label": label,
+        "from_cache": False,
+    }
 
     # 员工端输出脱敏
     from app.services.desensitize import is_employee, sanitize_for_employee
@@ -289,10 +320,7 @@ async def period_report(
     if is_employee(user.role_codes):
         result = sanitize_for_employee(result)
 
-    if isinstance(result, dict) and result.get("answered"):
-        result["from_cache"] = False
-        result["period_updated_at"] = cache_set(cache_key, result)
-
+    result["period_updated_at"] = await cache_set(cache_key, result)
     return success(data=result)
 
 
@@ -314,7 +342,7 @@ async def succession(
 
     cache_key = f"succession:{post_name}"
     if not req.force:
-        cached = cache_get(cache_key)
+        cached = await cache_get(cache_key)
         if cached is not None:
             cached["from_cache"] = True
             return success(data=cached)
@@ -329,6 +357,6 @@ async def succession(
 
     if isinstance(result, dict):
         result["from_cache"] = False
-        cache_set(cache_key, result)
+        await cache_set(cache_key, result)
 
     return success(data=result)
