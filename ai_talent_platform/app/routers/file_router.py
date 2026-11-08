@@ -183,13 +183,24 @@ async def download_revision_file(
     )
 
 
-@router.post("/revisions/{revision_id}/edit", summary="修改正文并另存新版本", description="基于指定版本编辑完整正文、标题和分类，生成新的Word文件和版本记录，原版本保持不变。expected_version必须匹配详情中的version，新版本需重新预览切片后发布。")
+@router.post("/revisions/{revision_id}/edit", summary="修改正文并另存新版本（已废弃，请用 /files/docs/{doc_id}/edit）", description="【已废弃】按revision_id编辑。用户实际操作对象是文档，调用方不应自行查找并传入版本ID：请改用 POST /files/docs/{doc_id}/edit（后端自动以当前已发布且生效的版本为基线）。本接口仅为兼容旧前端保留，deprecated=true。", deprecated=True)
 async def edit_revision(
     revision_id: int, request: RevisionEdit, context=Depends(get_revision_service, scope="function")
 ):
     """将编辑后的正文保存为新草稿。"""
     service, user = context
     return success(data=await service.edit(revision_id, request, user))
+
+
+@router.get(
+    "/docs/{doc_id}/editable",
+    summary="按文档读取可编辑正文（编辑基线）",
+    description="编辑页只需传 doc_id：返回该文档「当前已发布且生效」版本的正文、标题、分类与published_at，用于填充编辑器。不返回最新草稿，避免「打开的是草稿、保存却基于生效版本」的错位。配合 POST /files/docs/{doc_id}/edit 使用，调用方全程不需要查找或传入revision_id。文档尚无生效版本时返回404并提示先发布。需要知识库管理权限及文档归属权限。",
+)
+async def document_editable(doc_id: int, context=Depends(get_revision_service)):
+    """以文档为入口读取编辑基线（当前生效版本正文）。"""
+    service, user = context
+    return success(data=await service.document_editable(doc_id, user))
 
 
 @router.post(

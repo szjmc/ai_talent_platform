@@ -38,6 +38,7 @@ def test_version_routes_registered_with_chinese_descriptions():
     assert {r.path for r in file_router.routes} == {
         '/files/upload',
         '/files/docs/{doc_id}/retry',
+        '/files/docs/{doc_id}/editable',
         '/files/docs/{doc_id}/edit',
         '/files/revisions/{revision_id}/download',
         '/files/revisions/{revision_id}/edit',
@@ -177,3 +178,182 @@ async def test_strict_bm25_replaces_snapshot_left_by_rolled_back_attempt(monkeyp
     assert payload[0]['id'] == 1
     storage.read.assert_not_awaited()
     index._cache.clear()
+
+
+# ============================================================ doc_id 编辑入口
+# 需求：用户操作对象是「文档」，编辑接口不应要求调用方查找并传入 revision_id；
+# 后端必须以「当前已发布且生效的版本」为基线另存新草稿，不能用最新草稿。
+# 全部离线运行（SQLite 内存库），不依赖 MySQL / Milvus。
+import json as _json
+from typing import ClassVar
+
+import pytest_asyncio
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
+
+from app.models import Base
+
+
+@pytest_asyncio.fixture
+async def edit_db():
+    """SQLite 内存库：只为本组用例建表，不依赖 MySQL 集成夹具。"""
+    from sqlalchemy import BigInteger
+    from sqlalchemy.ext.compiler import compiles
+
+    @compiles(BigInteger, "sqlite")
+    def _bigint_sqlite(type_, compiler, **kw):
+        # SQLite 只有 INTEGER PRIMARY KEY 才自增，BIGINT 会丢 AUTOINCREMENT
+        return "INTEGER"
+
+    engine = create_async_engine(
+        "sqlite+aiosqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    factory = async_sessionmaker(bind=engine, expire_on_commit=False)
+    async with factory() as session:
+        yield session
+    await engine.dispose()
+
+
+class _EditUser:
+    """最小身份：文档创建人（超管，避免数据范围干扰基线判断）。"""
+
+    def __init__(self, uid: int):
+        self.id = uid
+        self.is_superuser = True
+        self.role_codes = ["super_admin"]
+
+
+async def _seed_edit_fixture(db):
+    """造「已生效 v1 + 更新的未发布草稿 v2」，并返回 (user, doc_id, published_id, draft_id)。"""
+    from app.adapters.storage.base_storage import get_storage
+    from app.models.file import File
+    from app.models.knowledge import KnowledgeDoc
+    from app.models.knowledge_revision import KnowledgeRevision
+
+    user = _EditUser(1)
+    doc = KnowledgeDoc(title="文档", category="resume", source_type="file",
+                       status="indexed", created_by=user.id)
+    db.add(doc)
+    await db.flush()
+
+    async def make(data: bytes, name: str) -> File:
+        key = await get_storage("local").save(data, name, subdir="knowledge_revision/resume")
+        row = File(file_name=name, stored_name=name, file_path=key, file_size=len(data),
+                   content_type="text/plain", extension=".txt", file_hash="f" * 64,
+                   storage_type="local", biz_type="knowledge_revision", uploader_id=user.id)
+        db.add(row)
+        await db.flush()
+        return row
+
+    def body(text: str) -> bytes:
+        return _json.dumps({"text": text, "documents": []}).encode()
+
+    published_body = await make(body("生效正文"), "p.txt")
+    published_file = await make(b"p", "p.docx")
+    published = KnowledgeRevision(doc_id=doc.id, revision_no=1, file_id=published_file.id,
+                                  body_file_id=published_body.id, title="生效版本",
+                                  category="resume", content_hash="h1", status="published",
+                                  created_by=user.id)
+    db.add(published)
+    await db.flush()
+
+    # 更新的草稿：revision_no 更大、id 更大，用来证明「不会拿它当基线」
+    draft_body = await make(body("草稿正文"), "d.txt")
+    draft_file = await make(b"d", "d.docx")
+    draft = KnowledgeRevision(doc_id=doc.id, revision_no=2, parent_revision_id=published.id,
+                              file_id=draft_file.id, body_file_id=draft_body.id,
+                              title="未发布草稿", category="resume", content_hash="h2",
+                              status="draft", created_by=user.id)
+    db.add(draft)
+    await db.flush()
+    return user, doc.id, published.id, draft.id
+
+
+@pytest.fixture(autouse=True)
+def _stub_durable_job(monkeypatch):
+    """编辑会写一份对象补偿日志（绑定全局 MySQL 引擎），本组用例离线运行，桩掉即可。"""
+    from app.services.knowledge_revision_service import KnowledgeRevisionService
+
+    class _Job:
+        values: ClassVar[dict] = {}
+
+        async def record(self, **values):
+            self.values.update(values)
+
+        async def close(self):
+            return None
+
+    async def _start(self, identity, **values):
+        job = _Job()
+        job.values.update(values)
+        self.jobs.append(job)
+        return job
+
+    monkeypatch.setattr(KnowledgeRevisionService, "start_job", _start)
+
+
+async def test_document_editable_reads_published_not_latest_draft(edit_db):
+    """按 doc_id 读取编辑基线：必须返回生效版本正文，而不是更新的未发布草稿。"""
+    from app.services.knowledge_revision_service import KnowledgeRevisionService
+
+    user, doc_id, published_id, draft_id = await _seed_edit_fixture(edit_db)
+    data = await KnowledgeRevisionService(edit_db).document_editable(doc_id, user)
+
+    assert data["body"] == "生效正文"
+    assert data["revision_id"] == published_id != draft_id
+    assert data["base_version"] >= 1
+
+
+async def test_edit_document_uses_published_version_as_parent(edit_db):
+    """只传 doc_id 编辑：新草稿来自当前生效版本，生效版本本身保持发布状态。"""
+    from app.core.exceptions import NotFoundError
+    from app.models.knowledge import KnowledgeDoc
+    from app.models.knowledge_revision import KnowledgeRevision
+    from app.schemas.knowledge_revision import DocumentEdit
+    from app.services.knowledge_revision_service import KnowledgeRevisionService
+
+    user, doc_id, published_id, _draft_id = await _seed_edit_fixture(edit_db)
+    result = await KnowledgeRevisionService(edit_db).edit_document(
+        doc_id, DocumentEdit(body="修改后的正文"), user)
+
+    assert result["status"] == "draft"
+    assert result["parent_revision_id"] == published_id
+    assert result["doc_id"] == doc_id
+
+    # 生效版本没有被改动，新草稿需要重新预览 + 发布
+    rows = (await edit_db.execute(
+        select(KnowledgeRevision).where(KnowledgeRevision.doc_id == doc_id))).scalars().all()
+    assert [r.id for r in rows if r.status == "published"] == [published_id]
+
+    # 文档未发布过任何版本时，按 doc_id 编辑必须明确拒绝（不能退化成基于草稿）
+
+    empty = KnowledgeDoc(title="空文档", category="resume", source_type="file",
+                         status="draft", created_by=user.id)
+    edit_db.add(empty)
+    await edit_db.flush()
+    with pytest.raises(NotFoundError):
+        await KnowledgeRevisionService(edit_db).document_editable(empty.id, user)
+    with pytest.raises(NotFoundError):
+        await KnowledgeRevisionService(edit_db).edit_document(
+            empty.id, DocumentEdit(body="无基线"), user)
+
+
+def test_edit_route_is_document_scoped_and_legacy_is_deprecated():
+    """路由契约：编辑入口按 doc_id，旧 revision_id 入口标注废弃（仍保留兼容）。"""
+    from app.core.application import create_application
+
+    paths = create_application().openapi()["paths"]
+    edit_doc = paths["/api/v1/files/docs/{doc_id}/edit"]["post"]
+    edit_rev = paths["/api/v1/files/revisions/{revision_id}/edit"]["post"]
+
+    # 编辑接口只接收 doc_id 与正文/标题/分类，不暴露 revision_id 或 expected_version
+    schema = edit_doc["requestBody"]["content"]["application/json"]["schema"]
+    assert schema["$ref"].endswith("/DocumentEdit")
+    props = create_application().openapi()["components"]["schemas"]["DocumentEdit"]["properties"]
+    assert set(props) == {"title", "category", "body"}
+    assert "expected_version" not in props
+    # 旧入口保留兼容但明确废弃，避免新前端继续按 revision_id 调用
+    assert edit_rev.get("deprecated") is True
+    assert "deprecated" not in edit_doc or edit_doc["deprecated"] is False

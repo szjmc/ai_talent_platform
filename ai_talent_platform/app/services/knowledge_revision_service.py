@@ -266,6 +266,30 @@ class KnowledgeRevisionService:
             created_by=user.id, status='draft'))
         return await self.detail(row.id, user)
 
+    async def document_editable(self, doc_id, user):
+        """以文档为入口读取「编辑基线」：当前已发布且生效的版本正文。
+
+        前端编辑页只需要 doc_id：它要展示的正文、标题、分类全部来自生效版本，
+        而不是「最新创建的版本」或未发布草稿。这样编辑页与 edit_document 用的是
+        同一个基线来源，不会出现「打开的是草稿、保存却基于生效版本」的错位。
+        """
+        doc = await self.document(doc_id, user)
+        row = await self.repo.published(self.db, doc_id)
+        if row is None:
+            raise NotFoundError('该文档暂无已发布且生效的版本，请先上传并发布后再编辑')
+        body = await self.read_json(row.body_file_id)
+        return {
+            'doc_id': doc.id,
+            'revision_id': row.id,
+            'revision_no': row.revision_no,
+            'title': row.title,
+            'category': row.category,
+            'status': row.status,
+            'published_at': row.published_at,
+            'body': body['text'],
+            'base_version': row.version,
+        }
+
     async def edit_document(self, doc_id, request, user):
         """以文档为入口编辑：后端确定修改所基于的版本。
 
