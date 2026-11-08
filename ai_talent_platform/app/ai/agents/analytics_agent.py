@@ -110,7 +110,7 @@ class AnalyticsAgent(BaseAgent):
             from app.ai.memory.conversation_memory import ConversationMemory
 
             mem = ConversationMemory(conversation_id)
-            recent = await mem.get_recent(limit=2)
+            recent = await mem.get_recent(limit=20)
             last_report = self._report_from_memory(recent)
             if last_report:
                 # 记下「这是追问」，供 parse_output 走纯文字回答分支

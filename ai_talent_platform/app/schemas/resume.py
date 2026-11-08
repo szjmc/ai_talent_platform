@@ -26,6 +26,7 @@ class ResumeResponse(BaseModel):
     id:int
     file_id:int|None=None
     talent_id:int|None=None
+    accuracy:float|None=None
     file_name:str
     file_type:str|None=None
     file_size:int

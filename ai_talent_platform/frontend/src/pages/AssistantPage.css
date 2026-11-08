@@ -1,0 +1,11 @@
+.assistant-page .assistant-layout > * { min-width: 0; }
+.assistant-page .chat-panel { min-height: 520px; }
+.assistant-page .chat-header { flex-wrap: wrap; }
+@media (max-width: 1024px) { .assistant-page .assistant-layout { grid-template-columns: minmax(0, 1fr) !important; } }
+@media (max-width: 760px) {
+  .assistant-page .assistant-layout > aside { display: block; }
+  .assistant-page .assistant-layout > aside > .card:first-child { display: none; }
+  .assistant-page .chat-panel { min-height: 480px !important; }
+  .assistant-page .chat-header .ant-tag { display: none; }
+  .assistant-page .chat-header .ant-select { max-width: 100% !important; }
+}

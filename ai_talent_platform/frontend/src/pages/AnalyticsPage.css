@@ -1,0 +1,11 @@
+.analytics-page .analytics-month { white-space: nowrap; font-size: clamp(18px, 2vw, 25px); }
+.analytics-page .metric-strip-item { min-width: 0; }
+.analytics-page .metric-strip-extra { overflow-wrap: anywhere; }
+.analytics-page .analytics-query .ant-input-affix-wrapper { min-width: 0; }
+.analytics-page .analytics-grid > * { min-width: 0; }
+@media (max-width: 760px) {
+  .analytics-page .analytics-query { align-items: stretch; }
+  .analytics-page .analytics-query .ant-btn { width: 100%; }
+  .analytics-page .metric-strip-item { padding: 14px; }
+  .analytics-page .analytics-hero { padding: 20px; }
+}

@@ -5,6 +5,7 @@ import {
   CheckCircleOutlined, ClockCircleOutlined, EyeOutlined, SafetyCertificateOutlined, VideoCameraOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { mediaUnavailableMessage } from '../utils/media';
 import {
   formatApiError, invitesApi,
   type ExamQuestion, type ExamResult, type ExamStart, type InviteVisit,
@@ -58,14 +59,15 @@ export default function InvitePage() {
 
   /* ---------------------------------------------------------------- 摄像头 */
   const startCamera = useCallback(async () => {
+    const unavailable = mediaUnavailableMessage();
+    if (unavailable) { setFailText(unavailable); return; }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 }, audio: false });
       streamRef.current = stream;
       if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play().catch(() => undefined); }
       setPhase('camera');
     } catch (error) {
-      message.error('无法获取摄像头权限，请在浏览器地址栏允许摄像头后重试');
-      setFailText(error instanceof Error ? error.message : '摄像头不可用');
+      setFailText('无法获取摄像头，请检查设备和浏览器权限后重试：' + (error instanceof Error ? error.message : '摄像头不可用'));
     }
   }, []);
 
@@ -264,6 +266,7 @@ export default function InvitePage() {
               <li>题量按您的简历解析结果自动组卷，从平台题库随机抽题；</li>
               <li>倒计时结束将自动交卷，请合理安排时间。</li>
             </ul>} />
+          {failText && <Alert type="error" showIcon message={failText} />}
           <Button type="primary" size="large" block icon={<SafetyCertificateOutlined />} onClick={startCamera}>第一步：开启摄像头</Button>
         </Space>
       </div>,

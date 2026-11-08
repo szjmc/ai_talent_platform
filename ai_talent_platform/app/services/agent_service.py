@@ -222,13 +222,13 @@ class AgentService:
         try:
             # 1) 已注册 Agent：dispatch_stream（唯一调度入口）；未注册 → 降级通用流
             not_registered = False
-            stream = dispatch_stream(
+            stream = (self._talent_chat_stream(session) if session.agent == "talent" else dispatch_stream(
                 session.agent,
                 session.payload,
                 db=self.db,
                 user=session.user,
                 context=None,
-            )
+            ))
             iterator = stream.__aiter__()
             while True:
                 try:
@@ -236,6 +236,8 @@ class AgentService:
                 except StopAsyncIteration:
                     break
                 except NotFoundError:
+                    if session.agent == "talent":
+                        raise  # 档案不存在或无权访问不是 Agent 未注册，不能降级编造答案
                     not_registered = True
                     break
                 if chunk is None:
@@ -275,6 +277,40 @@ class AgentService:
         except Exception as exc:  # noqa: BLE001 - 流内未知错误 → error 事件
             logger.exception("Agent 流式对话失败")
             yield {"event": "error", "data": {"code": 5000, "message": str(exc)}}
+
+    async def _talent_chat_stream(self, session: _ChatSession) -> AsyncIterator[Any]:
+        """基于已鉴权档案回答；未指定对象时明确询问，不凭空选择人才。"""
+        from app.services.talent_profile_service import TalentService
+        from app.core.pagination import PageParams
+        from app.schemas.talent import TalentQuery
+
+        service = TalentService(self.db, user=session.user)
+        talent_id = session.payload.get("talent_id")
+        question = str(session.payload.get("message") or "")
+        if not talent_id and "最新" in question and "人才" in question:
+            page = await service.page_list(PageParams(page=1, page_size=1, order_by="created_at", order="desc"), TalentQuery())
+            if page.items:
+                talent_id = page.items[0]["id"]
+            else:
+                yield "在您有权查看的范围内没有找到人才档案，请先创建或检查访问权限。"
+                return
+        if not talent_id:
+            yield "请先在对话上方选择要分析的人才，或明确提出分析最新人才。"
+            return
+        source = await service.profile_source(talent_id)
+        yield {"event": "talent", "data": {"talent_id": talent_id}}
+        await release_connection(self.db)
+        prompt = [ChatMessage(role="system", content=(
+            "你是人才档案助手。仅根据本次授权的人才资料和对话历史回答；"
+            "资料未提供的内容明确说明，禁止编造分数、姓名或事实。"
+            f"本次人才ID：{talent_id}。授权资料：{source}"
+        ))]
+        prompt.extend(ChatMessage.from_any(item) for item in session.history)
+        ctx = get_context()
+        async for text in llm_manager.stream(prompt, purpose="chat", user_id=ctx.user_id,
+                                             conversation_id=ctx.conversation_id, trace_id=ctx.trace_id):
+            if text:
+                yield str(text)
 
     async def _fallback_stream(self, session: _ChatSession) -> AsyncIterator[str]:
         """Agent 未注册时的通用 LLM 流（与 supervisor 降级应答同一提示词）。"""
@@ -341,6 +377,9 @@ class AgentService:
         if conversation_id is not None:
             update_context(conversation_id=str(conversation_id))
 
+        memory = ConversationMemory(conversation_key, window=settings.CONVERSATION_WINDOW)
+        if conversation_id is not None and self.db is not None:
+            await memory.get_recent(limit=settings.CONVERSATION_WINDOW, db=self.db)
         message_id = None
         if self.db is not None and conversation_id is not None:
             row = await self.repo.append_message(
@@ -353,7 +392,6 @@ class AgentService:
             )
             message_id = getattr(row, "id", None)
 
-        memory = ConversationMemory(conversation_key, window=settings.CONVERSATION_WINDOW)
         # 短期记忆立即可见（DB 行已由本服务落库，这里只写进程/Redis 记忆）
         await memory.append({"role": "user", "content": body.message}, db=None)
 
@@ -372,6 +410,8 @@ class AgentService:
             payload={
                 "agent_type": agent_type,
                 "message": body.message,
+                "question": body.message,
+                "talent_id": body.talent_id,
                 "conversation_id": str(conversation_id) if conversation_id is not None else None,
                 "history": history,
                 "trace_id": trace_id,

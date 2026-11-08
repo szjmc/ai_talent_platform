@@ -56,7 +56,8 @@ def _exam_base_url(request: Request) -> tuple[str, bool]:
         return settings.FRONTEND_URL, False
     if settings.PUBLIC_BASE_URL:
         return settings.PUBLIC_BASE_URL, False
-    return str(request.base_url), True
+    from app.core.middleware import request_base_url
+    return request_base_url(request) or str(request.base_url), True
 
 
 # 笔试达标线（百分制），达到后自动发面试邀约
@@ -73,7 +74,7 @@ async def create_assessment(body: AssessmentCreateRequest, request: Request, db:
     # 1) 读简历原件 -> 解析关键字（应聘岗位/等级/学历/工作年限/邮箱/技能）-> 按难度组卷 -> 自动建档
     result = await service.create_assessment_from_file(
         file_id=body.file_id, title=body.title,
-        question_count=body.question_count, user=user)
+        question_count=body.question_count, deadline=body.deadline, user=user)
     assessment = result["assessment"]
     kw = result["keywords"]
     difficulty = result["difficulty"]
@@ -119,11 +120,15 @@ async def list_assessments(page: PageParams = Depends(), talent_id: int | None =
     result.items = [{
         "id": a.id,
         "talent_id": a.talent_id,
+        "talent_name": a.talent.name if a.talent else None,
         "position_id": a.position_id,
+        "position_title": a.position.title if a.position else None,
         "title": a.title,
         "status": a.status,
         "question_count": a.question_count,
         "total_score": float(a.total_score) if a.total_score is not None else None,
+        "level": a.result.level if a.result else None,
+        "report_available": bool(a.result and a.result.report),
         "deadline": a.deadline.isoformat() if a.deadline else None,
         "created_by_ai": a.created_by_ai,
         "created_at": a.created_at.isoformat() if a.created_at else None,
@@ -154,11 +159,15 @@ async def get_assessment(assessment_id: int, request: Request, db: DbSession = N
     data = {
         "id": a.id,
         "talent_id": a.talent_id,
+        "talent_name": a.talent.name if a.talent else None,
         "position_id": a.position_id,
+        "position_title": a.position.title if a.position else None,
         "title": a.title,
         "status": a.status,
         "question_count": a.question_count,
         "total_score": float(a.total_score) if a.total_score is not None else None,
+        "level": a.result.level if a.result else None,
+        "report_available": bool(a.result and a.result.report),
         "deadline": a.deadline.isoformat() if a.deadline else None,
         "started_at": a.started_at.isoformat() if a.started_at else None,
         "submitted_at": a.submitted_at.isoformat() if a.submitted_at else None,

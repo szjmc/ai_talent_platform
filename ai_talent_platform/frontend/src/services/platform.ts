@@ -1,6 +1,6 @@
-import { request } from './api';
+import { downloadApiFile, request } from './api';
 import type {
-  Assessment, AssessmentReport, AssessmentSummary, AgentConversation, AuditEntry, Course,
+  DecisionReport, Assessment, AssessmentReport, AssessmentSummary, AgentConversation, AuditEntry, Course,
   DistributionResult, KnowledgeDoc, MatchingRunResult, NL2SQLResult, OrgNode, PageResult,
   Position, ReportItem, Resume, ResumeParseResult, Talent, TalentPortrait, TrainingNotification,
   TrainingPlan, TrainingRecommendation, TrendResult, User,
@@ -51,9 +51,10 @@ export const resumesApi = {
 
 export const assessmentsApi = {
   list: (params?: Record<string, unknown>) => request<PageResult<Assessment>>({ url: '/assessments', params }),
-  create: (data: { file_id: number; question_count?: number; title?: string }) => request<{ id: number; talent_id: number; question_count: number; exam_url: string; email?: Record<string, unknown> }>({ url: '/assessments', method: 'POST', data }),
+  create: (data: { file_id: number; question_count?: number; title?: string; deadline?: string }) => request<{ id: number; talent_id: number; question_count: number; exam_url: string; email?: Record<string, unknown> }>({ url: '/assessments', method: 'POST', data }),
   detail: (id: number) => request<Assessment & { resume_keywords?: Record<string, unknown>; exam_url?: string }>({ url: `/assessments/${id}` }),
-  report: (id: number) => request<AssessmentReport>({ url: `/assessments/${id}/report` }),
+  report: (id: number) => request<{ report?: AssessmentReport | null }>({ url: `/assessments/${id}/report` }),
+  generateReport: (id: number) => request<AssessmentReport>({ url: `/assessments/${id}/interview/finish`, method: 'POST' }),
   paper: (id: number) => request<{ assessment_id: number; questions: unknown[] }>({ url: `/assessments/${id}/paper` }),
   start: (id: number) => request<{ assessment_id: number; questions: unknown[] }>({ url: `/assessments/${id}/start`, method: 'POST' }),
   submit: (id: number, answers: { question_id: number; answer: unknown }[]) => request<Record<string, unknown>>({ url: `/assessments/${id}/submit`, method: 'POST', data: { answers } }),
@@ -130,14 +131,17 @@ export const analyticsApi = {
   distribution: (type: 'education'|'age'|'skill'|'org', params?: AnalyticsFilterParams) => request<DistributionResult>({ url: '/analytics/distribution', params: { type, ...params } }),
   trend: (params: { start_month: string; end_month: string; comparison?: 'none'|'mom'|'yoy'|'both' } & AnalyticsFilterParams) => request<TrendResult>({ url: '/analytics/trend', params }),
   assessmentSummary: (params?: AnalyticsFilterParams & { start_at?: string; end_at?: string; min_score?: number; max_score?: number }) => request<AssessmentSummary>({ url: '/analytics/assessment/summary', params }),
-  nl2sql: (data: { question: string; max_rows?: number; with_insight?: boolean; chart_type?: string }) => request<NL2SQLResult>({ url: '/analytics/nl2sql', method: 'POST', data }),
-  createReport: (data: { query_id?: string; question?: string; title?: string; format?: string }) => request<ReportItem>({ url: '/analytics/report', method: 'POST', data }),
+  nl2sql: (data: { question: string; max_rows?: number; with_insight?: boolean; chart_type?: string }) => request<NL2SQLResult>({ url: '/analytics/nl2sql', method: 'POST', data, timeout: 180000 }),
+  createReport: (data: { query_id?: string; question?: string; title?: string; format?: string }) => request<ReportItem>({ url: '/analytics/report', method: 'POST', data, timeout: 180000 }),
   reports: (params?: Record<string, unknown>) => request<PageResult<ReportItem>>({ url: '/analytics/reports', params }),
+  downloadReport: (item: ReportItem) => downloadApiFile(`/analytics/reports/${encodeURIComponent(item.report_id)}/download`, `${item.title.replace(/[\\/:*?"<>|]/g, '_')}.${item.format}`),
 };
 
 export const agentsApi = {
   conversations: (params?: Record<string, unknown>) => request<PageResult<AgentConversation>>({ url: '/agents/conversations', params }),
-  messages: (conversationId: string | number) => request<unknown[]>({ url: `/agents/conversations/${conversationId}/messages` }),
+  decisionReport: (question: string) => request<DecisionReport>({ url: '/agents/report/analysis', method: 'POST', data: { question }, timeout: 300000 }),
+  periodReport: (report_type: 'weekly' | 'monthly' | 'yearly', force = false) => request<DecisionReport>({ url: '/agents/report/period', method: 'POST', data: { report_type, force }, timeout: 300000 }),
+  messages: (conversationId: string | number, params?: Record<string, unknown>) => request<PageResult<{ id: number; role: string; content: string }>>({ url: `/agents/conversations/${conversationId}/messages`, params }),
 };
 
 /* ======================= 文件管理 [架构组] ======================= */

@@ -38,6 +38,8 @@ export default function FilesPage() {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [keyword, setKeyword] = useState('');
+  const [appliedKeyword, setAppliedKeyword] = useState('');
+  const [page, setPage] = useState(1);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadCategory, setUploadCategory] = useState('policy');
   const [uploadFiles, setUploadFiles] = useState<File[]>([]);
@@ -47,15 +49,15 @@ export default function FilesPage() {
   const [revisionLoading, setRevisionLoading] = useState(false);
   const { message, modal } = App.useApp();
 
-  const load = useCallback(async (search?: string) => {
+  const load = useCallback(async () => {
     setLoading(true); setLoadError('');
     try {
-      const res = await knowledgeApi.docs({ page: 1, page_size: 50, keyword: search || undefined });
+      const res = await knowledgeApi.docs({ page, page_size: 10, keyword: appliedKeyword || undefined });
       setDocs((res.items || []).map((d) => ({ ...d, id: d.id ?? d.doc_id ?? 0 })));
       setTotal(res.total || 0);
     } catch (error) { setLoadError(formatApiError(error)); setDocs([]); setTotal(0); }
     finally { setLoading(false); }
-  }, []);
+  }, [page, appliedKeyword]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -79,13 +81,13 @@ export default function FilesPage() {
       } else {
         message.success('文件已上传，请检查正文与切片预览后确认发布');
       }
-      setUploadOpen(false); setUploadFiles([]); await load(keyword);
+      setUploadOpen(false); setUploadFiles([]); await load();
     } catch (error) { message.error(formatApiError(error)); }
     finally { setUploading(false); }
   };
 
   const retry = async (doc: KnowledgeDoc) => {
-    try { await filesApi.retry(doc.id); message.success('已触发重建索引'); await load(keyword); }
+    try { await filesApi.retry(doc.id); message.success('已触发重建索引'); await load(); }
     catch (error) { message.error(formatApiError(error)); }
   };
 
@@ -98,7 +100,7 @@ export default function FilesPage() {
     title: '确认发布该版本？',
     content: `发布后该版本成为可检索内容，旧版本向量由补偿任务延迟清理。版本号：${rev.version}`,
     onOk: async () => {
-      try { await filesApi.publishRevision(rev.id ?? rev.revision_id ?? 0, rev.version); message.success('已发布'); await loadRevisions(selected!); await load(keyword); }
+      try { await filesApi.publishRevision(rev.id ?? rev.revision_id ?? 0, rev.version); message.success('已发布'); await loadRevisions(selected!); await load(); }
       catch (error) { message.error(formatApiError(error)); }
     },
   });
@@ -147,7 +149,7 @@ export default function FilesPage() {
           content: '仅逻辑删除文档索引并由补偿任务清理向量，不会物理删除原始文件。',
           okButtonProps: { danger: true },
           onOk: async () => {
-            try { await filesApi.deleteIndex(r.file_id || r.id, r.category); message.success('删除已受理'); await load(keyword); }
+            try { await filesApi.deleteIndex(r.file_id || r.id, r.category); message.success('删除已受理'); await load(); }
             catch (error) { message.error(formatApiError(error)); }
           },
         })} />
@@ -195,16 +197,16 @@ export default function FilesPage() {
 
     <div className="card filter-card"><div className="filter-row">
       <Input prefix={<SearchOutlined />} placeholder="搜索文件名 / 文档标题" style={{ width: 280 }} value={keyword} allowClear
-        onChange={(e) => setKeyword(e.target.value)} onPressEnter={() => void load(keyword)} />
-      <Button type="primary" ghost onClick={() => void load(keyword)}>查询</Button>
-      <Button onClick={() => { setKeyword(''); void load(); }}>重置</Button>
+        onChange={(e) => setKeyword(e.target.value)} onPressEnter={() => { setPage(1); setAppliedKeyword(keyword); }} />
+      <Button type="primary" ghost onClick={() => { setPage(1); setAppliedKeyword(keyword); }}>查询</Button>
+      <Button onClick={() => { setKeyword(''); setPage(1); setAppliedKeyword(''); }}>重置</Button>
       <div className="filter-spacer" />
       <span className="muted" style={{ fontSize: 11 }}>上传走 /files/upload · 版本文件走 /files/revisions</span>
     </div></div>
 
     <div className="card content-card">
       <div className="table-toolbar"><div className="table-title">文件与版本<span className="table-count">共 {total} 份</span></div></div>
-      <Table rowKey="id" columns={columns} dataSource={docs} loading={loading} scroll={{ x: 1000 }}
+      <Table rowKey="id" columns={columns} dataSource={docs} loading={loading} pagination={{ current: page, pageSize: 10, total, showSizeChanger: false, onChange: setPage }} scroll={{ x: 1000 }}
         locale={{ emptyText: loadError ? '后端文件接口暂不可用' : '暂无文件，点击右上角上传' }} />
     </div>
 

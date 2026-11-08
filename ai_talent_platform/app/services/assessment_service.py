@@ -127,6 +127,7 @@ class AssessmentService:
         file_id: int,
         title: str = "人才能力测评",
         question_count: int = 5,
+        deadline: datetime | None = None,
         user: Any = None,
     ) -> dict[str, Any]:
         """仅凭 file_id 完成「读简历 -> 解析关键字 -> 组卷 -> 自动建档」全流程。
@@ -154,6 +155,7 @@ class AssessmentService:
             "title": title,
             "status": "pending",
             "question_count": len(questions),
+            "deadline": deadline,
             "created_by_ai": True,
         })
         for i, q in enumerate(questions):
@@ -262,6 +264,8 @@ class AssessmentService:
         直接放行，避免候选人刷新后无法再次加载试卷；已交卷/已评分等终态拒绝取卷。
         """
         assessment = await self.repo.get_by_id_or_404(self.db, assessment_id, message="测评不存在")
+        if assessment.deadline is not None and datetime.now() > assessment.deadline:
+            raise BusinessRuleError("测评已截止，不能开始或继续作答")
         if assessment.status == "pending":
             self._guard_transition(assessment.status, "in_progress")
             await self.repo.update_status(

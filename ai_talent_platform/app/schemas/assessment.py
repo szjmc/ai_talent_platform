@@ -125,6 +125,8 @@ __all__ = [
 
 
 # ================================================================ HTTP 请求/响应 Schema
+from datetime import datetime
+from pydantic import field_validator
 from app.schemas.common import BaseSchema, ORMModel  # noqa: E402
 
 
@@ -140,6 +142,18 @@ class AssessmentCreateRequest(BaseSchema):
     file_id: int = Field(..., gt=0, description="已上传简历文件 ID（唯一必填入参）")
     title: str = Field("人才能力测评", max_length=128, description="测评标题（可选）")
     question_count: int = Field(5, ge=1, le=50, description="题目数量（可选，默认 5）")
+    deadline: datetime | None = Field(None, description="可选截止时间；带时区时转换为服务器本地时间")
+
+    @field_validator("deadline")
+    @classmethod
+    def validate_deadline(cls, value: datetime | None) -> datetime | None:
+        if value is not None:
+            if value.tzinfo is not None:
+                value = value.astimezone().replace(tzinfo=None)
+            if value <= datetime.now():
+                raise ValueError("截止时间必须晚于当前时间")
+        return value
+
 
 
 class AnswerItem(BaseSchema):

@@ -50,6 +50,7 @@ class AgentChatRequest(BaseSchema):
     conversation_id: str | int | None = Field(
         None, description="会话 ID（字符串数字）；首次对话传空由服务端创建"
     )
+    talent_id: int | None = Field(None, gt=0, description="本轮对话选择的人才 ID；服务端重新校验访问权限")
     message: str = Field(..., min_length=1, max_length=8000, description="用户消息")
     stream: bool = Field(False, description="是否流式（仅 /chat/stream 生效）")
 
