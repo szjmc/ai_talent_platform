@@ -256,6 +256,52 @@ def build_snapshot_rows(
     return rows
 
 
+# 从 current_company 字段推导地域信息（不新增 talents 表列）
+_CITY_PROVINCE: dict[str, tuple[str, str]] = {
+    "北京": ("北京市", "北京"), "上海": ("上海市", "上海"), "天津": ("天津市", "天津"),
+    "重庆": ("重庆市", "重庆"), "广州": ("广东省", "广州"), "深圳": ("广东省", "深圳"),
+    "珠海": ("广东省", "珠海"), "东莞": ("广东省", "东莞"), "佛山": ("广东省", "佛山"),
+    "中山": ("广东省", "中山"), "惠州": ("广东省", "惠州"),
+    "杭州": ("浙江省", "杭州"), "宁波": ("浙江省", "宁波"), "温州": ("浙江省", "温州"),
+    "南京": ("江苏省", "南京"), "苏州": ("江苏省", "苏州"), "无锡": ("江苏省", "无锡"),
+    "成都": ("四川省", "成都"), "武汉": ("湖北省", "武汉"), "西安": ("陕西省", "西安"),
+    "厦门": ("福建省", "厦门"), "福州": ("福建省", "福州"),
+    "长沙": ("湖南省", "长沙"), "青岛": ("山东省", "青岛"), "济南": ("山东省", "济南"),
+    "大连": ("辽宁省", "大连"), "沈阳": ("辽宁省", "沈阳"), "长春": ("吉林省", "长春"),
+    "哈尔滨": ("黑龙江省", "哈尔滨"), "石家庄": ("河北省", "石家庄"),
+    "太原": ("山西省", "太原"), "南昌": ("江西省", "南昌"), "贵阳": ("贵州省", "贵阳"),
+    "昆明": ("云南省", "昆明"), "兰州": ("甘肃省", "兰州"), "海口": ("海南省", "海口"),
+    "南宁": ("广西壮族自治区", "南宁"), "合肥": ("安徽省", "合肥"), "郑州": ("河南省", "郑州"),
+}
+_COUNTRY_MAP: dict[str, tuple[str, str]] = {
+    "中国": ("中国", "CN"), "美国": ("美国", "US"), "新加坡": ("新加坡", "SG"),
+    "德国": ("德国", "DE"), "英国": ("英国", "GB"), "日本": ("日本", "JP"),
+    "法国": ("法国", "FR"), "加拿大": ("加拿大", "CA"), "澳大利亚": ("澳大利亚", "AU"),
+    "印度": ("印度", "IN"), "韩国": ("韩国", "KR"), "以色列": ("以色列", "IL"),
+    "荷兰": ("荷兰", "NL"), "瑞士": ("瑞士", "CH"), "瑞典": ("瑞典", "SE"),
+    "西班牙": ("西班牙", "ES"), "意大利": ("意大利", "IT"), "爱尔兰": ("爱尔兰", "IE"),
+    "新西兰": ("新西兰", "NZ"), "马来西亚": ("马来西亚", "MY"), "泰国": ("泰国", "TH"),
+    "越南": ("越南", "VN"), "印度尼西亚": ("印度尼西亚", "ID"), "菲律宾": ("菲律宾", "PH"),
+    "俄罗斯": ("俄罗斯", "RU"),
+}
+
+
+def derive_location(current_company: str | None) -> dict[str, str | None]:
+    """从 current_company 字段推导国家/省份/城市（不依赖新增数据库列）。"""
+    if not current_company:
+        return {"country": None, "country_code": None, "province": None, "work_city": None}
+    text = str(current_company)
+    # 优先匹配国家名
+    for cn_name, (country, code) in _COUNTRY_MAP.items():
+        if cn_name in text:
+            return {"country": country, "country_code": code, "province": None, "work_city": None}
+    # 匹配城市名 → 推导省份
+    for city, (province, work_city) in _CITY_PROVINCE.items():
+        if city in text:
+            return {"country": "中国", "country_code": "CN", "province": province, "work_city": work_city}
+    return {"country": None, "country_code": None, "province": None, "work_city": None}
+
+
 def build_dim_talent_wide_rows(
     talents: list[dict[str, Any]],
     org_paths: dict[int, str],
