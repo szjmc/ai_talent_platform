@@ -66,6 +66,7 @@ class AgentChatResponse(ORMModel):
     usage: TokenUsage = Field(default_factory=TokenUsage, description="token 用量")
     degraded: bool = Field(False, description="是否降级通用应答")
     elapsed_ms: float = Field(0.0, ge=0, description="总耗时（毫秒）")
+    report: dict[str, Any] | None = Field(None, description="结构化报告（analytics 等 Agent 返回）")
 
 
 class AgentConversationResponse(ORMModel):
