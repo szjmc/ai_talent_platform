@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, App, Button, Drawer, Empty, Input, Modal, Select, Table, Tag, Upload } from 'antd';
-import { CloudUploadOutlined, DeleteOutlined, DownloadOutlined, FileTextOutlined, HistoryOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import { Alert, App, Button, Drawer, Empty, Input, Modal, Select, Space, Table, Tag, Upload } from 'antd';
+import { CloudUploadOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, EyeOutlined, FileTextOutlined, HistoryOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { PageHeader, StatusBadge } from '../components/Common';
-import { filesApi, knowledgeApi, type RevisionItem } from '../services/platform';
+import { filesApi, knowledgeApi, type DocumentEditable, type RevisionItem } from '../services/platform';
 import { formatApiError } from '../services/api';
 import type { KnowledgeDoc } from '../types';
 
@@ -45,6 +45,13 @@ export default function FilesPage() {
   const [selected, setSelected] = useState<KnowledgeDoc | null>(null);
   const [revisions, setRevisions] = useState<RevisionItem[]>([]);
   const [revisionLoading, setRevisionLoading] = useState(false);
+  // 切片预览结果：发布必须基于最新预览（后端要求先预览再发布，且预览会刷新乐观锁版本）。
+  const [preview, setPreview] = useState<{ revisionId: number; version: number; titleVersion: number; chunks: { content: string; metadata?: Record<string, unknown> }[] } | null>(null);
+  // 正文编辑：整个流程只认 doc_id。加载时后端给出「当前已发布且生效版本」的正文，
+  // 保存时后端同样以该版本为基线另存新草稿——调用方不查找、不维护 revision_id。
+  const [editing, setEditing] = useState<{ doc: KnowledgeDoc; base: DocumentEditable | null; body: string; title: string } | null>(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
   const { message, modal } = App.useApp();
 
   const load = useCallback(async (search?: string) => {
@@ -94,12 +101,62 @@ export default function FilesPage() {
     catch (error) { message.error(formatApiError(error)); }
   };
 
+  const openEdit = useCallback(async (doc: KnowledgeDoc) => {
+    setEditing({ doc, base: null, body: '', title: doc.title });
+    setEditLoading(true);
+    try {
+      const base = await filesApi.documentEditable(doc.id);
+      setEditing({ doc, base, body: base.body, title: base.title });
+    } catch (error) {
+      // 没有生效版本时后端会明确拒绝：提示先发布，而不是让用户对着空编辑器猜。
+      message.error(formatApiError(error));
+      setEditing(null);
+    } finally { setEditLoading(false); }
+  }, [message]);
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    if (!editing.body.trim()) { message.warning('正文不能为空'); return; }
+    setEditSaving(true);
+    try {
+      await filesApi.editDocument(editing.doc.id, {
+        body: editing.body,
+        title: editing.title || undefined,
+        category: editing.doc.category,
+      });
+      message.success('已基于当前生效版本另存为新草稿，请预览切片后确认发布');
+      setEditing(null);
+      await loadRevisions(editing.doc);
+    } catch (error) { message.error(formatApiError(error)); }
+    finally { setEditSaving(false); }
+  };
+
+  /** 生成切片预览（发布的前置步骤；同时刷新乐观锁版本）。 */
+  const doPreview = async (rev: RevisionItem) => {
+    const id = rev.id ?? rev.revision_id ?? 0;
+    const data = await knowledgeApi.revisionPreview(id, rev.version);
+    setPreview({ revisionId: id, version: data.version, titleVersion: rev.version, chunks: data.chunks || [] });
+    return data;
+  };
+
+  const previewRevision = async (rev: RevisionItem) => {
+    try { await doPreview(rev); }
+    catch (error) { message.error(formatApiError(error)); }
+  };
+
+  /** 发布：先预览再发布（后端强制要求，且发布要用预览返回的新版本号）。 */
   const publish = (rev: RevisionItem) => modal.confirm({
     title: '确认发布该版本？',
-    content: `发布后该版本成为可检索内容，旧版本向量由补偿任务延迟清理。版本号：${rev.version}`,
+    content: `发布前会自动生成切片预览，并用预览后的版本号提交。发布后该版本成为可检索内容，旧版本向量由补偿任务延迟清理。版本号：${rev.version}`,
     onOk: async () => {
-      try { await filesApi.publishRevision(rev.id ?? rev.revision_id ?? 0, rev.version); message.success('已发布'); await loadRevisions(selected!); await load(keyword); }
-      catch (error) { message.error(formatApiError(error)); }
+      try {
+        const id = rev.id ?? rev.revision_id ?? 0;
+        const data = await knowledgeApi.revisionPreview(id, rev.version);
+        await filesApi.publishRevision(id, data.version);
+        setPreview(null);
+        message.success('已发布');
+        await loadRevisions(selected!); await load(keyword);
+      } catch (error) { message.error(formatApiError(error)); }
     },
   });
 
@@ -139,6 +196,7 @@ export default function FilesPage() {
     { title: '分类', dataIndex: 'category', width: 110, render: (v) => <Tag>{CATEGORY_LABEL[v] || v}</Tag> },
     { title: '索引状态', dataIndex: 'status', width: 100, render: (v) => <StatusBadge status={v} /> },
     { title: '操作', width: 210, fixed: 'right', render: (_, r) => <>
+      <Button type="text" icon={<EditOutlined />} title="编辑正文（基于当前生效版本另存新草稿）" onClick={() => void openEdit(r)} />
       <Button type="text" icon={<HistoryOutlined />} title="查看版本文件" onClick={() => void loadRevisions(r)} />
       {r.status === 'failed' && <Button type="text" icon={<ReloadOutlined />} title="重建索引" onClick={() => void retry(r)} />}
       <Button type="text" danger icon={<DeleteOutlined />} title="删除文档索引"
@@ -164,11 +222,13 @@ export default function FilesPage() {
       return <>
         <Button type="text" icon={<DownloadOutlined />} title="下载版本文件" onClick={() => void download(id, `${selected?.title || 'document'}-v${r.version}.docx`, false)} />
         <Button type="text" icon={<FileTextOutlined />} title="下载来源原件" onClick={() => void download(id, `${selected?.title || 'document'}-原件`, true)} />
-        {r.status === 'draft' && <>
+        {/* 预览会把状态从 draft 改成 previewed；两种状态都必须保留「预览 / 发布」，否则关闭预览弹窗后无法再发布。 */}
+        {(r.status === 'draft' || r.status === 'previewed') && <>
+          <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => void previewRevision(r)}>预览</Button>
           <Button type="link" size="small" onClick={() => publish(r)}>发布</Button>
           <Button type="link" size="small" danger onClick={() => discard(r)}>取消</Button>
         </>}
-        {r.status !== 'draft' && <Button type="link" size="small" onClick={() => restore(r)}>恢复</Button>}
+        {r.status !== 'draft' && r.status !== 'previewed' && <Button type="link" size="small" onClick={() => restore(r)}>恢复</Button>}
       </>;
     } },
   ];
@@ -231,9 +291,63 @@ export default function FilesPage() {
         : <Table rowKey={(r) => `${r.id ?? r.revision_id}-${r.version}`} size="small" loading={revisionLoading}
             columns={revisionColumns} dataSource={revisions} pagination={false} scroll={{ x: 640 }} />}
       <div className="muted" style={{ fontSize: 12, marginTop: 12 }}>
-        「发布」会把该版本切换为可检索内容；「恢复」基于历史正文生成新草稿，需重新确认发布。
-        正文编辑与切片预览属于知识库流程（/knowledge/revisions）。
+        「编辑正文」按文档（doc_id）进入，后端自动以当前生效版本为基线另存新草稿；
+        「预览」生成切片并锁定发布版本（发布必须先预览）；「发布」会把该版本切换为可检索内容；
+        「恢复」基于历史正文生成新草稿，需重新确认发布。
       </div>
     </Drawer>
+
+    <Drawer width={760} open={!!editing} onClose={() => setEditing(null)}
+      title={editing ? `${editing.doc.title} · 编辑正文` : '编辑正文'}
+      extra={<Button type="primary" loading={editSaving} disabled={!editing?.base} onClick={() => void saveEdit()}>保存为新草稿</Button>}>
+      {editLoading && <Empty description="正在读取当前生效版本正文…" />}
+      {!!editing && !editLoading && <Space direction="vertical" style={{ width: '100%' }} size={12}>
+        <Alert type="info" showIcon
+          message="修改基于当前已发布且生效的版本"
+          description={editing.base
+            ? `基线：v${editing.base.revision_no}（revision_id ${editing.base.revision_id}）· ${editing.base.title}。保存会另存为「新草稿」，生效版本保持不变；新草稿需重新预览切片并确认发布后才会生效。未发布的草稿不会作为修改基础。`
+            : '正在读取基线版本信息…'} />
+        <div>
+          <div className="description-item-label" style={{ marginBottom: 6 }}>标题</div>
+          <Input value={editing.title} maxLength={255}
+            onChange={(e) => setEditing((old) => old ? { ...old, title: e.target.value } : old)} />
+        </div>
+        <div>
+          <div className="description-item-label" style={{ marginBottom: 6 }}>正文</div>
+          <Input.TextArea value={editing.body} autoSize={{ minRows: 16, maxRows: 26 }} disabled={!editing.base}
+            onChange={(e) => setEditing((old) => old ? { ...old, body: e.target.value } : old)} />
+        </div>
+      </Space>}
+    </Drawer>
+
+    <Modal
+      title={preview ? `切片预览 · ${preview.chunks.length} 个切片` : '切片预览'}
+      open={!!preview}
+      onCancel={() => setPreview(null)}
+      width={760}
+      okText="确认发布"
+      onOk={async () => {
+        if (!preview) return;
+        try {
+          await filesApi.publishRevision(preview.revisionId, preview.version);
+          message.success('已发布');
+          setPreview(null);
+          await loadRevisions(selected!); await load(keyword);
+        } catch (error) { message.error(formatApiError(error)); }
+      }}
+    >
+      <Alert type="info" showIcon style={{ marginBottom: 12 }}
+        message="请确认切片内容符合预期"
+        description="切片决定后续检索命中效果。确认后点击「确认发布」；如需调整正文，请先在知识库流程中编辑正文并重新预览。" />
+      <Space direction="vertical" style={{ width: '100%', maxHeight: 420, overflow: 'auto' }}>
+        {(preview?.chunks || []).map((chunk, index) => (
+          <div key={index} className="card" style={{ padding: 12 }}>
+            <div className="muted" style={{ fontSize: 11, marginBottom: 6 }}>切片 {index + 1}</div>
+            <div style={{ whiteSpace: 'pre-wrap', fontSize: 13 }}>{chunk.content || '（空切片）'}</div>
+          </div>
+        ))}
+        {preview && preview.chunks.length === 0 && <Empty description="该版本没有可发布的切片" />}
+      </Space>
+    </Modal>
   </>;
 }

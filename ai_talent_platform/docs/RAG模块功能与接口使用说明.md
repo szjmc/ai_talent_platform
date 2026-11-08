@@ -68,7 +68,9 @@ OCR提取文字，不承诺复杂版式、表格或手写内容还原；PDF某�
 | GET | /docs | 查询可管理文档；可传category、page、page_size，包括草稿；普通用户查本人，admin/超级用户可管理全部 | 管理 |
 | GET | /docs/{doc_id}/revisions | 版本列表；offset默认0，limit默认50、最大100，返回items和total | 管理及归属 |
 | GET | /revisions/{revision_id} | 查看完整body、状态、文件ID、来源版本和当前version | 管理及归属 |
-| POST | /revisions/{revision_id}/edit | JSON传expected_version、title、category、body；返回新的revision_id，原记录不覆盖 | 管理及归属 |
+| GET | /docs/{doc_id}/editable | 仅传doc_id，返回当前已发布生效版本的正文用于编辑页回显 | 管理及归属 |
+| POST | /docs/{doc_id}/edit | **推荐**：仅传doc_id + body（title/category可选），后端以生效版本为基线另存新草稿 | 管理及归属 |
+| POST | /revisions/{revision_id}/edit | 已废弃（deprecated）；旧写法，需传expected_version，新代码不要再用 | 管理及归属 |
 | POST | /revisions/{revision_id}/preview | JSON传expected_version，生成切片快照；返回chunks、chunk_count及递增后的version | 管理及归属 |
 | GET | /revisions/{revision_id}/preview | 查看保存的预览；offset默认0，limit默认50、最大200；检查preview_current和base_document_current | 管理及归属 |
 | POST | /revisions/{revision_id}/publish | JSON传预览响应的version作为expected_version；同步发布，成功status=published | 管理及归属 |

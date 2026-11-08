@@ -88,7 +88,12 @@ async def test_notification_runs_chain_once(monkeypatch, candidate):
     async def index(self, tid):
         """gxd-记录人才集合的写入阶段。"""
         events.append("index")
-        return {"talent_id": tid, "chunks": 1}
+        return {"talent_id": tid, "vectors": 1}
+
+    async def ensure(self, tid):
+        """gxd-重放时只补缺失阶段：不重复解析、不重复画像。"""
+        events.append("ensure")
+        return {"talent_id": tid, "status": "complete", "actions": []}
 
     for name, fn in (("get_by_hash", find_hash), ("save", save), ("get_scoped", scoped),
                      ("update_parse_result", save_result)):
@@ -99,6 +104,7 @@ async def test_notification_runs_chain_once(monkeypatch, candidate):
     monkeypatch.setattr(TalentService, "get_talent", AsyncMock(return_value=talent))
     monkeypatch.setattr(TalentService, "generate_portrait", portrait)
     monkeypatch.setattr(TalentRetrievalService, "sync_index", index)
+    monkeypatch.setattr(ResumeService, "ensure_derived", ensure)
 
     first = await service.process_uploaded_file(file.id)
     second = await service.process_uploaded_file(file.id)
@@ -107,11 +113,15 @@ async def test_notification_runs_chain_once(monkeypatch, candidate):
     assert first["processing_status"] == second["processing_status"]
     if candidate:
         assert first["processing_status"] == "needs_review" and first["talent_id"] is None
+        assert second["processing_status"] == "needs_review" and second["reused"]
         assert events == ["parse", "dedupe"]
     else:
         assert first["talent_id"] == second["talent_id"] == 15
         assert first["refresh"]["index"]["status"] == "success"
-        assert events == ["parse", "dedupe", "create", "portrait", "index"]
+        assert first["refresh"]["status"] == "complete"
+        assert second["processing_status"] == "succeeded" and second["reused"]
+        # 重放只补缺失阶段（ensure_derived），不再重复解析/建档案/画像
+        assert events == ["parse", "dedupe", "create", "portrait", "index", "ensure"]
 
 
 async def test_minio_missing_reader(monkeypatch):

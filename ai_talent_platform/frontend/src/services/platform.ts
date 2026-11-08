@@ -119,8 +119,15 @@ export const knowledgeApi = {
     request<{ total: number; items: RevisionItem[] }>({ url: `/knowledge/docs/${docId}/revisions`, params }),
   /** 版本正文（version 用于编辑/发布时的并发校验）。 */
   revision: (revisionId: number) => request<RevisionItem & { body?: string; content?: string }>({ url: `/knowledge/revisions/${revisionId}` }),
+  /** 生成切片预览：发布前必须先预览。
+   *  返回的 version 是预览后**新的**乐观锁版本（发布时要用它，不能用列表里的旧 version），
+   *  chunks 供人工确认切片是否符合预期。 */
+  revisionPreview: (revisionId: number, expectedVersion: number) =>
+    request<RevisionItem & { version: number; chunks: { content: string; metadata?: Record<string, unknown> }[]; chunk_count?: number }>({
+      url: `/knowledge/revisions/${revisionId}/preview`, method: 'POST', data: { expected_version: expectedVersion },
+    }),
   ask: (data: { question: string; session_id?: string | null; category?: string | null; top_k?: number; use_rerank?: boolean; suggest?: boolean }) =>
-    request<{ answer: string; session_id: string; intent: string; sources: { doc_id?: number; chunk_id?: number; file_id?: number; source?: string; page?: number | null; score?: number }[]; suggestions: string[] }>({ url: '/text2answer', method: 'POST', data }),
+    request<{ answer: string; session_id: string; intent: string; answer_mode?: 'model' | 'extractive'; sources: { doc_id?: number; chunk_id?: number; file_id?: number; source?: string; page?: number | null; score?: number }[]; suggestions: string[] }>({ url: '/text2answer', method: 'POST', data }),
   conversations: (params?: Record<string, unknown>) => request<PageResult<{ session_id: string; title: string; message_count: number; last_message_at?: string | null }>>({ url: '/conversations', params }),
   messages: (sessionId: string | number) => request<{ id: number; role: string; content: string; citations?: unknown[]; created_at?: string | null }[]>({ url: `/conversations/${sessionId}/messages` }),
 };
@@ -160,6 +167,20 @@ export interface RevisionItem {
   status?: string; title?: string; category?: string; file_id?: number | null;
   source_revision_id?: number | null; created_at?: string | null; updated_at?: string | null;
 }
+
+/** 按文档读取编辑基线：正文来自「当前已发布且生效」的版本，不含 revision_id 选择负担。 */
+export interface DocumentEditable {
+  doc_id: number;
+  revision_id: number;
+  revision_no: number;
+  title: string;
+  category: string;
+  status: string;
+  published_at?: string | null;
+  body: string;
+  base_version: number;
+}
+
 export interface QuestionImportResult { imported_count: number; failed_count: number; pending_count: number; sync_error?: string | null; [key: string]: unknown }
 
 export const filesApi = {
@@ -187,6 +208,9 @@ export const filesApi = {
   /** 版本流转：编辑正文另存 / 发布 / 历史恢复 / 取消草稿（都作用在文件版本上）。 */
   /** 正文编辑以「文档」为入口（doc_id）：后端基于当前已发布生效版本另存新草稿，
    *  调用方无需查找 revision_id，也无需维护 expected_version 乐观锁。 */
+  /** 读取「编辑基线」：只需 doc_id，返回当前生效版本正文/标题/分类，用于填充编辑器。 */
+  documentEditable: (docId: number) =>
+    request<DocumentEditable>({ url: `/files/docs/${docId}/editable`, method: 'GET' }),
   editDocument: (docId: number, data: { body: string; title?: string; category?: string }) =>
     request<RevisionItem>({ url: `/files/docs/${docId}/edit`, method: 'POST', data }),
   /** @deprecated 旧版按 revision_id 编辑，保留供历史版本恢复等特殊场景使用。 */

@@ -1245,7 +1245,9 @@ event: error   data: {"code":5002,"message":"模型调用失败"}
 | POST | `/files/upload` | `knowledge:manage` | 上传文件（multipart `file` 可多份 + `category` + 可选 `title`/`doc_id`）。**单份存为草稿**，需预览确认后发布；**多份逐份自动解析发布**，返回 `total`/`success_count`/`failed_count`/`items`，部分失败不撤销已成功项 |
 | POST | `/files/docs/{doc_id}/retry` | `knowledge:manage` | 重试失败索引（`doc_id` 是文档 ID，不是文件 ID） |
 | GET | `/files/revisions/{revision_id}/download` | `knowledge:manage` | 下载版本文件；`source=false` 取版本文件（编辑后为新生成 Word），`source=true` 取上传原件 |
-| POST | `/files/revisions/{revision_id}/edit` | `knowledge:manage` | 修改正文另存新版本（生成新 Word 文件，原版本保留） |
+| GET | `/files/docs/{doc_id}/editable` | `knowledge:manage` | 按文档读取编辑基线：返回当前已发布且生效版本的正文，供编辑页回显 |
+| POST | `/files/docs/{doc_id}/edit` | `knowledge:manage` | **推荐编辑入口**：只传 doc_id，后端以当前生效版本为基线另存新草稿 |
+| POST | `/files/revisions/{revision_id}/edit` | `knowledge:manage` | 已废弃（deprecated）：按版本编辑，仅兼容旧调用，需传 expected_version |
 | POST | `/files/revisions/{revision_id}/publish` | `knowledge:manage` | 确认发布版本，切换可检索内容 |
 | POST | `/files/revisions/{revision_id}/restore` | `knowledge:manage` | 从历史版本恢复为新草稿 |
 | POST | `/files/revisions/{revision_id}/discard` | `knowledge:manage` | 取消未发布草稿（已发布版本不可取消） |

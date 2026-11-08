@@ -3,9 +3,19 @@
 标签：[架构组]+[RAG组] [P1]（4 个向量集合定义与幂等创建）
 
 用法：
-    python scripts/init_milvus.py                 # 连接并创建/校验 4 个集合
-    python scripts/init_milvus.py --plan          # 只打印集合设计，不连接 Milvus
-    python scripts/init_milvus.py --drop          # 危险：删除 4 个集合后重建
+    python scripts/init_milvus.py                       # 连接并创建/校验 4 个集合
+    python scripts/init_milvus.py --plan                # 只打印集合设计，不连接 Milvus
+    python scripts/init_milvus.py --drop                # 危险：删除 4 个集合后重建
+    python scripts/init_milvus.py --replace talent_vectors   # 只重建指定集合（主键/维度不符时）
+
+说明（2026-11 对齐）：
+    人才向量集合 talent_vectors 一名人才一条复合画像向量，写入端还会带
+    version / name / kind / updated_at 等元数据。早期版本把该集合建成「严格静态
+    Schema + 必填标量字段」，导致 App 写入直接失败（version 不被接受、
+    organization_id 未提供又不可空）。现在统一：
+        - 开启动态字段（动态元数据无需改 Schema）；
+        - 文档列的标量字段声明为 nullable（App 不写也能插入，供后续过滤使用）；
+        - 向量维度以 EMBEDDING_DIM 为准，换模型后必须 --replace 重建。
 
 前置：pip install pymilvus>=2.4，并在 .env 设置 MILVUS_ENABLED=true / MILVUS_URI / MILVUS_TOKEN。
 未安装 pymilvus 时会打印安装命令与设计清单后退出（退出码 1），不会静默成功。
@@ -67,7 +77,7 @@ COLLECTIONS: list[dict[str, Any]] = [
     },
 ]
 
-DEFAULT_DIM = 1024          # text-embedding-v3 默认维度
+DEFAULT_DIM = 1024          # 与 settings.EMBEDDING_DIM 保持一致
 DEFAULT_METRIC = "COSINE"
 DEFAULT_INDEX = "IVF_FLAT"
 DEFAULT_NLIST = 1024
@@ -92,7 +102,7 @@ def _connect():
     )
 
 
-def create_all(dim: int, drop: bool) -> int:
+def create_all(dim: int, drop: bool, replace: list[str] | None = None) -> int:
     from pymilvus import Collection, FieldSchema, CollectionSchema, DataType, utility  # type: ignore
 
     _connect()
@@ -103,25 +113,34 @@ def create_all(dim: int, drop: bool) -> int:
         "bool": DataType.BOOL,
     }
 
+    targets = {name.strip() for name in (replace or []) if name.strip()}
+    unknown = targets - {spec["name"] for spec in COLLECTIONS}
+    if unknown:
+        print(f"未知集合：{sorted(unknown)}；可选：{[spec['name'] for spec in COLLECTIONS]}")
+        return 2
     for spec in COLLECTIONS:
         name = spec["name"]
-        if drop and utility.has_collection(name):
+        if (drop or name in targets) and utility.has_collection(name):
             Collection(name).drop()
             print(f"[drop] {name}")
         if utility.has_collection(name):
-            print(f"[skip] {name} 已存在")
+            print(f"[skip] {name} 已存在（结构与写入端不一致时用 --replace {name} 重建）")
             continue
         fields = [
             FieldSchema(name=spec["primary_field"], dtype=DataType.INT64, is_primary=True, auto_id=False),
             FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=dim),
         ]
         for field_name, field_type in spec["scalar_fields"]:
-            kwargs: dict[str, Any] = {}
+            # 标量字段全部可空：业务写入端（人才画像向量）按需提供，
+            # 不因为没传 organization_id / status 就让整次 upsert 失败。
+            kwargs: dict[str, Any] = {"nullable": True}
             if field_type == "varchar":
                 kwargs["max_length"] = 128
             fields.append(FieldSchema(name=field_name, dtype=type_map[field_type], **kwargs))
 
-        collection = Collection(name=name, schema=CollectionSchema(fields=fields, description=spec["description"]))
+        collection = Collection(name=name, schema=CollectionSchema(
+            fields=fields, description=spec["description"], enable_dynamic_field=True,
+        ))
         collection.create_index(
             field_name="vector",
             params={"index_type": DEFAULT_INDEX, "metric_type": DEFAULT_METRIC, "params": {"nlist": DEFAULT_NLIST}},
@@ -135,8 +154,11 @@ def create_all(dim: int, drop: bool) -> int:
 def main() -> None:
     parser = argparse.ArgumentParser(description="初始化 Milvus 向量集合")
     parser.add_argument("--plan", action="store_true", help="只打印设计，不连接")
-    parser.add_argument("--dim", type=int, default=DEFAULT_DIM, help=f"向量维度，默认 {DEFAULT_DIM}")
+    parser.add_argument("--dim", type=int, default=int(getattr(settings, "EMBEDDING_DIM", DEFAULT_DIM)),
+                        help="向量维度，默认取 settings.EMBEDDING_DIM")
     parser.add_argument("--drop", action="store_true", help="先删除已有集合再创建（危险）")
+    parser.add_argument("--replace", action="append", default=[], metavar="COLLECTION",
+                        help="只重建指定集合（可重复）；用于主键/维度/字段与写入端不一致时")
     args = parser.parse_args()
 
     if args.plan:
@@ -155,7 +177,7 @@ def main() -> None:
         raise SystemExit(1)
 
     try:
-        raise SystemExit(create_all(dim=args.dim, drop=args.drop))
+        raise SystemExit(create_all(dim=args.dim, drop=args.drop, replace=args.replace))
     except SystemExit:
         raise
     except Exception as exc:  # noqa: BLE001

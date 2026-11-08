@@ -19,13 +19,22 @@
     talent_vector_store.TalentVectorStore -> 通用多集合（业务：人才 / 岗位匹配）
 
 接口（与 BaseVectorStore 建议签名一致）：
-    create_collection(name, dim)               建集合（COSINE 相似度）
-    has_collection(name) / stats(name)         存在性 / 行数
-    upsert(collection, ids, vectors, metadata) 写入 / 更新（按 1000 条分批）
-    search(collection, vector, top_k, expr)    相似度检索（expr 为权限过滤条件）
-    delete(collection, ids | expr)             删除
-    drop(name)                                 删除集合
-    health()                                   探活
+    create_collection(name, dim, primary_field) 建集合（COSINE 相似度，主键可指定）
+    has_collection(name) / stats(name)          存在性 / 行数
+    primary_key_of(name) / describe(name)       主键探测（校验与团队 Schema 是否一致）
+    upsert(collection, ids, vectors, metadata)  写入 / 更新（按 1000 条分批，主键可指定）
+    query(collection, expr, output_fields)      按主键 / 过滤条件读回已写入的行
+    search(collection, vector, top_k, expr)     相似度检索（expr 为权限过滤条件）
+    delete(collection, ids | expr)              删除
+    drop(name)                                  删除集合
+    health()                                    探活
+
+主键约定（2026-11 对齐）：
+    talent_vectors 的主键是 talent_id（与 MySQL talents.id 同值、同名），一名人才一条
+    复合画像向量。历史上这里写死 "id" 并接受字符串切片 ID，导致：
+        - 字符串 chunk_id（t{id}:v{ver}:{n}:{hash}）写入 INT64 主键 → 整批写入失败；
+        - 读回条件却用 metadata["talent_id"]，与写入结构不一致 → 永远查不到。
+    现在主键字段名由调用方传入（默认 "id" 保持其他集合适配器不变）。
 
 降级约定：
     未启用 Milvus 或 pymilvus 缺失时抛 TalentVectorUnavailableError，
@@ -97,26 +106,128 @@ class TalentVectorStore:
         return _get_client()
 
     # ---------------------------------------------------------------- 集合管理
-    async def create_collection(self, name: str, dim: int) -> None:
-        """建集合（存在则跳过）。id 为主键（int），vector 为 dim 维向量。"""
+    async def create_collection(
+        self,
+        name: str,
+        dim: int,
+        *,
+        primary_field: str = "id",
+        metadata_fields: Sequence[str] = (),
+    ) -> None:
+        """建集合（存在则校验），保证「写入端能写、读取端能读」。
+
+        校验三件事，任一不满足都直接报错而不是静默写坏数据：
+            1. 主键必须是 primary_field（talent_vectors 固定 talent_id）；
+            2. 向量维度必须与当前 embedding 模型一致（换模型后旧集合必须重建）；
+            3. 集合要么开启动态字段，要么已声明我们要写的全部 metadata_fields
+               （scripts/init_milvus.py 早期版本建的是严格静态 Schema：既没开动态
+               字段，又要求 organization_id/status/skill_tags 必填，直接 upsert
+               version 会失败——这里能补的字段就地补齐，补不了给出可执行的修复命令）。
+        """
         client = self._client()
-        if await _run(client.has_collection, name):
-            logger.info("Milvus 集合已存在，跳过创建：%s", name)
+        if not await _run(client.has_collection, name):
+            await _run(
+                client.create_collection,
+                collection_name=name,
+                dimension=int(dim),
+                primary_field_name=primary_field,
+                id_type="int",
+                vector_field_name="vector",
+                metric_type=DEFAULT_METRIC,
+                auto_id=False,
+                # 动态字段让 name/kind/updated_at 这类展示型元数据无需改 Schema；
+                # 与 scripts/init_milvus.py 的新定义保持一致。
+                enable_dynamic_field=True,
+            )
+            logger.info(
+                "Milvus 集合创建完成：%s dim=%s metric=%s primary=%s",
+                name, dim, DEFAULT_METRIC, primary_field,
+            )
             return
-        await _run(
-            client.create_collection,
-            collection_name=name,
-            dimension=int(dim),
-            primary_field_name="id",
-            id_type="int",
-            vector_field_name="vector",
-            metric_type=DEFAULT_METRIC,
-            auto_id=False,
-        )
-        logger.info("Milvus 集合创建完成：%s dim=%s metric=%s", name, dim, DEFAULT_METRIC)
+
+        info = await self.describe(name)
+        current = _primary_of(info)
+        if current and current != primary_field:
+            raise TalentVectorUnavailableError(
+                f"集合 {name} 的主键是 {current}，与当前实现要求的 {primary_field} 不一致；"
+                f"请先清理该集合后由同步任务重建（历史写入本身也不可用）"
+            )
+        actual_dim = _dim_of(info)
+        if actual_dim and int(actual_dim) != int(dim):
+            raise TalentVectorUnavailableError(
+                f"集合 {name} 的向量维度是 {actual_dim}，与当前 embedding 的 {dim} 维不一致；"
+                f"换模型后必须重建集合：python scripts/init_milvus.py --replace {name} --dim {int(dim)}"
+            )
+        await self._ensure_metadata_fields(name, info, metadata_fields)
+        logger.info("Milvus 集合已存在且结构匹配，跳过创建：%s", name)
+
+    async def _ensure_metadata_fields(self, name: str, info: dict[str, Any], fields: Sequence[str]) -> None:
+        """校验 / 补齐写入端需要的 metadata 字段（只补可空字段，不动已有数据）。"""
+        declared = _field_map(info)
+        dynamic = bool(info.get("enable_dynamic_field"))
+        missing = [f for f in fields if f not in declared]
+        if not missing:
+            return
+        if dynamic:
+            # 动态字段模式下未知字段直接写入，无需改 Schema。
+            return
+        added, failed = [], []
+        add = getattr(self._client(), "add_collection_field", None)
+        if add is None:
+            failed = list(missing)
+        else:
+            # 先试一个字段探能力：Milvus Lite / 老版本服务端不支持在线加字段，
+            # 逐个试只会在日志里刷满四条 UNIMPLEMENTED 堆栈。
+            for index, field in enumerate(missing):
+                try:
+                    await _run(
+                        add, collection_name=name, field_name=field,
+                        data_type=_metadata_dtype(field), nullable=True,
+                    )
+                    added.append(field)
+                except Exception as exc:  # noqa: BLE001 - 老版本 Milvus / Lite 不支持加字段
+                    logger.warning("Milvus 集合 %s 不支持在线补字段（%s），剩余字段需要重建集合",
+                                   name, type(exc).__name__)
+                    failed = list(missing[index:])
+                    break
+        if failed:
+            raise TalentVectorUnavailableError(
+                f"集合 {name} 未开启动态字段，且缺少写入需要的字段 {failed}"
+                f"（服务端不支持在线加字段）；"
+                f"请执行 python scripts/init_milvus.py --replace {name} 重建为该集合的当前定义"
+            )
+        # 严格 Schema 下还要确认：必填但没人写的字段会让 upsert 直接失败。
+        refreshed = await self.describe(name)
+        unknown_required = [
+            fname for fname, fp in _field_map(refreshed).items()
+            if not fp.get("is_primary") and fname != "vector"
+            and not fp.get("nullable") and not fp.get("default_value")
+            and fname not in set(fields)
+        ]
+        if unknown_required:
+            raise TalentVectorUnavailableError(
+                f"集合 {name} 存在必填且写入端未提供的字段 {unknown_required}；"
+                f"请执行 python scripts/init_milvus.py --replace {name} 重建"
+            )
+        logger.info("Milvus 集合 %s 已补齐 metadata 字段：%s", name, added)
 
     async def has_collection(self, name: str) -> bool:
         return bool(await _run(self._client().has_collection, name))
+
+    async def describe(self, name: str) -> dict[str, Any]:
+        """集合结构（主键、向量维度、动态字段开关）。"""
+        return dict(await _run(self._client().describe_collection, name) or {})
+
+    async def primary_key_of(self, name: str) -> str | None:
+        """读回集合主键字段名；集合不存在时返回 None。"""
+        try:
+            info = await self.describe(name)
+        except Exception:  # noqa: BLE001 - 探测失败按「未知」处理，由上层决定降级
+            return None
+        for field in info.get("fields") or []:
+            if field.get("is_primary"):
+                return field.get("name")
+        return None
 
     async def stats(self, name: str) -> dict[str, Any]:
         """集合行数等统计（用于「集合为空则降级」判断）。"""
@@ -133,8 +244,14 @@ class TalentVectorStore:
         ids: Sequence[int],
         vectors: Sequence[Sequence[float]],
         metadata: Sequence[dict[str, Any]] | None = None,
+        *,
+        primary_field: str = "id",
     ) -> int:
-        """写入 / 覆盖向量（按 1000 条分批）。返回写入条数。"""
+        """写入 / 覆盖向量（按 1000 条分批）。返回写入条数。
+
+        primary_field 决定主键列名：talent_vectors 传 "talent_id"，其余集合沿用默认 "id"。
+        ids 必须是 int（Milvus INT64 主键）；字符串切片 ID 会被拒绝，避免静默写成错误数据。
+        """
         client = self._client()
         if len(ids) != len(vectors):
             raise ValueError(f"ids 与 vectors 数量不一致：{len(ids)} vs {len(vectors)}")
@@ -146,13 +263,44 @@ class TalentVectorStore:
         for start, batch_ids in enumerate_ids(ids, UPSERT_BATCH_SIZE):
             batch_vectors = list(vectors)[start : start + UPSERT_BATCH_SIZE]
             batch_metas = metas[start : start + UPSERT_BATCH_SIZE] if metas else [{}] * len(batch_ids)
-            rows = [
-                {"id": int(id_), "vector": list(vec), **(meta or {})}
-                for id_, vec, meta in zip(batch_ids, batch_vectors, batch_metas)
-            ]
+            rows = []
+            for id_, vec, meta in zip(batch_ids, batch_vectors, batch_metas):
+                key = int(id_)
+                info = {
+                    k: v for k, v in (meta or {}).items()
+                    # 主键/向量/同名 id 不能出现在 metadata；None 写入动态字段会报类型错误。
+                    if k not in (primary_field, "vector", "id") and v is not None
+                }
+                rows.append({primary_field: key, "vector": list(vec), **info})
             await _run(client.upsert, collection_name=collection, data=rows)
             count += len(rows)
         return count
+
+    # ---------------------------------------------------------------- 读回
+    async def query(
+        self,
+        collection: str,
+        expr: str,
+        *,
+        output_fields: Sequence[str] | None = None,
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """按过滤表达式读回已写入的行（不计算相似度）。
+
+        expr 里的主键名必须与写入时一致，例如 talent_id == 12。
+        """
+        client = self._client()
+        raw = await _run(
+            client.query,
+            collection_name=collection,
+            filter=expr,
+            output_fields=list(output_fields or ["*"]),
+            limit=max(1, int(limit)),
+        )
+        rows: list[dict[str, Any]] = []
+        for item in list(raw or []):
+            rows.append(dict(item) if isinstance(item, dict) else item)
+        return rows
 
     async def delete(
         self,
@@ -167,7 +315,9 @@ class TalentVectorStore:
             await _run(client.delete, collection_name=collection, filter=expr)
         elif ids:
             id_list = [int(item) for item in ids]
-            await _run(client.delete, collection_name=collection, id=id_list)
+            # MilvusClient.delete 的参数名是 ids；写成 id=... 会被当成 filter 表达式
+            # （实测 pymilvus 3.x 抛 DataTypeNotMatchException），删除静默失效。
+            await _run(client.delete, collection_name=collection, ids=id_list)
         else:
             raise ValueError("delete 需要 ids 或 expr 之一")
 
@@ -212,6 +362,39 @@ class TalentVectorStore:
             return {"ok": True, "collections": list(names or [])}
         except Exception as exc:  # noqa: BLE001 - 探活失败要给可读原因
             return {"ok": False, "reason": str(exc)}
+
+
+def _field_map(info: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """describe_collection 结果 -> {字段名: 字段定义}。"""
+    return {f.get("name"): f for f in (info.get("fields") or []) if f.get("name")}
+
+
+def _primary_of(info: dict[str, Any]) -> str | None:
+    for field in info.get("fields") or []:
+        if field.get("is_primary"):
+            return field.get("name")
+    return None
+
+
+def _dim_of(info: dict[str, Any]) -> int | None:
+    for field in info.get("fields") or []:
+        if field.get("name") == "vector":
+            dim = (field.get("params") or {}).get("dim")
+            return int(dim) if dim is not None else None
+    return None
+
+
+def _metadata_dtype(field: str) -> Any:
+    """metadata 字段对应的 Milvus 类型（仅用于在线补字段）。"""
+    try:
+        from pymilvus import DataType
+    except ImportError:  # pragma: no cover - 未安装 pymilvus 时上层已降级
+        return None
+    if field in ("version", "organization_id"):
+        return DataType.INT64
+    if field == "skill_tags":
+        return DataType.JSON
+    return DataType.VARCHAR
 
 
 def enumerate_ids(ids: Sequence[int], size: int):

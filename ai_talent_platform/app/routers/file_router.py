@@ -42,7 +42,7 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile
 from fastapi.responses import Response
 
 from app.config.settings import settings
@@ -62,14 +62,42 @@ router = APIRouter(prefix="/files", tags=["文件管理"])
 
 
 # ============================================================================
+# 简历自动入库（RAG 上传 -> 人才链路）
+# ============================================================================
+def _trace_id() -> str:
+    """取当前请求的 trace_id，交给后台任务串起日志。"""
+    try:
+        from app.config.logging_config import trace_id_ctx
+
+        return trace_id_ctx.get() or "-"
+    except Exception:  # noqa: BLE001 - 日志模块未就绪不影响上传
+        return "-"
+
+
+def _queue_resume_ingest(tasks: BackgroundTasks, result: dict, user) -> dict:
+    """原件已提交后调用：判断是否需要人才处理，需要就排后台任务。
+
+    返回给前端的调度说明（scheduled / reason），不写库、不提交事务；
+    身份只取当前登录用户 ID，角色在后台任务里从数据库重建。
+    """
+    from app.services.resume_ingest import plan, run_revision_ingest
+
+    ingest = plan(result, user)
+    if ingest.get("scheduled"):
+        tasks.add_task(run_revision_ingest, ingest["revision_id"], user.id, _trace_id())
+    return ingest
+
+
+# ============================================================================
 # 上传
 # ============================================================================
 @router.post(
     "/upload",
     summary="上传文件并建立文档草稿",
-    description="上传知识文档原件。file可选择多份文件，整批必须且只能选择一个七大分类category。单份保存草稿，人工检查正文、预览切片并确认发布；多份逐份自动解析、切片、向量化并发布，无需人工确认，返回total、success_count、failed_count和逐份items，部分失败不撤销已成功文件。title省略时各自使用文件名；doc_id为空时各自新建文档，填写时沿用已有文档追加版本（多份顺序发布，最后成功版本生效）。需要知识库管理及文档归属权限。",
+    description="上传知识文档原件。file可选择多份文件，整批必须且只能选择一个七大分类category。单份保存草稿，人工检查正文、预览切片并确认发布；多份逐份自动解析、切片、向量化并发布，无需人工确认，返回total、success_count、failed_count和逐份items，部分失败不撤销已成功文件。title省略时各自使用文件名；doc_id为空时各自新建文档，填写时沿用已有文档追加版本（多份顺序发布，最后成功版本生效）。category=resume时，原件与版本记录**提交成功后**自动触发一次人才处理（后台执行：原件→简历→人才档案→画像/向量），预览、发布、恢复都不会再次触发；返回值resume_ingest说明是否已排队及未排队原因（如缺少resume:parse权限）。需要知识库管理及文档归属权限。",
 )
 async def upload_document(
+    tasks: BackgroundTasks,
     file: list[UploadFile] = File(
         ..., description="一份保存草稿，多份自动发布；所有文件共用category",
         json_schema_extra={"items": {"type": "string", "format": "binary"}},
@@ -85,12 +113,19 @@ async def upload_document(
     if len(file) == 1:
         item = file[0]
         data = await item.read(settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024 + 1)
+        result = await service.upload(
+            data, item.filename or "document.txt", item.content_type, category,
+            title if title is not None else (item.filename or "document.txt")[:255], user, doc_id,
+        )
+        # 先把原件 + 版本记录真正提交到 MySQL，再决定是否通知人才模块：
+        # 依赖里的提交发生在响应之后，若在这里不提交，后台任务可能读到未提交的版本。
+        await service.commit_upload()
+        ingest = _queue_resume_ingest(tasks, result, user)
+        data = {**result, "resume_ingest": ingest} if category == "resume" else result
         return success(
-            data=await service.upload(
-                data, item.filename or "document.txt", item.content_type, category,
-                title if title is not None else (item.filename or "document.txt")[:255], user, doc_id,
-            ),
-            message="草稿已保存，请检查正文和切片预览后确认发布",
+            data=data,
+            message=("草稿已保存，简历已进入人才自动处理" if ingest.get("scheduled")
+                     else "草稿已保存，请检查正文和切片预览后确认发布"),
         )
     results = []
     # 逐份读取并独立提交，避免一份失败回滚整批，或同时把多份大文件读入内存。
@@ -104,6 +139,8 @@ async def upload_document(
             )
         except Exception as exc:
             result = KnowledgeRevisionService.batch_error(name, exc)
+        # upload_and_publish 内部已逐份提交草稿；提交成功（有 revision_id）才排人才处理。
+        result["resume_ingest"] = _queue_resume_ingest(tasks, result, user)
         results.append(result)
     count = sum(item["status"] == "published" for item in results)
     return success(
@@ -146,13 +183,24 @@ async def download_revision_file(
     )
 
 
-@router.post("/revisions/{revision_id}/edit", summary="修改正文并另存新版本", description="基于指定版本编辑完整正文、标题和分类，生成新的Word文件和版本记录，原版本保持不变。expected_version必须匹配详情中的version，新版本需重新预览切片后发布。")
+@router.post("/revisions/{revision_id}/edit", summary="修改正文并另存新版本（已废弃，请用 /files/docs/{doc_id}/edit）", description="【已废弃】按revision_id编辑。用户实际操作对象是文档，调用方不应自行查找并传入版本ID：请改用 POST /files/docs/{doc_id}/edit（后端自动以当前已发布且生效的版本为基线）。本接口仅为兼容旧前端保留，deprecated=true。", deprecated=True)
 async def edit_revision(
     revision_id: int, request: RevisionEdit, context=Depends(get_revision_service, scope="function")
 ):
     """将编辑后的正文保存为新草稿。"""
     service, user = context
     return success(data=await service.edit(revision_id, request, user))
+
+
+@router.get(
+    "/docs/{doc_id}/editable",
+    summary="按文档读取可编辑正文（编辑基线）",
+    description="编辑页只需传 doc_id：返回该文档「当前已发布且生效」版本的正文、标题、分类与published_at，用于填充编辑器。不返回最新草稿，避免「打开的是草稿、保存却基于生效版本」的错位。配合 POST /files/docs/{doc_id}/edit 使用，调用方全程不需要查找或传入revision_id。文档尚无生效版本时返回404并提示先发布。需要知识库管理权限及文档归属权限。",
+)
+async def document_editable(doc_id: int, context=Depends(get_revision_service)):
+    """以文档为入口读取编辑基线（当前生效版本正文）。"""
+    service, user = context
+    return success(data=await service.document_editable(doc_id, user))
 
 
 @router.post(

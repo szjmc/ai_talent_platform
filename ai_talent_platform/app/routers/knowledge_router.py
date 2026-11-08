@@ -32,6 +32,14 @@ async def recovery_lifespan(app):
                 await recover()
             except Exception:
                 logging.getLogger(__name__).exception("入库补偿扫描失败，下轮重试")
+            # 简历自动入库是进程内后台任务，进程重启/任务丢失时靠这里补上：
+            # sweep 本身幂等（已成功/待复核的版本不会再次处理），所以可以周期执行。
+            if settings.RESUME_INGEST_SWEEP_ENABLED:
+                try:
+                    from app.services.resume_ingest import sweep
+                    await sweep()
+                except Exception:
+                    logging.getLogger(__name__).exception("简历自动入库补扫失败，下轮重试")
             await asyncio.sleep(60)
     task = asyncio.create_task(worker()) if settings.RAG_DURABLE_INGEST_ENABLED else None
     try:

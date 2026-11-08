@@ -2,9 +2,24 @@
 gxd-人才多维向量同步、带权限的语义搜索与有来源的档案问答。
 
 标签：[RAG组] [P1]（人才向量检索与召回复核）
+
+============================ 本轮对齐（重要） ============================
+团队 `talent_vectors` 的约定是「一名人才一条复合画像向量」，主键就是 MySQL
+`talents.id`，字段名 `talent_id`。原实现按切片写多行、主键用字符串
+`t{id}:v{ver}:{n}:{hash}`，而集合主键是 INT64 —— 写入必然失败；读回又用
+`metadata["talent_id"]` 过滤，与写入结构（扁平字段）不一致，即使写入成功也查不到。
+
+现在：
+    写：一条复合画像文本 -> embed -> upsert(primary_field="talent_id")
+        附带 version / name / kind / updated_at 等标量字段（供读回比对版本）
+    读：search(filter="talent_id in [...]") -> 命中行的 talent_id 与 MySQL 回表行
+        比对 version，版本不一致（旧向量）直接丢弃，随后按当前档案重建证据文本
+   兜底：Milvus 未启用时 sync_index/retrieve 明确报错，不返回伪造结果。
+=========================================================================
 """
 import json
-from hashlib import sha256
+import logging
+from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
 from app.services.talent_profile_service import TalentService
 from app.repositories.talent_resume_repository import ResumeRepository
@@ -16,6 +31,10 @@ from app.config.talent_config import talent_settings as cfg
 from app.config.settings import settings
 from app.core.exceptions import AIError, ExternalServiceError
 from app.utils.resume_data import extract_parsed
+
+# talent_vectors 每条画像向量要携带的标量/动态字段（写入端与建集合校验共用）。
+PROFILE_METADATA_FIELDS = ("version", "name", "kind", "updated_at")
+
 
 class EvidenceCitation(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -43,52 +62,151 @@ class TalentRetrievalService(TalentService):
         if not settings.MILVUS_ENABLED:
             raise ExternalServiceError("请先启用并配置Milvus及Embedding模型")
 
-    @staticmethod
-    def split_text(text):
-        """gxd-以固定窗口和重叠切分文本，保留可追溯原文。"""
-        step = max(1, cfg.chunk_size - cfg.chunk_overlap)
-        return [text[i:i+cfg.chunk_size] for i in range(0, len(text), step) if text[i:i+cfg.chunk_size].strip()]
+    # ------------------------------------------------------------ 文本与写入
+    async def build_profile_text(self, obj) -> str:
+        """gxd-把一名人才的全部可检索资料拼成一条复合画像文本。
 
-    async def build_chunks(self, obj):
-        """gxd-生成原文、技能、经验及有证据的素质向量材料；空维度不强造内容。"""
-        chunks = []
-        def append(text, kind, source, page=None):
-            """gxd-记录分块编号、原有版本号及内容摘要，回表时拒绝旧内容。"""
-            for piece in self.split_text(text):
-                fingerprint = sha256(json.dumps([kind, source, page, piece], ensure_ascii=False).encode()).hexdigest()[:24]
-                chunks.append({"chunk_id": f"t{obj.id}:v{obj.version}:{len(chunks)}:{fingerprint}", "talent_id": obj.id, "version": obj.version, "kind": kind, "text": piece, "source": source, "page": page})
-        append(await self.profile_source(obj.id), "profile", "当前人才档案")
-        if obj.skill_tags:
-            append("、".join(obj.skill_tags), "skill", "当前人才技能")
+        一条向量承载一个档案：档案字段 + 技能 + 简历要点 + 画像证据。
+        空维度不写占位内容，避免向量里出现「无」这类噪声。
+        """
+        parts = []
+
+        def add(value, label):
+            text = str(value or "").strip()
+            if text:
+                parts.append(label + "：" + text if label else text)
+
+        add(obj.name, "姓名")
+        add("、".join(obj.skill_tags or []), "技能")
+        add(obj.education, "学历")
+        add(obj.school, "院校")
+        add(obj.major, "专业")
+        add(f"{obj.work_years}年" if obj.work_years else "", "工作年限")
+        add(obj.current_company, "当前公司")
+        add(obj.current_position, "当前职位")
+        add(obj.self_evaluation, "自我评价")
+        add(obj.portrait_summary, "画像摘要")
+
         rows = await ResumeRepository().list_by_talent(self.db, obj.id)
         for row in rows:
             data = row.parsed_data or {}
-            for page in data.get("source_pages", []):
-                append(page["content"], "resume", row.file_name, page.get("page"))
-            # 兼容扁平 / 嵌套两种历史写入格式（原写法只认嵌套 parsed，扁平数据取不到经历）
+            for page in (data.get("source_pages") or [])[:3]:
+                add(page.get("content"), f"简历原文({row.file_name})")
+            # 兼容扁平 / 嵌套两种历史写入格式
             parsed = extract_parsed(data)
-            for exp in parsed.get("work_experience", []) + parsed.get("projects", []):
-                append(json.dumps(exp, ensure_ascii=False), "experience", row.file_name)
+            for exp in (parsed.get("work_experience") or [])[:6] + (parsed.get("projects") or [])[:4]:
+                add(json.dumps(exp, ensure_ascii=False), "经历")
+
         portrait = await self.repo.latest_portrait(self.db, obj.id)
         if portrait:
-            for label in portrait.labels or []:
-                if label.get("category") == "quality" and label.get("evidence"):
-                    append(label["name"] + "：" + label["evidence"], "quality", "画像证据")
-        return chunks
+            for label in (portrait.labels or []):
+                if label.get("name") and label.get("evidence"):
+                    add(label["name"] + "：" + str(label["evidence"]), "画像证据")
+
+        text = "\n".join(parts)
+        return text[: cfg.profile_text_chars]
 
     async def sync_index(self, talent_id):
-        """gxd-直接同步当前资料向量，不创建MySQL索引表；内容摘要防止回滚后的旧向量误命中。"""
+        """gxd-按当前档案覆盖写入「一人一条」向量，主键固定为 MySQL talent_id。
+
+        版本号随档案写入：读回时用它丢弃回滚前的旧向量，因此不需要额外的索引状态表。
+        """
         self.require_vector()
         obj = await self.get_talent(talent_id, lock=True)
-        chunks = await self.build_chunks(obj)
-        vectors = await embed_texts([x["text"] for x in chunks])
-        await self.vector.create_collection(cfg.collection, cfg.embedding_dim)
-        await self.vector.upsert(cfg.collection, [x["chunk_id"] for x in chunks], vectors, chunks)
-        # 不在MySQL提交前删除旧向量；回滚后仍可检索旧版本，成功后按新版本过滤。
-        return {"talent_id": obj.id, "version": obj.version, "chunks": len(chunks), "status": "ready"}
+        text = await self.build_profile_text(obj)
+        if not text.strip():
+            raise ExternalServiceError("档案没有可向量化的内容，请先补充资料")
+        vectors = await embed_texts([text])
+        # 集合维度以实际向量长度为准：配置里的 embedding_dim 只是约定值，
+        # 两者不一致时按真实向量建集合并留一条告警，避免「dim mismatch」把索引写成半成品。
+        dim = len(vectors[0]) if vectors else cfg.embedding_dim
+        if dim != cfg.embedding_dim:
+            logging.getLogger(__name__).warning(
+                "gxd-向量维度与 talent_settings.embedding_dim 不一致 dim=%s configured=%s", dim, cfg.embedding_dim)
+        await self.vector.create_collection(
+            cfg.collection, dim,
+            primary_field=cfg.primary_field,
+            # 声明写入端需要携带的元数据：集合若为严格静态 Schema，先校验/补字段，
+            # 避免 upsert 时才因为「unexpected field version」整批失败。
+            metadata_fields=PROFILE_METADATA_FIELDS,
+        )
+        await self.vector.upsert(
+            cfg.collection,
+            [int(obj.id)],
+            vectors,
+            [{
+                "version": int(obj.version),
+                "name": (obj.name or "")[:128],
+                "kind": "profile",
+                "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }],
+            primary_field=cfg.primary_field,
+        )
+        # 写入成功才把版本回写进结果；回滚后旧向量仍可检索，读回时按版本过滤。
+        return {"talent_id": obj.id, "version": obj.version, "vectors": 1,
+                "chars": len(text), "primary_field": cfg.primary_field, "status": "ready"}
 
+    async def read_index(self, talent_id):
+        """gxd-读回该人才在 Milvus 中的向量行（用于索引状态与「只补索引」判断）。
+
+        返回 {"indexed": bool, "version": int|None, "primary_field": ...}；
+        Milvus 未启用或集合不存在时 indexed=False，不抛异常（详情接口可展示）。
+        """
+        result = {"indexed": False, "version": None, "primary_field": cfg.primary_field,
+                  "collection": cfg.collection}
+        if not settings.MILVUS_ENABLED:
+            result["status"] = "disabled"
+            result["message"] = "Milvus未启用，向量尚未同步"
+            return result
+        try:
+            if not await self.vector.has_collection(cfg.collection):
+                result["status"] = "missing"
+                result["message"] = "向量集合尚未创建，等待首次同步"
+                return result
+            rows = await self.vector.query(
+                cfg.collection,
+                f"{cfg.primary_field} == {int(talent_id)}",
+                output_fields=[cfg.primary_field, "version"],
+                limit=1,
+            )
+        except Exception as exc:  # noqa: BLE001 - 索引状态探测失败不能让详情 500
+            result["status"] = "unknown"
+            result["message"] = f"索引状态读取失败：{type(exc).__name__}"
+            return result
+        if not rows:
+            result["status"] = "missing"
+            result["message"] = "尚未写入该人才的向量"
+            return result
+        version = rows[0].get("version")
+        result.update(indexed=True, version=int(version) if version is not None else None, status="indexed")
+        return result
+
+    async def drop_index(self, talent_id):
+        """按 talent_id 删除该人才的画像向量（删档 / 合并后调用）。
+
+        集合不存在或未启用时直接返回 False，不抛异常：调用方是业务流程收尾，
+        向量清理失败不应回滚已经完成的主档操作（由调用方记录告警）。
+        """
+        if not settings.MILVUS_ENABLED:
+            return False
+        if not await self.vector.has_collection(cfg.collection):
+            return False
+        await self.vector.delete(cfg.collection, ids=[int(talent_id)])
+        logging.getLogger(__name__).info("gxd-已删除人才向量 talent_id=%s", talent_id)
+        return True
+
+    async def index_state(self, obj):
+        """gxd-判断某个已回表人才的向量是否与当前版本一致（missing/current/stale）。"""
+        found = await self.read_index(obj.id)
+        if not found.get("indexed"):
+            return found, "missing"
+        if found.get("version") is None or int(found["version"]) != int(obj.version):
+            return found, "stale"
+        return found, "current"
+
+    # ------------------------------------------------------------ 检索
     async def retrieve(self, query, top_k, filters=None, ids=None):
-        """gxd-使用原有表限定权限和版本，按当前档案重建证据核验向量，不依赖索引状态表。"""
+        """gxd-用原有表限定权限和版本，按当前档案重建证据文本，不依赖索引状态表。"""
         self.context.require_permission("talent:read")
         self.require_vector()
         rows = await self.repo.filtered(self.db, self.context, filters or {}, ids)
@@ -100,22 +218,40 @@ class TalentRetrievalService(TalentService):
         visible_ids = list(visible)
         for offset in range(0, len(visible_ids), 100):
             group = visible_ids[offset:offset+100]
-            expr = " or ".join(f'(metadata["talent_id"] == {i} and metadata["version"] == {visible[i].version})' for i in group)
-            hits.extend(await self.vector.search(cfg.collection, vector, min(top_k * 5, 250), expr=expr))
-        current_chunks, verified, seen = {}, [], set()
+            expr = f"{cfg.primary_field} in [{','.join(str(int(i)) for i in group)}]"
+            hits.extend(await self.vector.search(
+                cfg.collection, vector, top_k=min(top_k * 5, 250), expr=expr,
+                output_fields=[cfg.primary_field, "version"],
+            ))
+        verified, seen = [], set()
         for hit in sorted(hits, key=lambda x: x["score"], reverse=True):
-            metadata = hit.get("metadata") or {}
-            talent_id = metadata.get("talent_id")
-            if not isinstance(talent_id, int) or talent_id not in visible:
+            # 主键即 talent_id；兼容旧适配器把主键放在 "id" 上的返回结构。
+            raw_id = hit.get(cfg.primary_field, hit.get("id"))
+            try:
+                talent_id = int(raw_id)
+            except (TypeError, ValueError):
                 continue
-            if metadata.get("version") != visible[talent_id].version:
+            obj = visible.get(talent_id)
+            if obj is None or talent_id in seen:
                 continue
-            if talent_id not in current_chunks:
-                current_chunks[talent_id] = {c["chunk_id"]: c for c in await self.build_chunks(visible[talent_id])}
-            chunk = current_chunks[talent_id].get(hit["id"])
-            if chunk and hit["id"] not in seen:
-                seen.add(hit["id"])
-                verified.append({**chunk, "score": hit["score"]})
+            version = hit.get("version")
+            if version is not None and int(version) != int(obj.version):
+                # 旧版本向量：档案已变更，等下一次同步覆盖，不拿旧内容当证据。
+                continue
+            seen.add(talent_id)
+            text = await self.build_profile_text(obj)
+            if not text.strip():
+                continue
+            verified.append({
+                "chunk_id": f"t{obj.id}:v{obj.version}",
+                "talent_id": obj.id,
+                "version": obj.version,
+                "kind": "profile",
+                "text": text,
+                "source": "当前人才档案",
+                "page": None,
+                "score": hit["score"],
+            })
         # 无独立状态表，不能把未命中误报为未向量化；未知数量明确返回null。
         return verified, visible, None
 
