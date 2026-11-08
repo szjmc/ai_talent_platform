@@ -20,6 +20,9 @@ client.interceptors.request.use((config) => {
 let refreshing: Promise<string> | null = null;
 client.interceptors.response.use((response) => response, async (error: AxiosError<ApiResponse<unknown>>) => {
   const original = error.config as (typeof error.config & { _retried?: boolean });
+  if (error.response?.data instanceof Blob) {
+    try { error.response.data = JSON.parse(await error.response.data.text()); } catch { /* non-JSON response */ }
+  }
   const code = error.response?.data?.code;
   const refreshToken = localStorage.getItem(REFRESH_KEY);
   if ((code === 2002 || (error.response?.status === 401 && code === 2001)) && refreshToken && original && !original._retried && !original.url?.includes('/auth/')) {
@@ -62,6 +65,18 @@ export async function request<T>(config: Parameters<typeof client.request>[0]): 
   try {
     const response = await client.request<ApiResponse<T>>(config);
     return response.data.data;
+  } catch (error) { throw new ApiError(error); }
+}
+
+/** Authenticated file download, using the same token refresh and error handling as API requests. */
+export async function downloadApiFile(path: string, fileName: string): Promise<void> {
+  try {
+    const response = await client.get<Blob>(path, { responseType: 'blob', timeout: 180000 });
+    const url = URL.createObjectURL(response.data);
+    const link = document.createElement('a');
+    link.href = url; link.download = fileName;
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   } catch (error) { throw new ApiError(error); }
 }
 

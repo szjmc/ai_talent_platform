@@ -5,6 +5,7 @@ import {
   AudioOutlined, AudioMutedOutlined, DisconnectOutlined, PhoneFilled, UserOutlined, VideoCameraOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { mediaUnavailableMessage } from '../utils/media';
 import { formatApiError, invitesApi, inviteWsUrl, type InviteVisit } from '../services/api';
 
 type Role = 'candidate' | 'interviewer';
@@ -56,7 +57,7 @@ export default function InterviewRoomPage() {
   /* ------------------------------------------------------------------ 落地信息 */
   useEffect(() => {
     invitesApi.visit(token).then(info => {
-      if (info.type !== 'interview') { setFailText('该邀约不是面试'); setPhase('failed'); return; }
+      if (info.type !== 'interview') { setFailText('该邀约不是面试'); setPhase('failed'); setLoading(false); return; }
       setVisit(info);
       const start = info.interview_time ? dayjs(info.interview_time) : null;
       if (start && start.isAfter(dayjs().add(15, 'minute'))) setSysNotice('尚未到进场时间（可提前 15 分钟进入）');
@@ -65,6 +66,13 @@ export default function InterviewRoomPage() {
     }).catch(error => { setFailText(formatApiError(error)); setPhase('failed'); setLoading(false); });
     return () => { /* unmount 时统一清理 */ };
   }, [token]);
+
+  useEffect(() => {
+    if (phase === 'room' && localVideoRef.current && localStreamRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+      void localVideoRef.current.play().catch(() => undefined);
+    }
+  }, [phase]);
 
   /* 计时 */
   useEffect(() => {
@@ -190,6 +198,8 @@ export default function InterviewRoomPage() {
   /* ------------------------------------------------------------------ 进房 */
   const enterRoom = useCallback(async () => {
     setSysNotice('');
+    const unavailable = mediaUnavailableMessage();
+    if (unavailable) { setFailText(unavailable); setPhase('failed'); return; }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { width: 1280, height: 720, facingMode: 'user' }, audio: { echoCancellation: true },

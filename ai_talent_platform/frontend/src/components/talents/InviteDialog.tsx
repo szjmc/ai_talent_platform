@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, Checkbox, DatePicker, Divider, Input, InputNumber, Modal, Segmented, Space, Typography, message } from 'antd';
 import { CopyOutlined, LinkOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
+import { copyToClipboard } from '../../utils/clipboard';
+import { interviewerInviteUrl, isInsecureInviteUrl } from '../../utils/media';
 import type { Talent } from '../../types';
 import { invitesApi, formatApiError, type InviteChannel, type InviteInfo, type InviteType } from '../../services/api';
 
@@ -80,8 +82,9 @@ export default function InviteDialog({ talent, initialKind = 'written_test', ope
     }
   };
 
-  const copyText = (text: string) => {
-    navigator.clipboard?.writeText(text).then(() => message.success('已复制到剪贴板')).catch(() => message.info('请手动复制'));
+  const copyText = async (text: string) => {
+    if (await copyToClipboard(text)) message.success('已复制到剪贴板');
+    else message.warning('复制失败，请选中链接手动复制');
   };
 
   const close = () => {
@@ -90,7 +93,7 @@ export default function InviteDialog({ talent, initialKind = 'written_test', ope
     onClose();
     if (finished) onCreated?.(finished); // 关闭后打开记录抽屉，保留链接入口
   };
-  const interviewerUrl = created ? `${created.url}?role=interviewer` : '';
+  const interviewerUrl = created ? interviewerInviteUrl(created.url) : '';
 
   return (
     <Modal open={open} onCancel={close} footer={null} width={560} title={created ? '邀约已创建' : `为 ${talent?.name ?? ''} 创建邀约`} destroyOnHidden>
@@ -143,6 +146,7 @@ export default function InviteDialog({ talent, initialKind = 'written_test', ope
         <Space direction="vertical" size={14} style={{ width: '100%' }}>
           <Alert type="success" showIcon message={`已创建：${created.title}`}
             description={`类型：${KIND_OPTIONS.find(o => o.value === created.type)?.label} · 状态：${created.status}${created.question_count ? ` · ${created.question_count} 题` : ''}`} />
+          {isInsecureInviteUrl(created.url) && <Alert type="warning" showIcon message="当前邀约链接不是 HTTPS" description="远程候选人的浏览器可能禁止摄像头和麦克风。请配置候选人可访问且证书受信任的 HTTPS 地址（INVITE_BASE_URL），再重新发送邀约。localhost 仅供本机测试。" />}
           <div>
             <div className="invite-form-label"><LinkOutlined /> 候选人链接（短信 / 邮件正文即此链接）</div>
             <Input.Search readOnly value={created.url} enterButton={<><CopyOutlined /> 复制</>} onSearch={() => copyText(created.url)} />

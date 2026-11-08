@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, Drawer, Empty, Input, List, Pagination, Segmented, Space, Tag, Typography, message } from 'antd';
 import { CopyOutlined, ExportOutlined, ReloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { copyToClipboard } from '../../utils/clipboard';
+import { interviewerInviteUrl } from '../../utils/media';
 import { formatApiError, invitesApi, type InviteInfo, type InviteType } from '../../services/api';
 
 const TYPE_OPTIONS = [
@@ -73,8 +75,9 @@ export default function InviteRecordsDrawer({ open, initialKeyword = '', onClose
 
   useEffect(() => { if (open) void load(); }, [open, load]);
 
-  const copy = (text: string) => {
-    navigator.clipboard?.writeText(text).then(() => message.success('已复制链接')).catch(() => message.info('请手动复制'));
+  const copy = async (text: string) => {
+    if (await copyToClipboard(text)) message.success('已复制链接');
+    else message.warning('复制失败，请选中链接手动复制');
   };
 
   const applySearch = () => { setAppliedKeyword(keyword.trim()); setPage(1); };
@@ -144,6 +147,10 @@ export default function InviteRecordsDrawer({ open, initialKeyword = '', onClose
                     <Button size="small" icon={<CopyOutlined />} onClick={() => copy(item.url)}>复制</Button>
                     <Button size="small" icon={<ExportOutlined />} href={item.url} target="_blank">打开</Button>
                   </Space.Compact>
+                  {item.type === 'interview' && <Space.Compact style={{ width: '100%', marginTop: 6 }}>
+                    <Input aria-label="面试官链接" readOnly value={interviewerInviteUrl(item.url)} size="small" style={{ fontFamily: 'monospace', fontSize: 12 }} />
+                    <Button size="small" icon={<CopyOutlined />} onClick={() => copy(interviewerInviteUrl(item.url))}>复制面试官链接</Button>
+                  </Space.Compact>}
                 </div>
               </List.Item>
             );
