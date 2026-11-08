@@ -368,17 +368,14 @@ export default function AnalyticsPage() {
 
         {view === 'report' && (
           <>
-            {/* 周期报告模式下显示月/周/年报快捷按钮 */}
+            {/* 单次分析：不显示周期按钮；周期报告：显示「更新数据」+ 周期标签 */}
             {report.report_type && (
               <div className="tal-period-bar">
-                <button className={`tal-btn ${periodType === 'weekly' ? 'tal-btn-primary' : ''}`} onClick={() => loadPeriod('weekly')} style={{ height: 30, padding: '4px 12px', fontSize: 12 }}>生成周报</button>
-                <button className={`tal-btn ${periodType === 'monthly' ? 'tal-btn-primary' : ''}`} onClick={() => loadPeriod('monthly')} style={{ height: 30, padding: '4px 12px', fontSize: 12 }}>生成月报</button>
-                <button className={`tal-btn ${periodType === 'yearly' ? 'tal-btn-primary' : ''}`} onClick={() => loadPeriod('yearly')} style={{ height: 30, padding: '4px 12px', fontSize: 12 }}>生成年报</button>
                 <button className="tal-btn" onClick={() => loadPeriod(periodType, true)} style={{ height: 30, padding: '4px 12px', fontSize: 12 }}>
-                  <ReloadOutlined style={{ marginRight: 4 }} />强制重新计算
+                  <ReloadOutlined style={{ marginRight: 4 }} />更新数据
                 </button>
                 <span className="tal-period-tag">
-                  {report.report_type === 'weekly' ? '月报' : report.report_type === 'yearly' ? '年报' : '月报'}
+                  {report.report_type === 'weekly' ? '周报' : report.report_type === 'yearly' ? '年报' : '月报'}
                 </span>
                 <span className="tal-period-date">{report.period_label || '—'}</span>
                 <span className="tal-period-date">{report.from_cache ? '缓存命中' : '本次生成'}</span>
@@ -608,7 +605,7 @@ export default function AnalyticsPage() {
               <button className="tal-btn tal-btn-primary" onClick={() => loadPeriod('weekly')}>生成周报</button>
               <button className="tal-btn tal-btn-primary" onClick={() => loadPeriod('monthly')}>生成月报</button>
               <button className="tal-btn tal-btn-primary" onClick={() => loadPeriod('yearly')}>生成年报</button>
-              <button className="tal-btn" onClick={() => loadPeriod(periodType, true)}><ReloadOutlined style={{ marginRight: 4 }} />强制重新计算（force=true）</button>
+              <button className="tal-btn" onClick={() => loadPeriod(periodType, true)}><ReloadOutlined style={{ marginRight: 4 }} />更新数据</button>
               <button className="tal-btn" onClick={() => setView('report')}>查看图表 →</button>
             </div>
 

@@ -109,6 +109,30 @@ class SqlQuerySkill(BaseSkill):
         max_rows = int(max_rows or self.default_max_rows)
         max_rows = max(1, min(max_rows, MAX_ROWS_LIMIT))
 
+        # 数据范围由上下文注入（行级权限），不接受 LLM 传入的 user_id / org_id
+        scope = {
+            "user_id": context.user_id,
+            "roles": context.roles,
+            "organization_id": context.organization_id,
+            "data_scope": context.data_scope,
+        }
+
+        # 缓存：相同 question + scope 在 TTL 内直接返回结果，避免重复调 Vanna 生成 SQL
+        # key 含 data_scope 与 user_id，保证不同权限档不会互相串数据。
+        import hashlib
+
+        cache_key_raw = f"nl2sql:{scope.get('data_scope')}:{scope.get('user_id')}:{max_rows}:{with_insight}:{question}"
+        cache_key = "nl2sql:" + hashlib.md5(cache_key_raw.encode("utf-8")).hexdigest()
+        try:
+            from app.infrastructure.cache import get_json
+
+            cached = await get_json(cache_key)
+            if isinstance(cached, dict) and cached.get("_v") == 1:
+                logger.info("sql_query 命中缓存：%s", question[:40])
+                return cached["payload"]
+        except Exception:  # noqa: BLE001
+            cached = None
+
         adapter = self._load_adapter()
         method = getattr(adapter, "ask", None) or getattr(adapter, "query", None)
         require_dependency(
@@ -117,18 +141,23 @@ class SqlQuerySkill(BaseSkill):
             hint="Vanna 组未实现 NL2SQL 适配器",
         )
 
-        # 数据范围由上下文注入（行级权限），不接受 LLM 传入的 user_id / org_id
-        scope = {
-            "user_id": context.user_id,
-            "roles": context.roles,
-            "organization_id": context.organization_id,
-            "data_scope": context.data_scope,
-        }
         result = method(question=question, user_scope=scope, max_rows=max_rows, with_insight=with_insight)
         # 兼容同步替代实现和当前异步 ask，统一拿到结果后再转成工具返回结构。
         if hasattr(result, "__await__"):
             result = await result
-        return self._shape(result, question, max_rows, with_insight)
+        payload = self._shape(result, question, max_rows, with_insight)
+
+        # 异步回写缓存（TTL 10 分钟；缓存键由 _shape 挂在 payload["_cache_key"] 上）
+        cache_key = payload.pop("_cache_key", None)
+        if cache_key:
+            try:
+                from app.infrastructure.cache import set_json
+
+                await set_json(cache_key, {"_v": 1, "payload": {**payload, "cached": True}}, ttl=600)
+            except Exception:  # noqa: BLE001
+                pass
+
+        return payload
 
     # ---------------------------------------------------------------- 内部实现
     def _guard_question(self, question: str) -> None:
@@ -201,7 +230,10 @@ class SqlQuerySkill(BaseSkill):
             payload["insight"] = data.get("insight")
         if data.get("chart"):
             payload["chart"] = data["chart"]
+        payload["cached"] = False  # 本次是实时查询结果
         logger.info("sql_query 完成：rows=%s truncated=%s", len(rows), truncated)
+        # 缓存键通过闭包挂在 payload 上，由 execute() 在异步上下文里回写缓存
+        payload["_cache_key"] = cache_key
         return payload
 
 
