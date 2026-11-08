@@ -134,6 +134,7 @@ async def test_run_revision_ingest_rebuilds_identity_from_user_id(monkeypatch):
             return False
 
     monkeypatch.setattr("app.infrastructure.database.session.session_scope", lambda: Session())
+    monkeypatch.setattr(ResumeService, "claim_revision", AsyncMock(return_value=True))
     built = AIContext(user_id=3, roles=["admin"])
     monkeypatch.setattr(resume_ingest, "load_context", AsyncMock(return_value=built))
     processed = AsyncMock(return_value={"revision_id": 77, "source_file_id": 11, "resume_id": 21,
@@ -155,6 +156,7 @@ async def test_run_revision_ingest_swallows_failures(monkeypatch):
             return False
 
     monkeypatch.setattr("app.infrastructure.database.session.session_scope", lambda: Session())
+    monkeypatch.setattr(ResumeService, "claim_revision", AsyncMock(return_value=True))
     monkeypatch.setattr(resume_ingest, "load_context", AsyncMock(return_value=AIContext(user_id=3, roles=["admin"])))
     monkeypatch.setattr(ResumeService, "process_rag_revision", AsyncMock(side_effect=RuntimeError("boom")))
     result = await resume_ingest.run_revision_ingest(77, 3)
@@ -268,3 +270,102 @@ async def test_revision_ingest_status_marks_pending_review(monkeypatch):
     assert chain["talent_id"] is None and chain["complete"] is False
     assert chain["duplicates"][0]["talent_id"] == 42
     TalentService.detail.assert_not_awaited()
+
+
+# ---------------------------------------------------------------- 回归（本轮排查发现）
+def test_ensure_derived_reports_partial_when_vector_disabled(monkeypatch):
+    """gxd-向量未启用时不能报 complete：完成口径必须和人才详情一致。
+
+    回归：画像已存在的第二次入库会走 ensure_derived 的「没有需要执行的阶段」分支，
+    原实现无条件返回 complete，而 detail() 里 index.status=disabled、complete=False，
+    同一份数据两个接口结论相反，前端会显示「已入库」但检索永远搜不到这个人。
+    """
+    import asyncio
+
+    from app.config.settings import settings
+    from app.services.talent_profile_service import TalentService
+
+    monkeypatch.setattr(settings, "MILVUS_ENABLED", False)
+    portrait = NS(version=1)
+    obj = NS(id=31, version=3)
+    service = TalentService(NS(), context=CTX)
+    service.get_talent = AsyncMock(return_value=obj)
+    service.repo.latest_portrait = AsyncMock(return_value=portrait)
+
+    result = asyncio.get_event_loop_policy().new_event_loop().run_until_complete(
+        service.ensure_derived(31))
+    assert result["actions"] == []
+    assert result["status"] == "partial"
+    assert result["index"]["status"] == "disabled"
+    assert result["message"]
+
+
+async def test_duplicate_candidates_degrades_when_semantic_search_unavailable(monkeypatch):
+    """gxd-语义查重不可用（无向量集合 / 无 Embedding 密钥）时必须降级，不能阻断入库。
+
+    回归：MilvusClient 在空集合上 search 返回 list 而不是 awaitable，`await` 抛 TypeError，
+    会让每份新简历在 finalize_parse 阶段失败 —— 自动入库全链路失效。
+    """
+    from app.config.settings import settings
+    from app.services.talent_profile_service import TalentService
+    from app.services.talent_retrieval_service import TalentRetrievalService
+
+    monkeypatch.setattr(settings, "MILVUS_ENABLED", True)
+    service = TalentService(NS(), context=CTX)
+    service.repo.get_by_mobile = AsyncMock(return_value=None)
+    monkeypatch.setattr(TalentRetrievalService, "search",
+                        AsyncMock(side_effect=TypeError("object list can't be used in 'await' expression")))
+
+    found = await service.duplicate_candidates({"basic_info": {"name": "甲"}, "skills": ["Python"]})
+    assert found == []
+
+
+async def test_claim_revision_skips_already_succeeded(monkeypatch):
+    """gxd-同一版本只处理一次：已成功 / 待复核过的不再重复解析，失败过允许重试。"""
+    service = ResumeService(NS(), context=CTX)
+    service.revision_row = AsyncMock(return_value=revision())
+
+    class Repo:
+        # claim_revision 用 model.parsed_data 组 JSON 过滤条件，这里给真实模型类
+        model = __import__("app.models.resume", fromlist=["Resume"]).Resume
+
+        async def list(self, db, **kwargs):
+            return [NS(parsed_data={"ingest": {"revision_id": 77, "status": "succeeded"}})]
+
+    service.repo = Repo()
+    # JSON 表达式在 Python 侧再确认一次，这里只验证状态判断分支
+    monkeypatch.setattr("app.repositories.knowledge_revision_repository.KnowledgeRevisionRepository.revision",
+                        AsyncMock(return_value=revision()))
+    assert await service.claim_revision(77) is False
+
+    service.repo.list = AsyncMock(return_value=[
+        NS(parsed_data={"ingest": {"revision_id": 77, "status": "failed"}})])
+    assert await service.claim_revision(77) is True
+
+
+async def test_ingest_file_rejects_resume_of_another_owner():
+    """gxd-同内容简历属于别人时不能静默复用（会把他人简历挂到本次原件上）。"""
+    service = ResumeService(NS(begin_nested=nullcontext, flush=AsyncMock()), context=CTX)
+    existing = NS(id=21, status="success", talent_id=None, created_by=99,
+                  parsed_at=None, parse_error=None, parsed_data={})
+    service.repo.get_by_hash = AsyncMock(return_value=existing)
+    service.get_resume = AsyncMock(side_effect=NotFoundError("简历不存在或无权访问"))
+
+    with pytest.raises(Exception) as excinfo:
+        await service.ingest_file(rag_file(uploader_id=3))
+    assert "其他账号" in str(getattr(excinfo.value, "message", excinfo.value))
+
+
+async def test_revision_ingest_status_falls_back_to_hash(monkeypatch):
+    """gxd-原件的 file_id 与简历行不一致时，按内容哈希回查，避免断链。"""
+    service = ResumeService(NS(flush=AsyncMock()), context=CTX)
+    service.revision_row = AsyncMock(return_value=revision())
+    service.repo.get_file = AsyncMock(return_value=rag_file())
+    service.repo.list = AsyncMock(return_value=[])
+    service.repo.get_by_hash = AsyncMock(return_value=NS(id=21, status="success", talent_id=None,
+                                                         parsed_data={"ingest": {"status": "needs_review"}}))
+    service.repo.get_scoped = AsyncMock(return_value=NS(id=21))
+    service.repo.scope = lambda context: True
+
+    chain = await service.revision_ingest_status(77)
+    assert chain["resume_id"] == 21 and chain["matched_by"] == "file_hash"

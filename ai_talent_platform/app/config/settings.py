@@ -25,10 +25,10 @@ from __future__ import annotations
 import os
 import json  # noqa: F401 - 供 .env 中 JSON 形式的配置项直接粘贴（DIFY 校验器已移除，保留导入不影响运行）
 from functools import lru_cache
-from typing import Annotated, Literal
+from typing import Literal
 
 from pydantic import Field, computed_field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict, NoDecode
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # 项目根目录：.../ai_talent_platform（本文件位于 ai_talent_platform/app/config/）
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -247,6 +247,13 @@ class Settings(BaseSettings):
     # RAG 批量和维度校验配置；实际模型维度必须与远程服务一致。
     # 补偿表初始化后启用；关闭时维持原入库行为。
     RAG_DURABLE_INGEST_ENABLED: bool = False
+    # 简历自动入库的周期性补扫：后台任务是进程内的，进程重启/任务丢失时靠它补齐。
+    # 补扫基于数据状态判断（已成功/待复核的版本不会重复处理），可安全周期执行。
+    RESUME_INGEST_SWEEP_ENABLED: bool = True
+    # 未配置向量供应商（或无 Embedding 密钥）时，是否允许仍把版本发布为「仅词法检索可用」。
+    # true：发布成功但跳过 Milvus 写入，doc.index_error 明确提示；配置密钥后重建索引即可补齐向量。
+    # false：发布直接失败（严格模式，适合必须保证语义检索可用的生产库）。
+    RAG_ALLOW_PUBLISH_WITHOUT_EMBEDDING: bool = True
     OCR_ENABLED: bool = True
     OCR_MIN_CONFIDENCE: float = Field(default=0.5, ge=0, le=1)
     OCR_MAX_PIXELS: int = Field(default=20000000, ge=1)

@@ -82,3 +82,49 @@ complete      # 画像与向量都就绪才为 true
 
 > 真实环境验完整链路需要 LLM（结构化解析 + 画像）与 Embedding 供应商；只有知识库权限、
 > 没有 `resume:parse` 的账号不会自动建模（原件照常保存，`resume_ingest.reason` 会说明原因）。
+
+---
+
+## 8. 幂等与补扫（防止重复 / 防止漏掉）
+
+| 场景 | 行为 |
+| --- | --- |
+| 同一份原件上传两次（字节相同） | 复用同一 `resume_id` / `talent_id`，只补缺失的派生阶段 |
+| 同一 revision 被重复触发（双击、批量、多 worker） | 进程内 `_inflight` 集合 + `claim_revision()` 行锁去重，模型只调用一次 |
+| 上次处理失败 | 允许重试（`claim_revision` 只在 succeeded/needs_review 时拒绝） |
+| 进程重启导致后台任务丢失 | 恢复 worker 每 60s 调 `sweep()` 补扫（`RESUME_INGEST_SWEEP_ENABLED`，默认开）；也可手动 `POST /api/v1/talents/ingest/sweep` |
+| 同内容简历属于其他账号 | 不静默复用，返回 409「相同内容的简历已由其他账号上传」；回查接口给 `needs_review` + `duplicate_of_other_owner` |
+
+补扫判定完全基于数据状态，不引入任务表：`category=resume` + 有原件 + 状态不是
+rejected/archived + 没有「succeeded/needs_review 的 ingest 记录」。
+
+## 9. 删除 / 合并后的向量一致性
+
+- `delete_talent()`：软删 MySQL 档案后按 `talent_id` 删除 Milvus 向量（失败只记日志，不回滚删除）。
+- `merge()`：源档案软删后逐个删除其向量，主档 `version+1` 后重建，避免语义检索继续召回
+  被合并掉的重复档案。
+
+## 10. Milvus 集合结构要求（上线前必查）
+
+`talent_vectors` 必须满足以下任一条，否则 `sync_index` 会给出**可执行**的报错而不是静默失败：
+
+1. 开启动态字段（推荐，`scripts/init_milvus.py` 当前定义）；或
+2. 静态 Schema 且已声明 `version` / `name` / `kind` / `updated_at`，且没有「必填但业务不写」的字段。
+
+早期版本脚本建的是「严格静态 + organization_id/status/skill_tags 必填 + 未开动态字段」，
+写入会报 `unexpected field version` / `Insert missed an field organization_id`。修复：
+
+```bash
+python scripts/init_milvus.py --replace talent_vectors --dim 1024   # 维度取 settings.EMBEDDING_DIM
+```
+
+同时校验向量维度：换 embedding 模型后维度不一致会被明确拒绝（同一条命令重建）。
+
+## 11. 降级约定（为什么不会「整条链路挂掉」）
+
+| 依赖 | 不可用时 |
+| --- | --- |
+| Milvus / Embedding | 画像照常生成；索引阶段标 `disabled`/`failed`，`status=partial`，可只补索引重试 |
+| 语义查重 | 降级为「仅手机号查重」，不阻断简历入库 |
+| 知识库发布时无 Embedding 密钥 | `RAG_ALLOW_PUBLISH_WITHOUT_EMBEDDING=true` 时发布为「仅词法检索」，`index_error` 明确提示 |
+| LLM（简历结构化/画像） | 解析失败写 `parse_error`，`processing_status=failed`，原件与版本记录照常保留 |

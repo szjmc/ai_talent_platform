@@ -32,6 +32,10 @@ from app.config.settings import settings
 from app.core.exceptions import AIError, ExternalServiceError
 from app.utils.resume_data import extract_parsed
 
+# talent_vectors 每条画像向量要携带的标量/动态字段（写入端与建集合校验共用）。
+PROFILE_METADATA_FIELDS = ("version", "name", "kind", "updated_at")
+
+
 class EvidenceCitation(BaseModel):
     model_config = ConfigDict(extra="forbid")
     chunk_id: str
@@ -119,7 +123,13 @@ class TalentRetrievalService(TalentService):
         if dim != cfg.embedding_dim:
             logging.getLogger(__name__).warning(
                 "gxd-向量维度与 talent_settings.embedding_dim 不一致 dim=%s configured=%s", dim, cfg.embedding_dim)
-        await self.vector.create_collection(cfg.collection, dim, primary_field=cfg.primary_field)
+        await self.vector.create_collection(
+            cfg.collection, dim,
+            primary_field=cfg.primary_field,
+            # 声明写入端需要携带的元数据：集合若为严格静态 Schema，先校验/补字段，
+            # 避免 upsert 时才因为「unexpected field version」整批失败。
+            metadata_fields=PROFILE_METADATA_FIELDS,
+        )
         await self.vector.upsert(
             cfg.collection,
             [int(obj.id)],
@@ -170,6 +180,20 @@ class TalentRetrievalService(TalentService):
         version = rows[0].get("version")
         result.update(indexed=True, version=int(version) if version is not None else None, status="indexed")
         return result
+
+    async def drop_index(self, talent_id):
+        """按 talent_id 删除该人才的画像向量（删档 / 合并后调用）。
+
+        集合不存在或未启用时直接返回 False，不抛异常：调用方是业务流程收尾，
+        向量清理失败不应回滚已经完成的主档操作（由调用方记录告警）。
+        """
+        if not settings.MILVUS_ENABLED:
+            return False
+        if not await self.vector.has_collection(cfg.collection):
+            return False
+        await self.vector.delete(cfg.collection, ids=[int(talent_id)])
+        logging.getLogger(__name__).info("gxd-已删除人才向量 talent_id=%s", talent_id)
+        return True
 
     async def index_state(self, obj):
         """gxd-判断某个已回表人才的向量是否与当前版本一致（missing/current/stale）。"""

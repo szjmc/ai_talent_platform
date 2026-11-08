@@ -126,6 +126,34 @@ class ResumeService:
         await self.record_ingest(result)
         return result
 
+    async def claim_revision(self, revision_id):
+        """占位式去重：同一版本只处理一次（跨 worker / 重复点击都成立）。
+
+        判断依据是「是否已经有简历行由本次 revision 触发」，不新增表也不加列：
+            - 版本不存在 -> False（不处理，交给调用方按 can_ingest 跳过）；
+            - 版本已标记 ingested_revision_id，且那次处理没有失败 -> 不再重复处理；
+            - 处理失败过则允许重试（原件已保存，重试是安全的）。
+        用 `SELECT ... FOR UPDATE` 锁版本行，让并发的两个后台任务串行进入这里。
+        """
+        from sqlalchemy import select
+        from app.models.knowledge_revision import KnowledgeRevision
+        from app.repositories.knowledge_revision_repository import KnowledgeRevisionRepository
+
+        revision = await KnowledgeRevisionRepository().revision(self.db, revision_id, lock=True)
+        if revision is None:
+            return False
+        rows = await self.repo.list(
+            self.db, filters={}, extra_where=[
+                (self.repo.model.parsed_data["ingest"]["revision_id"].as_integer() == int(revision_id))
+            ], limit=5)
+        for row in rows:
+            ingest = ((row.parsed_data or {}).get("ingest") or {})
+            if ingest.get("revision_id") != int(revision_id):
+                continue  # JSON 过滤在老 MySQL 上可能退化为前缀匹配，Python 侧再确认一次
+            if ingest.get("status") in ("succeeded", "needs_review"):
+                return False
+        return True
+
     async def revision_row(self, revision_id):
         """gxd-读取知识库版本记录（入口事实来源：category / source_file_id）。"""
         from app.repositories.knowledge_revision_repository import KnowledgeRevisionRepository
@@ -160,7 +188,13 @@ class ResumeService:
                 if row is None:
                     raise
 
-        row = await self.get_resume(row.id, lock=True)
+        try:
+            row = await self.get_resume(row.id, lock=True)
+        except NotFoundError as exc:
+            # 同哈希命中的简历行落到「当前用户数据范围之外」：不能把别人的简历档案
+            # 静默挂到本次上传的原件上（候选人数据属于上传人），也不要假装是 404。
+            # 数据范围内的复用（超管 / 全部范围 / 同人才范围）不受影响。
+            raise DuplicateError("相同内容的简历已由其他账号上传，请联系管理员核对后处理") from exc
         # 已绑定人才但派生资料没补齐（例如上次索引失败）：只补缺失阶段，不重复解析。
         if row.status == "success" and row.talent_id:
             result = self.parse_result_data(row)
@@ -247,12 +281,29 @@ class ResumeService:
         }
         if file is None:
             return chain
+        # 简历行只有一个 file_id，但同一份字节可能先由「普通简历上传」或他人从知识库上传过：
+        # 这时按 file_id 查只会得到空结果，回查就断链了。先按 file_id 找，
+        # 找不到再按内容哈希找（哈希全表唯一），保证 revision -> resume 一定能对上。
         rows = await self.repo.list(
             self.db, filters={"file_id": file.id}, extra_where=[self.repo.scope(self.context)], limit=1)
+        matched_by = "file_id"
+        if not rows and getattr(file, "file_hash", None):
+            row = await self.repo.get_by_hash(self.db, file.file_hash.lower())
+            if row is not None:
+                if await self.repo.get_scoped(self.db, row.id, self.context):
+                    rows, matched_by = [row], "file_hash"
+                else:
+                    # 同内容简历属于其他账号：不返回该简历的任何标识，但要让调用方知道
+                    # 「不是没处理，而是需要人工核对」，避免长期停在 not_started。
+                    chain["processing_status"] = "needs_review"
+                    chain["reason"] = "duplicate_of_other_owner"
+                    chain["message"] = "相同内容的简历已由其他账号上传，请联系管理员核对"
+                    return chain
         if not rows:
             chain["processing_status"] = "not_ingested"
             return chain
         row = rows[0]
+        chain["matched_by"] = matched_by
         ingest = (row.parsed_data or {}).get("ingest") or {}
         chain.update(
             resume_id=row.id,

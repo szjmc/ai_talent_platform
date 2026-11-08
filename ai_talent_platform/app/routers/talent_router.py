@@ -8,7 +8,7 @@
 会把模块 docstring 提前闭合，导致「、」被当成代码 → 整个应用 import 失败。
 此处合并为单个 docstring，并补上守门测试要求的「标签：」行。
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.core.dependencies import CurrentUser, DbSession, require_permission
 from app.core.pagination import PageParams
@@ -70,6 +70,17 @@ async def revision_ingest_status(revision_id: int, service=Depends(get_resume_se
     疑似重复的简历在这里返回 processing_status=needs_review 与 duplicates，不会自动合并。
     """
     return success(data=await service.revision_ingest_status(revision_id))
+
+@router.post("/ingest/sweep", summary="补扫漏掉的简历自动入库", response_model=ApiResponse[dict], dependencies=[Depends(require_permission("talent:update"))])
+async def sweep_resume_ingest(limit: int = Query(10, ge=1, le=50)):
+    """gxd-按数据状态补处理「原件已提交但还没入库成功」的简历版本（幂等）。
+
+    上传后的自动解析是进程内后台任务，进程重启或任务取消会丢一次调度；这里按
+    版本状态重新排队，已成功/待复核的不会重复解析。正常情况由恢复 worker 自动执行，
+    此接口供运维手动触发（需要 talent:update 权限）。
+    """
+    from app.services.resume_ingest import sweep
+    return success(data=await sweep(limit=limit))
 
 @router.post("/merge", summary="确认合并重复人才", response_model=ApiResponse[dict], dependencies=[Depends(require_permission("talent:update"))])
 async def merge_talent(data: TalentMergeRequest, service: TalentService = Depends(get_service)):

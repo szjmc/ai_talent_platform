@@ -56,7 +56,11 @@ class _FakeMilvus:
         primary = options.get("primary_field_name") or "id"
         return {"fields": [{"name": primary, "is_primary": True},
                            {"name": "vector", "params": {"dim": options.get("dimension")}}],
-                "enable_dynamic_field": True}
+                "enable_dynamic_field": bool(options.get("enable_dynamic_field", True))}
+
+    def add_collection_field(self, collection_name, field_name, data_type, nullable=True):
+        # Milvus Lite / 老版本 Milvus 不支持在线加字段（UNIMPLEMENTED）
+        raise NotImplementedError("add_collection_field")
 
     def _primary(self, collection_name):
         return self.collections[collection_name].get("primary_field_name") or "id"
@@ -89,8 +93,9 @@ class _FakeMilvus:
                 hits.append({"id": pk, "distance": 0.5, "entity": entity})
         return [hits[:limit]]
 
-    def delete(self, collection_name, id=None, filter=None):
-        for pk in id or []:
+    def delete(self, collection_name, ids=None, filter=None):
+        # MilvusClient 的参数名是 ids；写成 id= 会被当作 filter 表达式（实测直接抛错）
+        for pk in ids or []:
             self.rows[collection_name].pop(pk, None)
 
     def drop_collection(self, collection_name):
@@ -150,3 +155,84 @@ async def test_talent_vectors_primary_field_talent_id(monkeypatch):
     client.rows["legacy_collection"] = {}
     with pytest.raises(module.TalentVectorUnavailableError):
         await store.create_collection("legacy_collection", 2, primary_field="talent_id")
+
+
+# ---------------------------------------------------------------- 本轮修复的回归
+class _DeleteRecorder:
+    """记录 delete 调用参数的替身（校验删档/合并后真的按 talent_id 删了向量）。"""
+
+    def __init__(self, rows=None):
+        self.deleted = []
+        self._rows = rows or {}
+
+    def has_collection(self, name):
+        return True
+
+    def delete(self, collection_name, ids=None, filter=None):
+        self.deleted.append({"collection": collection_name, "ids": ids, "filter": filter})
+        return list(ids or [])
+
+    def query(self, collection_name, filter, output_fields, limit):
+        return []
+
+
+async def test_drop_index_deletes_by_talent_id(monkeypatch):
+    """gxd-删档 / 合并后必须按 talent_id 删除向量，不能只软删 MySQL。"""
+    from app.config.settings import settings
+    from app.services.talent_retrieval_service import TalentRetrievalService
+
+    from app.ai.context import AIContext
+    from app.config.talent_config import talent_settings
+
+    monkeypatch.setattr(settings, "MILVUS_ENABLED", True)
+    client = _DeleteRecorder()
+    store = TalentVectorStore()
+    monkeypatch.setattr(store, "_client", lambda: client)
+    service = TalentRetrievalService(None, context=AIContext(user_id=1, roles=["admin"]), vector=store)
+
+    assert await service.drop_index(7) is True
+    # MilvusClient.delete 的关键字是 ids；写成 id= 会被当成 filter 表达式（实测抛错）
+    assert client.deleted == [{"collection": talent_settings.collection, "ids": [7], "filter": None}]
+
+
+async def test_create_collection_enables_dynamic_field(monkeypatch):
+    """gxd-新建集合必须开启动态字段：画像向量会带 version/kind/name/updated_at。
+
+    回归：脚本旧定义建的是严格静态 Schema，写 version 直接报
+    DataNotMatchException「unexpected field version」，整条索引链路失败。
+    """
+    import app.adapters.vector_store.talent_vector_store as module
+
+    client = _FakeMilvus()
+    monkeypatch.setattr(module, "_get_client", lambda: client)
+    store = module.TalentVectorStore()
+    await store.create_collection("talent_vectors", 4, primary_field="talent_id",
+                                  metadata_fields=("version", "name", "kind", "updated_at"))
+    assert client.collections["talent_vectors"]["enable_dynamic_field"] is True
+    assert client.collections["talent_vectors"]["primary_field_name"] == "talent_id"
+
+
+async def test_create_collection_rejects_static_schema_and_dim_mismatch(monkeypatch):
+    """gxd-旧静态集合 / 维度不符时明确报错并给出修复命令，而不是等到 upsert 才失败。"""
+    import app.adapters.vector_store.talent_vector_store as module
+
+    class StaticClient(_FakeMilvus):
+        def create_collection(self, collection_name, **kwargs):
+            # 模拟脚本旧定义：没有开启动态字段
+            self.collections[collection_name] = {**kwargs, "enable_dynamic_field": False}
+            self.rows[collection_name] = {}
+
+        def add_collection_field(self, *args, **kwargs):
+            raise NotImplementedError("Milvus Lite 不支持在线加字段")
+
+    client = StaticClient()
+    monkeypatch.setattr(module, "_get_client", lambda: client)
+    store = module.TalentVectorStore()
+    await store.create_collection("legacy", 4, primary_field="talent_id")
+    with pytest.raises(module.TalentVectorUnavailableError) as excinfo:
+        await store.create_collection("legacy", 4, primary_field="talent_id",
+                                      metadata_fields=("version",))
+    assert "--replace" in str(excinfo.value)
+    with pytest.raises(module.TalentVectorUnavailableError) as excinfo:
+        await store.create_collection("legacy", 8, primary_field="talent_id")
+    assert "维度" in str(excinfo.value)

@@ -210,13 +210,29 @@ class TalentService:
         return obj
 
     async def delete_talent(self, talent_id):
-        """gxd-使用原有字段逻辑删除，检索回表后立即排除；不依赖向量清理任务。"""
+        """gxd-逻辑删除档案，并同步删除该人才的画像向量。
+
+        检索侧虽然会回表排除已删除档案，但向量留着有两个问题：
+            1. Milvus 里永久堆积「永远召不回」的行，集合越来越大；
+            2. 同一份简历后续重新入库若复用了同一个 talent_id（自增不会复用，
+               但手工/数据迁移会），会读到别人的旧版本向量。
+        所以删除时直接按 talent_id 删除向量；Milvus 不可用只记日志，不影响删除本身。
+        """
+        from app.config.settings import settings
+        from app.services.talent_retrieval_service import TalentRetrievalService
         self.context.require_permission("talent:delete")
         obj = await self.get_talent(talent_id, lock=True)
         obj.mobile = None
         obj.soft_delete()
         obj.version += 1
         await self.db.flush()
+        if settings.MILVUS_ENABLED:
+            try:
+                await TalentRetrievalService(
+                    self.db, context=self.context).drop_index(talent_id)
+            except Exception as exc:  # noqa: BLE001 - 向量清理失败不能回滚业务删除
+                logging.getLogger(__name__).warning(
+                    "gxd-删除人才后清理向量失败 talent_id=%s type=%s", talent_id, type(exc).__name__)
 
     async def refresh_derived(self, talent_id, *, portrait=True):
         """gxd-请求内刷新派生资料；AI故障回滚本阶段并返回提示，保留已保存主档。
@@ -307,9 +323,25 @@ class TalentService:
 
         actions = [name for name, needed in (("portrait", need_portrait), ("index", need_index)) if needed]
         if not actions:
-            current = {"talent_id": talent_id, "actions": [], "status": "complete",
-                       "portrait": {"status": "skipped", "version": getattr(portrait, "version", None)},
-                       "index": {"status": "skipped", "version": getattr(obj, "version", None)}}
+            # 完成口径必须与 detail() 一致：画像在 MySQL、向量为当前版本。
+            # 不能因为「这次没有需要执行的阶段」就无条件报 complete —— 否则 Milvus 关闭
+            # （或集合还没建）的部署里，第二份及以后的简历都会显示成功，但检索永远搜不到。
+            if not settings.MILVUS_ENABLED:
+                index_part = {"status": "disabled", "message": "Milvus未启用，向量尚未同步"}
+            else:
+                index_part = {"status": "skipped", "version": getattr(obj, "version", None),
+                              "message": "向量已是当前版本，无需重建"}
+            current = {
+                "talent_id": talent_id,
+                "actions": [],
+                "status": "complete" if (portrait is not None and index_part["status"] == "skipped") else (
+                    "partial" if (portrait is not None or index_part["status"] == "skipped") else "failed"),
+                "portrait": {"status": "skipped", "version": getattr(portrait, "version", None)},
+                "index": index_part,
+                "index_state": state,
+            }
+            if current["status"] != "complete":
+                current["message"] = self.derived_message(current)
             self.last_refresh = current
             return current
 
@@ -372,14 +404,31 @@ class TalentService:
                 found.append({"talent_id": row.id, "name": row.name, "reason": "mobile", "same_name": row.name == basic.get("name")})
             else:
                 return [{"reason": "restricted_identity_conflict", "requires_review": True}]
+        # 语义查重只是「加分项」：Milvus/Embedding 任何不可用都必须降级为「仅手机号查重」，
+        # 否则每份新简历都会在 finalize_parse 里抛错 —— 表现为自动入库全部失败。
+        # 这里必须连同 embeddings 一起兜住（无密钥时 Embedding 会抛 AIError）。
         from app.config.settings import settings
         if settings.MILVUS_ENABLED:
-            from app.services.talent_retrieval_service import TalentRetrievalService
-            from app.schemas.talent import TalentSemanticSearchRequest
             from app.config.talent_config import talent_settings
+            from app.schemas.talent import TalentSemanticSearchRequest
+            from app.services.talent_retrieval_service import TalentRetrievalService
+
             query = " ".join(parsed.get("skills", [])) or basic.get("current_position") or basic.get("name") or "人才"
-            result = await TalentRetrievalService(self.db, context=self.context).search(TalentSemanticSearchRequest(query=query, top_k=5), interpret=False)
-            found.extend({"talent_id": x["talent_id"], "name": x["name"], "score": x["score"], "reason": "semantic", "requires_review": True} for x in result["items"] if x["score"] >= (threshold if threshold is not None else talent_settings.duplicate_threshold) and not any(y.get("talent_id") == x["talent_id"] for y in found))
+            try:
+                result = await TalentRetrievalService(
+                    self.db, context=self.context).search(
+                        TalentSemanticSearchRequest(query=query, top_k=5), interpret=False)
+            except Exception as exc:  # noqa: BLE001 - 语义查重在人工复核流程之前，不能阻断入库
+                logging.getLogger(__name__).warning(
+                    "gxd-语义查重不可用，降级为手机号查重 type=%s", type(exc).__name__)
+                result = {"items": []}
+            limit = threshold if threshold is not None else talent_settings.duplicate_threshold
+            found.extend(
+                {"talent_id": x["talent_id"], "name": x["name"], "score": x["score"],
+                 "reason": "semantic", "requires_review": True}
+                for x in result.get("items") or []
+                if x.get("score", 0) >= limit
+                and not any(y.get("talent_id") == x["talent_id"] for y in found))
         return found
 
     async def merge(self, data):
@@ -417,5 +466,16 @@ class TalentService:
                 await self.db.flush()
         except IntegrityError as exc:
             raise DuplicateError("关联记录存在唯一冲突，合并已回滚，请先处理冲突记录") from exc
+        # 源档案已软删除：其向量必须清掉（否则检索仍会命中被合并掉的重复档案）。
+        from app.config.settings import settings
+        if settings.MILVUS_ENABLED:
+            from app.services.talent_retrieval_service import TalentRetrievalService
+            retrieval = TalentRetrievalService(self.db, context=self.context)
+            for source_id in data.source_ids:
+                try:
+                    await retrieval.drop_index(source_id)
+                except Exception as exc:  # noqa: BLE001 - 清理失败不回滚已完成的合并
+                    logging.getLogger(__name__).warning(
+                        "gxd-合并后清理源档案向量失败 talent_id=%s type=%s", source_id, type(exc).__name__)
         refresh = await self.refresh_derived(target.id)
         return {"target_id": target.id, "source_ids": data.source_ids, "conflicts": conflicts, "refresh": refresh}
