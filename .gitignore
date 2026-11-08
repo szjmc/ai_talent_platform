@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 .venv-docs/
 .docx_env/
+.perf_env/
 
 # Generated project-documentation artifacts (reproducible via tools/project_docs)
 deliverables/

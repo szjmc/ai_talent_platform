@@ -1,0 +1,27 @@
+[
+  {
+    "target": "mysql",
+    "name": "talents_page",
+    "sql": "SELECT id, name, status FROM talents WHERE is_deleted=0 ORDER BY id DESC LIMIT 20"
+  },
+  {
+    "target": "mysql",
+    "name": "talents_deep_offset",
+    "sql": "SELECT id, name FROM talents WHERE is_deleted=0 ORDER BY id DESC LIMIT 20 OFFSET 10000"
+  },
+  {
+    "target": "mysql",
+    "name": "matching_records_by_position",
+    "sql": "SELECT * FROM matching_records WHERE position_id=1 ORDER BY created_at DESC LIMIT 20"
+  },
+  {
+    "target": "pg",
+    "name": "analytics_distribution",
+    "sql": "SELECT education, count(*) FROM dim_talent_wide GROUP BY education"
+  },
+  {
+    "target": "pg",
+    "name": "analytics_trend",
+    "sql": "SELECT snapshot_month, count(*) FROM fact_talent_snapshot GROUP BY snapshot_month ORDER BY snapshot_month"
+  }
+]
