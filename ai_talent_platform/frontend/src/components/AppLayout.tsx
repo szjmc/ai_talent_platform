@@ -5,7 +5,7 @@ import {
   ApartmentOutlined, AuditOutlined, BarChartOutlined, BellOutlined, BookOutlined,
   DashboardOutlined, DatabaseOutlined, FileSearchOutlined, FileTextOutlined, FolderOpenOutlined,
   MenuFoldOutlined, MenuUnfoldOutlined, NodeIndexOutlined, QuestionCircleOutlined, RobotOutlined,
-  SearchOutlined, SettingOutlined, SolutionOutlined, TeamOutlined, ThunderboltOutlined, UserOutlined,
+  SearchOutlined, SettingOutlined, SolutionOutlined, TeamOutlined, ThunderboltOutlined, UserOutlined, VideoCameraOutlined,
   DownOutlined, LogoutOutlined, LockOutlined, CheckCircleFilled,
 } from '@ant-design/icons';
 import { useAuth } from '../store/AuthContext';
@@ -27,6 +27,7 @@ const menuGroups = [
   ]},
   { type: 'group' as const, label: '人才发展', children: [
     { key: '/assessments', icon: <FileTextOutlined/>, label: '智能测评' },
+    { key: '/ai-interviews', icon: <VideoCameraOutlined/>, label: 'AI 数字人面试' },
     { key: '/trainings', icon: <BookOutlined/>, label: '培训发展' },
   ]},
   { type: 'group' as const, label: '智能应用', children: [
@@ -42,13 +43,14 @@ const menuGroups = [
 ];
 const permissionByPath: Record<string, string> = {
   '/assistant': 'agent:use', '/talents': 'talent:read', '/positions': 'position:read', '/resumes': 'talent:read',
-  '/matchings': 'matching:read', '/assessments': 'assessment:read', '/trainings': 'training:read',
+  '/matchings': 'matching:read', '/assessments': 'assessment:read', '/ai-interviews': 'ai_interview:read', '/trainings': 'training:read',
   '/knowledge': 'knowledge:read', '/analytics': 'analytics:read', '/organizations': 'organization:read',
   '/users': 'user:read', '/audit': 'audit:read',
 };
 const searchItems = [
   { title: '人才驾驶舱', path: '/dashboard', type: '页面' }, { title: '人才档案', path: '/talents', type: '页面' },
   { title: '岗位管理', path: '/positions', type: '页面' }, { title: '人岗匹配', path: '/matchings', type: '页面' },
+  { title: 'AI 数字人面试', path: '/ai-interviews', type: '页面' },
   { title: '数据洞察', path: '/analytics', type: '页面' }, { title: '用户与权限', path: '/users', type: '页面' },
 ];
 

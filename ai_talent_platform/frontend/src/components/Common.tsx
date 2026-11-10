@@ -26,6 +26,7 @@ export function StatusBadge({ status }: { status: string }) {
     active: ['success', '在职'], open: ['success', '招聘中'], success: ['success', '成功'], indexed: ['success', '已索引'], scored: ['success', '已评分'], completed: ['success', '已完成'], enabled: ['success', '已启用'],
     reserve: ['info', '人才储备'], parsing: ['info', '解析中'], indexing: ['info', '索引中'], in_progress: ['info', '作答中'], submitted: ['info', '评分中'], running: ['info', '执行中'], paused: ['warning', '已暂停'], pending: ['warning', '待开始'], uploaded: ['warning', '待解析'],
     left: ['default', '已离职'], closed: ['default', '已关闭'], disabled: ['default', '已停用'], failed: ['error', '失败'], error: ['error', '异常'],
+    cancelled: ['default', '已取消'], canceled: ['default', '已取消'], expired: ['warning', '已过期'],
   };
   const [type, text] = map[status] || ['default', status];
   return <span className={`status-badge ${type}`}>{text}</span>;

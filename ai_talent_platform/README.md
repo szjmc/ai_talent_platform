@@ -6,14 +6,15 @@
 > 数据库说明：**不使用 SQLite**。业务主数据走 MySQL（`mysql+aiomysql`），
 > 海量履历/测评历史/分析宽表走 PgSQL（`postgresql+asyncpg`，也是 Vanna NL2SQL 的查询库）。
 
-当前进度：**公共层（P0）已完成并通过验收**，认证、用户、组织三大模块可跑通；
-ORM 层已完整落地：MySQL 25 张业务表 + PgSQL 6 张分析表，全局映射见 `docs/orm_mapping.md`；
+当前进度：**公共层（P0）已完成并通过验收**；总路由已实现 20 个业务模块
+（认证、用户、组织、智能体、AI 数字人面试、人才、分析、知识库、简历、问答、RAG、Dify、岗位、匹配、培训、测评、邀约、文件、审计等）；
+ORM 层已完整落地：MySQL 业务表（含 AI 面试 2 张）+ PgSQL 6 张分析表，全局映射见 `docs/orm_mapping.md`；
 架构组（AI 公共层 + Skills + 集成）已完整落地：LLM 适配器（qwen / OpenAI / DeepSeek / Ollama，模型全部配置驱动）
 / LLMManager / Agent 基类与调度 / 上下文 / 记忆 / 文件存储（本地 / MinIO / 阿里云 OSS / S3）/ 事件总线 / 匹配策略，
 见 `docs/plan/05-代码标签与优先级总表.md` 与 `docs/storage_and_llm_adapters.md`；全局 ORM 映射由 `python scripts/dump_orm_mapping.py` 自动生成；
 PgSQL 分析库另有独立初始化脚本 `scripts/init_pgsql.py`（含分区父表和 DEFAULT 分区，数据同步/ETL 仍未实现）；
-其余业务模块（人才、分析已实现；岗位、简历、测评、培训、匹配、知识库、文件等）已建好骨架，
-每个文件开头写明实现思路与待写代码，按 TODO 补齐即可。
+AI 数字人面试提供「创建 → 候选人 token 链接 → 数字人提问/追问 → 语音或文字作答 → 规则量化评分 → HR 报告」闭环，
+见 [docs/ai_interview.md](docs/ai_interview.md)。
 
 ---
 
@@ -66,6 +67,7 @@ python main.py                # http://127.0.0.1:8000/docs
 | **[docs/storage_and_llm_adapters.md](docs/storage_and_llm_adapters.md)** | **对象存储与多模型适配手册**：MinIO / 阿里云 OSS / DeepSeek 配置、预签名下载、模型按用途选择与降级、扩展新厂商 |
 | [docs/architecture.md](docs/architecture.md) | 六层架构图（**内联 SVG，离线可打开**）、依赖规则、调用链路 |
 | [docs/development.md](docs/development.md) | 开发规范与五大组协作约定 |
+| **[docs/ai_interview.md](docs/ai_interview.md)** | **AI 数字人面试**：状态机、数字人设定、评分公式、HR/候选人接口、前端页面、配置与隐私说明 |
 | [docs/api_document.md](docs/api_document.md) | **接口契约（全模块）**：统一响应/错误码/JWT/RBAC 权限矩阵 + 15 个模块的 method/path/权限/请求字段/示例/错误码 |
 | [docs/database_design.md](docs/database_design.md) | **数据库设计（完整明确）**：内联 SVG ER 图 + 25 张表字段字典 + 可直接执行的 MySQL 8 DDL + PgSQL/Milvus/Redis 设计 |
 | [docs/orm_mapping.md](docs/orm_mapping.md) | **全局 ORM 映射字典**：MySQL 25 张表 + PgSQL 6 张表自动导出清单 |
@@ -112,9 +114,10 @@ config    → 配置：settings / logging / prompt
 | 用户 | `GET/POST /api/v1/users` `GET/PUT/DELETE /api/v1/users/{id}` `PATCH /{id}/status` `PUT /{id}/roles` `POST /{id}/reset-password` |
 | 组织 | `GET /api/v1/organizations/tree` `GET/POST /api/v1/organizations` `GET/PUT/DELETE /{id}` `PATCH /{id}/move` |
 | 智能体 | `GET /api/v1/agents` `POST /api/v1/agents/chat` `POST /api/v1/agents/chat/stream` `GET /api/v1/agents/conversations` `GET /api/v1/agents/conversations/{id}/messages` `POST /api/v1/agents/tasks` `GET /api/v1/agents/tasks/{task_id}` |
+| AI 数字人面试 | `GET /api/v1/ai-interviews/config` `GET/POST /api/v1/ai-interviews` `GET /api/v1/ai-interviews/{id}` `GET /{id}/report` `POST /{id}/cancel`；公开：`GET/POST /api/v1/ai-interviews/session/{token}` `/start` `/answer` `/repeat` `/finish` |
 | 系统 | `GET /api/v1/system/info` |
 
-其余 8 个模块当前为占位路由（返回 501 + 主责研发组提示，见 `data.owner`），实现后替换 `app/routers/router.py` 中的 include 即可。
+当前无占位模块：`app/routers/router.py` 注册的 20 个模块均已实现（占位路由机制保留，便于后续扩展）。
 
 
 ## 目录速览

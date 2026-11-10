@@ -167,3 +167,78 @@ export interface PeriodReportResponse {
   report_type: string; period_label: string; from_cache: boolean; period_updated_at?: string;
   source?: string;
 }
+
+/* ======================= AI 数字人面试 [Agent组] ======================= */
+export interface AiInterviewPersona {
+  key: string; name: string; title: string; style: string; tagline?: string;
+  avatar_theme: string; language: string; voice_hint?: string;
+}
+export interface AiInterviewSession {
+  id: number; talent_id?: number | null; position_id?: number | null; invitation_id?: number | null;
+  assessment_id?: number | null; token: string; url: string; title: string;
+  candidate_name: string; candidate_email?: string | null; position_title?: string | null;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'expired';
+  difficulty: string; question_count: number; duration_minutes: number; language: string;
+  interviewer: AiInterviewPersona; answered_count: number;
+  total_score?: number | null; level?: string | null; recommendation?: string | null;
+  recommendation_label?: string | null; started_at?: string | null; finished_at?: string | null;
+  expires_at?: string | null; created_at?: string | null;
+}
+export interface AiInterviewTurn {
+  id?: number; seq: number; role: 'interviewer' | 'candidate' | string; kind: string;
+  question_index?: number | null; dimension?: string | null; content: string;
+  input_mode?: string | null; duration_seconds: number; score?: number | null;
+  signals?: Record<string, unknown> | null; feedback?: string | null; created_at?: string | null;
+}
+export interface AiInterviewPerQuestion {
+  index?: number; question: string; dimension?: string; dimension_label?: string;
+  answer?: string; score?: number | null; feedback?: string;
+  signals?: { keywords_hit?: string[]; numbers?: string[]; chinese_chars?: number; english_words?: number; structure_markers?: string[]; [key: string]: unknown };
+}
+export interface AiInterviewReport {
+  total_score: number; level: string; recommendation: string; recommendation_label: string;
+  dimension_scores: Record<string, number | null>; dimension_labels: Record<string, string>;
+  dimension_weights?: Record<string, number>; question_count: number; answered_count: number;
+  completion_rate: number; per_question: AiInterviewPerQuestion[];
+  strengths: string[]; weaknesses: { dimension?: string; label?: string; score?: number; gap?: string }[];
+  suggestions: string[]; summary: string; scoring_method: string; prompt_version?: string;
+  generated_at?: string; integrity?: Record<string, unknown>; observations?: string[];
+}
+export interface AiInterviewDetail extends AiInterviewSession {
+  plan: { id: number; text: string; dimension: string; intent?: string; keywords?: string[]; follow_up?: string; weight?: number }[];
+  turns: AiInterviewTurn[];
+  report?: AiInterviewReport | null;
+}
+export interface AiInterviewQuestion {
+  index: number; text: string; kind: 'main' | 'follow_up';
+  dimension: string; dimension_label: string; intent?: string;
+}
+export interface AiInterviewPublicState {
+  token: string; title: string; status: 'pending' | 'in_progress' | 'completed' | 'cancelled' | 'expired';
+  candidate_name: string; position_title?: string | null; language: string; difficulty: string;
+  duration_minutes: number; question_count: number; interviewer: AiInterviewPersona;
+  greeting: string; started_at?: string | null; finished_at?: string | null; deadline?: string | null;
+  progress: { answered: number; total: number; percent: number; current_index: number; remaining_seconds?: number | null };
+  current_question?: AiInterviewQuestion | null;
+  transcript: { seq: number; role: string; kind: string; content: string; created_at?: string | null }[];
+  result?: {
+    total_score: number; level: string; recommendation?: string; recommendation_label?: string;
+    dimension_scores: Record<string, number | null>; dimension_labels: Record<string, string>;
+    answered_count: number; question_count: number; completion_rate: number;
+    summary: string; strengths: string[]; weaknesses: { label?: string; score?: number; gap?: string }[];
+    suggestions: string[]; per_question: { index: number; question: string; dimension_label: string; score: number | null; feedback: string }[];
+    scoring_method: string;
+  } | null;
+  server_time?: string | null;
+}
+export interface AiInterviewAnswerResult {
+  accepted: boolean; completed: boolean; timed_out: boolean; interviewer_reply: string;
+  follow_up: boolean; next_question?: AiInterviewQuestion | null;
+  progress: AiInterviewPublicState['progress']; state: AiInterviewPublicState;
+  result?: AiInterviewPublicState['result'] | null;
+}
+export interface AiInterviewConfig {
+  personas: AiInterviewPersona[]; default_question_count: number; max_question_count: number;
+  default_duration_minutes: number; default_expires_hours: number;
+  languages: { value: string; label: string }[]; difficulties: { value: string; label: string }[];
+}

@@ -26,6 +26,7 @@ from app.models.base import (
 )
 
 # ------------------------------------------------------------------ 业务模型（MySQL）
+from app.models.ai_interview import AiInterviewSession, AiInterviewTurn  # noqa: E402
 from app.models.assessment import (  # noqa: E402
     Assessment,
     AssessmentAnswer,
@@ -113,6 +114,9 @@ __all__ = [
     "AssessmentQuestion",
     "AssessmentAnswer",
     "AssessmentResult",
+    # AI 数字人面试（新建表）
+    "AiInterviewSession",
+    "AiInterviewTurn",
     # 培训
     "Course",
     "TrainingPlan",

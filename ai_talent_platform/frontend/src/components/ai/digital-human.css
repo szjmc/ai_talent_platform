@@ -1,0 +1,201 @@
+/* AI 数字人面试官形象（仅作用于 .dh-* 命名空间，避免影响平台其它页面） */
+.dh-stage {
+  position: relative;
+  width: var(--dh-size, 260px);
+  max-width: 100%;
+  aspect-ratio: 260 / 300;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  isolation: isolate;
+  flex: none;
+}
+.dh-aurora {
+  position: absolute;
+  inset: 4% 6% 12%;
+  border-radius: 50% 50% 42% 42%;
+  background:
+    radial-gradient(60% 55% at 50% 32%, var(--dh-glow), transparent 70%),
+    radial-gradient(70% 60% at 32% 72%, rgba(255, 255, 255, .18), transparent 65%);
+  filter: blur(14px);
+  opacity: .9;
+  z-index: 0;
+  animation: dh-breathe 7s ease-in-out infinite;
+}
+.dh-ring {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  translate: -50% -50%;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--dh-a) 42%, transparent);
+  z-index: 0;
+  pointer-events: none;
+}
+.dh-ring-1 { width: 74%; aspect-ratio: 1; animation: dh-spin 26s linear infinite; border-style: dashed; opacity: .7; }
+.dh-ring-2 { width: 92%; aspect-ratio: 1; animation: dh-spin-reverse 38s linear infinite; opacity: .35; }
+.dh-ring-1::after,
+.dh-ring-2::after {
+  content: '';
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dh-a);
+  box-shadow: 0 0 12px var(--dh-glow);
+  top: 12%;
+  left: 14%;
+}
+.dh-particles { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.dh-particles i {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--dh-a) 80%, #fff);
+  opacity: .55;
+  animation: dh-float 8s ease-in-out infinite;
+}
+.dh-particles i:nth-child(1) { left: 18%; top: 26%; animation-delay: -1s; }
+.dh-particles i:nth-child(2) { right: 14%; top: 32%; animation-delay: -3s; }
+.dh-particles i:nth-child(3) { left: 9%; top: 58%; animation-delay: -5s; }
+.dh-particles i:nth-child(4) { right: 8%; top: 62%; animation-delay: -2s; }
+.dh-particles i:nth-child(5) { left: 30%; top: 12%; animation-delay: -6s; }
+.dh-particles i:nth-child(6) { right: 27%; top: 8%; animation-delay: -4s; }
+
+.dh-figure {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 20px 32px rgba(12, 22, 48, .28));
+  animation: dh-idle-bob 6.5s ease-in-out infinite;
+  transform-origin: 50% 90%;
+}
+.dh-eye { animation: dh-blink 5.4s infinite; }
+.dh-mouth { transform-box: fill-box; }
+.dh-speaking .dh-mouth { animation: dh-talk .34s ease-in-out infinite; }
+.dh-speaking .dh-figure { animation-duration: 2.6s; }
+.dh-listening .dh-figure { animation: dh-listen 2.4s ease-in-out infinite; }
+.dh-listening .dh-ring-1 { animation-duration: 9s; opacity: 1; }
+.dh-thinking .dh-ring-2 { animation-duration: 7s; opacity: .8; }
+.dh-done .dh-figure { filter: drop-shadow(0 20px 32px rgba(12, 22, 48, .2)) grayscale(.12); }
+
+.dh-waveform {
+  position: absolute;
+  left: 50%;
+  bottom: 38px;
+  translate: -50% 0;
+  z-index: 3;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 26px;
+  opacity: 0;
+  transition: opacity .25s;
+}
+.dh-waveform i { width: 3px; height: 6px; border-radius: 3px; background: linear-gradient(180deg, #fff, var(--dh-a)); }
+.dh-speaking .dh-waveform,
+.dh-listening .dh-waveform { opacity: .9; }
+.dh-speaking .dh-waveform i { animation: dh-wave .7s ease-in-out infinite; }
+.dh-speaking .dh-waveform i:nth-child(2) { animation-delay: .08s; }
+.dh-speaking .dh-waveform i:nth-child(3) { animation-delay: .16s; }
+.dh-speaking .dh-waveform i:nth-child(4) { animation-delay: .05s; }
+.dh-speaking .dh-waveform i:nth-child(5) { animation-delay: .2s; }
+.dh-speaking .dh-waveform i:nth-child(6) { animation-delay: .12s; }
+.dh-speaking .dh-waveform i:nth-child(7) { animation-delay: .02s; }
+.dh-listening .dh-waveform i { animation: dh-listen-wave 1.1s ease-in-out infinite; background: linear-gradient(180deg, #fff, #43d6a0); }
+.dh-listening .dh-waveform i:nth-child(2n) { animation-delay: .2s; }
+.dh-listening .dh-waveform i:nth-child(3n) { animation-delay: .38s; }
+
+.dh-status {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  translate: -50% 0;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgba(12, 20, 40, .62);
+  color: #eaf0ff;
+  font-size: 11px;
+  letter-spacing: .2px;
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, .14);
+  white-space: nowrap;
+}
+.dh-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dh-a);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dh-a) 22%, transparent);
+}
+.dh-speaking .dh-status-dot { animation: dh-pulse 1s infinite; }
+.dh-listening .dh-status-dot { background: #43d6a0; animation: dh-pulse 1.2s infinite; }
+
+.dh-nameplate {
+  position: absolute;
+  right: 2px;
+  bottom: 40px;
+  z-index: 4;
+  text-align: right;
+  color: #f4f7ff;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, .4);
+  display: none;
+}
+.dh-nameplate strong { display: block; font-size: 12px; letter-spacing: .4px; }
+.dh-nameplate span { font-size: 9px; opacity: .75; }
+
+@keyframes dh-idle-bob {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-5px) scale(1.004); }
+}
+@keyframes dh-listen {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  35% { transform: translateY(-2px) rotate(-.6deg); }
+  70% { transform: translateY(-4px) rotate(.6deg); }
+}
+@keyframes dh-breathe {
+  0%, 100% { opacity: .72; transform: scale(.985); }
+  50% { opacity: 1; transform: scale(1.02); }
+}
+@keyframes dh-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  94% { transform: scaleY(.08); }
+  96% { transform: scaleY(1); }
+}
+@keyframes dh-talk {
+  0%, 100% { transform: scaleY(.52); }
+  25% { transform: scaleY(1.2); }
+  50% { transform: scaleY(.7); }
+  75% { transform: scaleY(1.32); }
+}
+@keyframes dh-spin { to { transform: rotate(360deg); } }
+@keyframes dh-spin-reverse { to { transform: rotate(-360deg); } }
+@keyframes dh-float {
+  0%, 100% { transform: translate3d(0, 0, 0); opacity: .35; }
+  50% { transform: translate3d(4px, -12px, 0); opacity: .8; }
+}
+@keyframes dh-wave {
+  0%, 100% { height: 6px; opacity: .55; }
+  50% { height: 22px; opacity: 1; }
+}
+@keyframes dh-listen-wave {
+  0%, 100% { height: 5px; opacity: .5; }
+  50% { height: 12px; opacity: .95; }
+}
+@keyframes dh-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.5); opacity: .65; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dh-stage *,
+  .dh-stage *::before,
+  .dh-stage *::after { animation: none !important; }
+}
