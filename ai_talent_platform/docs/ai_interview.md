@@ -176,7 +176,17 @@ score = 34
 
 > 路由顺序：`/config` 必须注册在 `/{session_id}` 之前，否则 FastAPI 会把 `config` 当成整数 ID 返回 422（已处理）。
 
-### 6.3 权限矩阵
+### 6.3 从「人才邀约」发起（`/invites`）
+
+人才详情 → 面试邀约 → 面试形式选择「AI 数字人面试」后，`POST /api/v1/invites` 使用 `type=ai_interview` 创建：
+
+- 额外字段：`interviewer_persona`、`language`（`zh-CN` / `en-US`）、`difficulty`（`junior` / `middle` / `senior`）、`question_count`（3–10）、`duration_minutes`（5–120）、`expires_hours`；
+- 服务端先创建 `ai_interview_sessions`，再创建 `talent_invitations`，两者共用同一 token、有效期与题量，并回填 `ai_interview_sessions.invitation_id`；
+- 邀约链接直接指向 `/ai-interview/{token}`；旧链接 `/invite/{token}` 访问时前端自动跳转，不再展示视频面试落地页；
+- AI 面试开始 / 取消 / 完成时同步邀约状态（`opened` / `cancelled` / `finished`），邀约记录中可见「候选人已打开」等进度；
+- 短信 / 邮件模板按 AI 面试单独生成（无需预约、建议使用 Chrome/Edge、允许麦克风），不再出现「提前 5 分钟进面试间」等视频面试文案。
+
+### 6.4 权限矩阵
 
 | 角色 | `ai_interview:read` | `ai_interview:manage` |
 | --- | --- | --- |
@@ -229,12 +239,13 @@ AI_INTERVIEW_ANSWER_MAX_CHARS=4000
 
 ## 10. 测试与验收
 
-- `tests/test_ai_interview.py`（10 个用例）：
+- `tests/test_ai_interview.py`（11 个用例）：
   - 引擎单测：中英文问题计划、评分边界/短答案封顶/跑题惩罚、追问阈值、等级与建议；
   - 服务集成：创建 → 开始 → 多题作答 → 自动收尾 → 报告结构；
   - 异常：过期/非法 token、重复开始幂等；
   - API：权限（EMPLOYEE 403、MANAGER 只读）、公开流程（start/answer/finish/report）；
-  - 隐私：候选人结果不返回 HR 推荐结论，summary 改第二人称，建议中过滤招聘决策语句。
+  - 隐私：候选人结果不返回 HR 推荐结论，summary 改第二人称，建议中过滤招聘决策语句；
+  - 邀约联动：从 `/invites` 选择 AI 数字人面试，共用 token、`invitation_id` 回填、开始/完成同步邀约状态。
 - 回归：`pytest tests/test_ai_interview.py tests/test_code_tags.py tests/test_orm_mapping.py tests/test_api_grouping.py tests/test_mysql_ddl_defaults.py tests/test_router_stubs.py`。
 - 前端：`npm run build`（tsc + vite）通过；本地 `npm run dev` + 后端 SQLite 可完成端到端演示。
 

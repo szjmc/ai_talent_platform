@@ -22,8 +22,11 @@ logger = logging.getLogger(__name__)
 def build_invite_payload(
     *, type_: str, title: str, candidate_name: str, link: str, interview_time: str | None
 ) -> tuple[str, str]:
-    """生成 (subject, body)。type_: written_test/assessment/interview。"""
-    kind = {"written_test": "笔试", "assessment": "测评", "interview": "面试"}.get(type_, "邀约")
+    """生成 (subject, body)。type_: written_test/assessment/interview/ai_interview。"""
+    kind = {
+        "written_test": "笔试", "assessment": "测评",
+        "interview": "视频面试", "ai_interview": "AI 数字人面试",
+    }.get(type_, "邀约")
     subject = f"【AI 人才平台】{kind}邀约：{title or kind}"
     lines = [
         f"{candidate_name or '您好'}，您好：",
@@ -33,14 +36,21 @@ def build_invite_payload(
     ]
     if interview_time:
         lines.append(f"面试时间：{interview_time}")
-    lines += [
-        "",
-        "1. 链接在有效期内仅可本人使用，请勿转发；",
-        "2. 笔试需打开摄像头，系统将进行作弊检测；",
-        "3. 面试请提前 5 分钟进入面试间，测试摄像头与麦克风。",
-        "",
-        "—— AI 人才平台",
-    ]
+    if type_ == "ai_interview":
+        lines += [
+            "",
+            "1. 链接在有效期内可随时开始，仅限本人使用，请勿转发；",
+            "2. 建议使用 Chrome / Edge，并允许浏览器使用麦克风；",
+            "3. 进入后按 AI 数字人面试官引导作答，支持语音或文字回答。",
+        ]
+    else:
+        lines += [
+            "",
+            "1. 链接在有效期内仅可本人使用，请勿转发；",
+            "2. 笔试需打开摄像头，系统将进行作弊检测；",
+            "3. 面试请提前 5 分钟进入面试间，测试摄像头与麦克风。",
+        ]
+    lines += ["", "—— AI 人才平台"]
     return subject, "\n".join(lines)
 
 

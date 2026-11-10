@@ -64,7 +64,7 @@ def _client_ip(request: Request) -> str | None:
 # ------------------------------------------------------------------- host 侧（鉴权）
 @router.post(
     "",
-    summary="创建并发送邀约（笔试/测评/面试）",
+    summary="创建并发送邀约（笔试/测评/视频面试/AI 数字人面试）",
     response_model=ApiResponse[InviteResponse],
     dependencies=[Depends(require_permission(PermissionEnum.TALENT_UPDATE))],
 )
@@ -88,7 +88,7 @@ async def list_invites(
     user: CurrentUser,
     page: PageParams = Depends(),
     talent_id: int | None = Query(None, gt=0, description="按人才过滤"),
-    type: str | None = Query(None, pattern=r"^(written_test|assessment|interview)$", description="邀约类型"),
+    type: str | None = Query(None, pattern=r"^(written_test|assessment|interview|ai_interview)$", description="邀约类型"),
     status: str | None = Query(
         None, pattern=r"^(created|sent|opened|submitted|finished|expired|cancelled)$", description="状态"
     ),

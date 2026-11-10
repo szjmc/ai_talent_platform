@@ -389,3 +389,66 @@ def test_candidate_result_hides_hr_only_content():
     assert "强烈推荐" not in result["summary"]
     assert result["summary"].startswith("你完成 5/5 道题")
     assert result["suggestions"] == ["继续补充可量化的业务结果"]
+
+
+@pytest.mark.asyncio
+async def test_interview_invitation_can_choose_ai_digital_human(client, db_session):
+    """面试邀约选择 AI 数字人：同一次创建同时落邀约与 AI 会话，链接直达数字人面试页。"""
+    _, admin_token = await _make_user(db_session, superuser=True)
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    resp = await client.post(
+        f"{API}/invites",
+        headers=headers,
+        json={
+            "type": "ai_interview",
+            "talent_name": "邀约候选人",
+            "email": "invite-ai@example.com",
+            "channels": ["email"],
+            "question_count": 3,
+            "duration_minutes": 15,
+            "expires_hours": 24,
+            "interviewer_persona": "tech_lead",
+            "title": "邀约候选人 · AI 数字人面试",
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    invite = resp.json()["data"]
+    assert invite["type"] == "ai_interview"
+    assert invite["question_count"] == 3
+    assert invite["duration_minutes"] == 15
+    assert invite["url"].endswith(f"/ai-interview/{invite['token']}")
+
+    row = (await db_session.execute(
+        select(AiInterviewSession).where(AiInterviewSession.token == invite["token"])
+    )).scalar_one()
+    assert row.invitation_id == invite["id"]
+    assert row.interviewer_persona == "tech_lead"
+    assert row.status == "pending"
+
+    # 候选人公开页可直接拿到 AI 面试状态，无需再走 /invite 落地页
+    state = await client.get(f"{API}/ai-interviews/session/{invite['token']}")
+    assert state.status_code == 200, state.text
+    assert state.json()["data"]["status"] == "pending"
+    assert state.json()["data"]["progress"]["total"] == 3
+
+    # 开始/结束 AI 面试时，邀约记录状态同步流转（不是两份互不相干的数据）
+    started = await client.post(f"{API}/ai-interviews/session/{invite['token']}/start")
+    assert started.status_code == 200, started.text
+    listing = await client.get(f"{API}/invites", headers=headers, params={"type": "ai_interview"})
+    assert listing.status_code == 200
+    items = listing.json()["data"]["items"]
+    target = next(item for item in items if item["id"] == invite["id"])
+    assert "/ai-interview/" in target["url"]
+    assert target["status"] == "opened"
+
+    answered = await client.post(
+        f"{API}/ai-interviews/session/{invite['token']}/answer",
+        json={"answer": STRONG_ANSWERS[0], "duration_seconds": 60, "input_mode": "text"},
+    )
+    assert answered.status_code == 200, answered.text
+    finished = await client.post(f"{API}/ai-interviews/session/{invite['token']}/finish")
+    assert finished.status_code == 200, finished.text
+    listing = await client.get(f"{API}/invites", headers=headers, params={"type": "ai_interview"})
+    target = next(item for item in listing.json()["data"]["items"] if item["id"] == invite["id"])
+    assert target["status"] == "finished"

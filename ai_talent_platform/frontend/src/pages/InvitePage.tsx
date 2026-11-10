@@ -12,7 +12,7 @@ import {
 
 type Phase = 'loading' | 'intro' | 'camera' | 'exam' | 'result' | 'failed';
 
-const KIND_TEXT: Record<string, string> = { written_test: '笔试', assessment: '测评', interview: '面试' };
+const KIND_TEXT: Record<string, string> = { written_test: '笔试', assessment: '测评', interview: '视频面试', ai_interview: 'AI 数字人面试' };
 
 /**
  * 候选人公开落地页（无需登录，凭 token 访问）：
@@ -39,13 +39,18 @@ export default function InvitePage() {
   const loadVisit = useCallback(async () => {
     try {
       const info = await invitesApi.visit(token);
+      if (info.type === 'ai_interview') {
+        // 兼容旧链接 / 手动拼 /invite/{token}：AI 面试统一由数字人页面承接
+        navigate(`/ai-interview/${encodeURIComponent(token)}`, { replace: true });
+        return;
+      }
       setVisit(info);
       setPhase('intro');
     } catch (error) {
       setFailText(formatApiError(error));
       setPhase('failed');
     }
-  }, [token]);
+  }, [token, navigate]);
 
   useEffect(() => { loadVisit(); }, [loadVisit]);
 

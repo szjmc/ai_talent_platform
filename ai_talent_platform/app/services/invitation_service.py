@@ -30,6 +30,7 @@ from app.config.settings import settings
 from app.core.exceptions import BusinessRuleError, NotFoundError, ParamError
 from app.core.pagination import PageParams, build_page_result
 from app.core.response import PageResult
+from app.models.ai_interview import AiInterviewSession
 from app.models.assessment import AssessmentQuestion
 from app.models.invitation import ExamSession, TalentInvitation
 from app.models.talent import Talent
@@ -48,11 +49,14 @@ from app.schemas.invitation import (
     InviteVisitResponse,
     ViolationItem,
 )
+from app.schemas.ai_interview import AiInterviewCreateRequest
+from app.services.ai_interview_service import AiInterviewService, build_ai_interview_url
 from app.services.invite_notify import build_invite_payload, send_email, send_sms
 
 logger = logging.getLogger(__name__)
 
 _EXAM_TYPES = ("written_test", "assessment")
+_AI_INTERVIEW_TYPE = "ai_interview"
 _KNOWN_CHANNELS = ("sms", "email")
 
 
@@ -191,7 +195,7 @@ class InvitationService:
             type=row.type,
             title=row.title or "",
             token=row.token,
-            url=build_invitation_link(row.token),
+            url=build_ai_interview_url(row.token) if row.type == _AI_INTERVIEW_TYPE else build_invitation_link(row.token),
             status=row.status,
             channels=list(row.channels or []),
             send_results=[InviteSendResult(**r) for r in (row.send_results or []) if isinstance(r, dict)],
@@ -228,32 +232,61 @@ class InvitationService:
         if "email" in body.channels and not snapshot.get("email"):
             raise ParamError("邮件发送需要邮箱：请完善人才档案或在请求中提供 email")
 
-        # 2) 题量（简历解析信号）+ 抽题快照
+        title = body.title or (
+            "AI 数字人面试邀约" if body.type == _AI_INTERVIEW_TYPE
+            else ("面试邀约" if body.type == "interview" else ("测评邀约" if body.type == "assessment" else "笔试邀约"))
+        )
         question_count: int | None = None
         question_ids: list[int] = []
-        if body.type in _EXAM_TYPES:
-            pool_ids = [
-                int(i) for i in (await self.db.execute(
-                    select(AssessmentQuestion.id).where(AssessmentQuestion.is_deleted.is_(False))
-                )).scalars()
-            ]
-            if not pool_ids:
-                raise BusinessRuleError(
-                    "题库为空：请先在测评模块导入题目（或运行 scripts/seed_question_bank.py 生成演示题库）"
-                )
-            want = body.question_count or derive_question_count(
-                getattr(talent, "work_years", None), getattr(talent, "skill_tags", None)
-            )
-            question_count = min(max(1, want), len(pool_ids))
-            question_ids = random.sample(pool_ids, question_count)
+        ai_session_id: int | None = None
 
-        # 3) 落库
-        duration = body.duration_minutes or settings.INVITE_EXAM_DURATION_MINUTES
-        expires_hours = body.expires_hours or settings.INVITE_TOKEN_TTL_HOURS
-        token = await self.repo.mint_token(self.db)
-        title = body.title or (
-            "面试邀约" if body.type == "interview" else ("测评邀约" if body.type == "assessment" else "笔试邀约")
-        )
+        if body.type == _AI_INTERVIEW_TYPE:
+            # 2A) AI 数字人面试：先建数字人会话（问题计划、token、有效期都在同一次事务内）
+            ai_data = await AiInterviewService(self.db).create(
+                AiInterviewCreateRequest(
+                    talent_id=body.talent_id,
+                    candidate_name=snapshot.get("name") or None,
+                    candidate_email=snapshot.get("email") or None,
+                    title=title,
+                    interviewer_persona=body.interviewer_persona or "friendly_hr",
+                    language=body.language or "zh-CN",
+                    difficulty=body.difficulty or "middle",
+                    question_count=body.question_count or settings.AI_INTERVIEW_DEFAULT_QUESTION_COUNT,
+                    duration_minutes=body.duration_minutes or settings.AI_INTERVIEW_DEFAULT_DURATION_MINUTES,
+                    expires_hours=body.expires_hours or settings.AI_INTERVIEW_LINK_TTL_HOURS,
+                    send_email=False,  # 统一由邀约渠道发送，避免重复通知
+                ),
+                current_user,
+            )
+            token = str(ai_data["token"])
+            ai_session_id = int(ai_data["id"])
+            question_count = int(ai_data.get("question_count") or 0)
+            duration = int(ai_data.get("duration_minutes") or settings.AI_INTERVIEW_DEFAULT_DURATION_MINUTES)
+            expires_at = ai_data.get("expires_at") or (
+                datetime.now() + timedelta(hours=body.expires_hours or settings.AI_INTERVIEW_LINK_TTL_HOURS)
+            )
+        else:
+            # 2B) 笔试/测评：按简历解析题量并抽题快照
+            if body.type in _EXAM_TYPES:
+                pool_ids = [
+                    int(i) for i in (await self.db.execute(
+                        select(AssessmentQuestion.id).where(AssessmentQuestion.is_deleted.is_(False))
+                    )).scalars()
+                ]
+                if not pool_ids:
+                    raise BusinessRuleError(
+                        "题库为空：请先在测评模块导入题目（或运行 scripts/seed_question_bank.py 生成演示题库）"
+                    )
+                want = body.question_count or derive_question_count(
+                    getattr(talent, "work_years", None), getattr(talent, "skill_tags", None)
+                )
+                question_count = min(max(1, want), len(pool_ids))
+                question_ids = random.sample(pool_ids, question_count)
+            duration = body.duration_minutes or settings.INVITE_EXAM_DURATION_MINUTES
+            token = await self.repo.mint_token(self.db)
+            expires_at = datetime.now() + timedelta(hours=body.expires_hours or settings.INVITE_TOKEN_TTL_HOURS)
+
+        # 3) 落库（邀约与 AI 会话共用 token，公开链接指向 AI 面试页）
         invite = await self.repo.create(
             self.db,
             {
@@ -265,12 +298,18 @@ class InvitationService:
                 "channels": list(body.channels),
                 "question_count": question_count,
                 "duration_minutes": duration,
-                "interview_time": body.interview_time,
-                "expires_at": datetime.now() + timedelta(hours=expires_hours),
+                "interview_time": None if body.type == _AI_INTERVIEW_TYPE else body.interview_time,
+                "expires_at": expires_at,
                 "status": "created",
                 "created_by": getattr(current_user, "id", None),
             },
         )
+        if ai_session_id:
+            ai_session = (await self.db.execute(
+                select(AiInterviewSession).where(AiInterviewSession.id == ai_session_id)
+            )).scalar_one_or_none()
+            if ai_session is not None:
+                ai_session.invitation_id = invite.id
         if body.type in _EXAM_TYPES:
             await self.sessions.create(
                 self.db,
@@ -287,7 +326,7 @@ class InvitationService:
         await self.db.commit()
 
         # 4) 通知（commit 后发送，链接已持久；失败结果如实落库）
-        link = build_invitation_link(token)
+        link = build_ai_interview_url(token) if body.type == _AI_INTERVIEW_TYPE else build_invitation_link(token)
         interview_time_iso = (
             body.interview_time.strftime("%Y-%m-%d %H:%M") if body.interview_time else None
         )

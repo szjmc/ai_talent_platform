@@ -388,8 +388,17 @@ class AiInterviewService:
         row.status = "cancelled"
         row.finished_at = datetime.now()
         row.updated_by = getattr(user, "id", None)
+        await self._sync_invitation_status(row, "cancelled")
         await self.db.flush()
         return self._session_brief(row)
+
+    async def _sync_invitation_status(self, row: AiInterviewSession, status: str) -> None:
+        """AI 面试进度同步到关联的面试邀约记录，避免两份状态不一致。"""
+        if not row.invitation_id:
+            return
+        invite = await self.invite_repo.get_by_id(self.db, row.invitation_id)
+        if invite is not None and invite.status != status:
+            invite.status = status
 
     # ================================================================ 候选人公开接口
     async def public_state(self, token: str) -> dict[str, Any]:
@@ -415,6 +424,7 @@ class AiInterviewService:
             row.current_question_kind = "main"
             row.follow_up_used = False
             row.answered_count = 0
+            await self._sync_invitation_status(row, "opened")
             greeting = self._greeting(row)
             await self._add_turn(row, role="interviewer", kind="greeting", content=greeting)
             first = plan[0]
@@ -632,6 +642,7 @@ class AiInterviewService:
         row.recommendation = str(report.get("recommendation") or "")
         row.report = report
         row.generator = str(report.get("scoring_method") or "rule")
+        await self._sync_invitation_status(row, "finished")
         closing = engine.closing_text(row.candidate_name, row.language)
         if not any(turn.role == "interviewer" and turn.kind == "closing" for turn in turns):
             await self._add_turn(row, role="interviewer", kind="closing", content=closing)

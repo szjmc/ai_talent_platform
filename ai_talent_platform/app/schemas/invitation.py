@@ -10,7 +10,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-InviteType = Literal["written_test", "assessment", "interview"]
+InviteType = Literal["written_test", "assessment", "interview", "ai_interview"]
 InviteChannel = Literal["sms", "email"]
 
 
@@ -19,7 +19,10 @@ class InviteCreateRequest(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    type: InviteType = Field(default="written_test", description="written_test 笔试 / assessment 测评 / interview 面试")
+    type: InviteType = Field(
+        default="written_test",
+        description="written_test 笔试 / assessment 测评 / interview 视频面试 / ai_interview AI 数字人面试",
+    )
     talent_id: int | None = Field(default=None, gt=0, description="库内人才 ID（演示数据可不传）")
     talent_name: str | None = Field(default=None, max_length=64, description="候选人姓名（无档案时用快照）")
     mobile: str | None = Field(default=None, max_length=20, description="手机号（sms 渠道必填）")
@@ -27,9 +30,16 @@ class InviteCreateRequest(BaseModel):
     channels: list[InviteChannel] = Field(default_factory=lambda: ["sms"], description="发送渠道：sms / email")
     question_count: int | None = Field(default=None, ge=1, le=100, description="笔试题量；空=按简历解析结果自动")
     duration_minutes: int | None = Field(default=None, ge=5, le=600, description="笔试时长（分钟）")
-    interview_time: datetime | None = Field(default=None, description="面试约定时间（type=interview 必填）")
+    interview_time: datetime | None = Field(default=None, description="视频面试约定时间（type=interview 必填）")
     expires_hours: int | None = Field(default=None, ge=1, le=720, description="链接有效期（小时），默认取配置")
     title: str = Field(default="", max_length=128, description="邀约标题")
+    # ----- AI 数字人面试（type=ai_interview）-----
+    interviewer_persona: str | None = Field(
+        default=None, max_length=32,
+        description="AI 数字人面试官：friendly_hr / tech_lead / strict_expert / global_interviewer",
+    )
+    language: Literal["zh-CN", "en-US"] | None = Field(default=None, description="AI 面试语言：zh-CN / en-US")
+    difficulty: Literal["junior", "middle", "senior"] | None = Field(default=None, description="AI 面试难度：junior / middle / senior")
 
     @field_validator("channels")
     @classmethod
@@ -43,7 +53,12 @@ class InviteCreateRequest(BaseModel):
     @model_validator(mode="after")
     def _check_type(self) -> "InviteCreateRequest":
         if self.type == "interview" and self.interview_time is None:
-            raise ValueError("面试邀约必须设置 interview_time")
+            raise ValueError("视频面试邀约必须设置 interview_time")
+        if self.type == "ai_interview":
+            if self.question_count is not None and not 3 <= self.question_count <= 10:
+                raise ValueError("AI 面试问题数量需在 3-10 之间")
+            if self.duration_minutes is not None and not 5 <= self.duration_minutes <= 120:
+                raise ValueError("AI 面试时长需在 5-120 分钟之间")
         if "sms" in self.channels and not self.mobile and not self.talent_id:
             raise ValueError("短信发送需要手机号 mobile（或绑定库内人才）")
         if "email" in self.channels and not self.email and not self.talent_id:

@@ -139,7 +139,7 @@ export async function downloadWithToken(url: string, fileName: string): Promise<
 }
 
 /* ======================= 人才邀约（笔试 / 测评 / 面试间）[Agent组] ======================= */
-export type InviteType = 'written_test' | 'assessment' | 'interview';
+export type InviteType = 'written_test' | 'assessment' | 'interview' | 'ai_interview';
 export type InviteChannel = 'sms' | 'email';
 
 export interface InviteCreatePayload {
@@ -154,6 +154,10 @@ export interface InviteCreatePayload {
   interview_time?: string;
   expires_hours?: number;
   title?: string;
+  /** AI 数字人面试配置（type=ai_interview） */
+  interviewer_persona?: string;
+  language?: string;
+  difficulty?: string;
 }
 export interface InviteSendResult { channel: string; ok: boolean; mode: string; error?: string | null }
 export interface InviteInfo {
