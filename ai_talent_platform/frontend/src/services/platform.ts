@@ -5,6 +5,7 @@ import type {
   Position, ReportItem, Resume, ResumeParseResult, Talent, TalentPortrait, TrainingNotification,
   TrainingPlan, TrainingRecommendation, TrendResult, User,
   AnalyticsAgentResponse, PeriodReportResponse,
+  AiInterviewConfig, AiInterviewSession, AiInterviewDetail, AiInterviewReport, AiInterviewPublicState, AiInterviewAnswerResult,
 } from '../types';
 
 /** 与后端 OpenAPI 对齐的业务接口封装；不在前端构造任何模拟业务数据。 */
@@ -262,3 +263,24 @@ export function orgNameMap(items: OrgNode[]): Map<number, string> {
 export function withOrganizationNames<T extends { organization_id?: number | null; organization_name?: string | null }>(rows: T[], names: Map<number, string>): T[] {
   return rows.map((row) => ({ ...row, organization_name: row.organization_name ?? (row.organization_id != null ? names.get(row.organization_id) ?? null : null) }));
 }
+
+/* ======================= AI 数字人面试 [Agent组] ======================= */
+export const aiInterviewsApi = {
+  config: () => request<AiInterviewConfig>({ url: '/ai-interviews/config' }),
+  list: (params?: { page?: number; page_size?: number; status?: string; keyword?: string; talent_id?: number; position_id?: number }) =>
+    request<PageResult<AiInterviewSession>>({ url: '/ai-interviews', params }),
+  create: (data: Record<string, unknown>) =>
+    request<AiInterviewSession & { plan_source?: string; email?: { ok?: boolean; error?: string | null } | null }>(
+      { url: '/ai-interviews', method: 'POST', data }),
+  detail: (id: number) => request<AiInterviewDetail>({ url: `/ai-interviews/${id}` }),
+  report: (id: number) => request<AiInterviewReport & { session_id: number; candidate_name: string }>(
+    { url: `/ai-interviews/${id}/report` }),
+  cancel: (id: number) => request<AiInterviewSession>({ url: `/ai-interviews/${id}/cancel`, method: 'POST' }),
+  /** 以下为候选人公开接口（凭 token，无需登录）。 */
+  state: (token: string) => request<AiInterviewPublicState>({ url: `/ai-interviews/session/${encodeURIComponent(token)}` }),
+  start: (token: string) => request<AiInterviewPublicState>({ url: `/ai-interviews/session/${encodeURIComponent(token)}/start`, method: 'POST' }),
+  answer: (token: string, data: { answer: string; duration_seconds: number; input_mode: 'voice' | 'text' }) =>
+    request<AiInterviewAnswerResult>({ url: `/ai-interviews/session/${encodeURIComponent(token)}/answer`, method: 'POST', data }),
+  repeat: (token: string) => request<{ text: string; completed: boolean }>({ url: `/ai-interviews/session/${encodeURIComponent(token)}/repeat`, method: 'POST' }),
+  finish: (token: string) => request<AiInterviewPublicState>({ url: `/ai-interviews/session/${encodeURIComponent(token)}/finish`, method: 'POST' }),
+};

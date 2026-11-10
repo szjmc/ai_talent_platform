@@ -39,8 +39,8 @@ npm run preview
 
 - 前端不再包含 `mockData`、演示登录或 `VITE_DEMO_FALLBACK` 降级。
 - 所有业务请求统一走 `{ code, message, data, trace_id }` 响应契约，页面只消费 `data`。
-- 登录、用户、组织、人才、简历、测评、匹配、培训、知识库、数据分析、AI 助手均对接后端真实接口。
-- 后端尚未实现的占位模块（如文件中心、审计、岗位 CRUD）会展示空态/错误提示，不再用模拟数据填充。
+- 登录、用户、组织、人才、简历、测评、匹配、培训、知识库、数据分析、AI 助手、AI 数字人面试均对接后端真实接口。
+- 后端返回占位/未实现时页面展示空态或错误提示，不使用模拟数据填充。
 - 页面交互与既有字段命名保持不变；后端未返回的扩展字段以空态展示，不参与伪造统计。
 
 ## 页面与接口
@@ -55,6 +55,8 @@ npm run preview
 | 简历解析 | `/resumes` | `/resumes/*` |
 | 人岗匹配 | `/matchings` | `/matchings/*` |
 | 智能测评 | `/assessments` | `/assessments/*`、`/resumes/upload` |
+| AI 数字人面试（HR） | `/ai-interviews` | `/ai-interviews/*` |
+| AI 面试候选人页（公开，免登录） | `/ai-interview/:token` | `/ai-interviews/session/:token/*` |
 | 培训发展 | `/trainings` | `/trainings/*` |
 | 知识库 | `/knowledge` | `/knowledge/docs*`、`/text2answer`、`/conversations*` |
 | 数据洞察 | `/analytics` | `/analytics/*` |

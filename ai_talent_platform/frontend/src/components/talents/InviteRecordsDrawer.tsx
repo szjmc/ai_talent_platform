@@ -8,13 +8,15 @@ const TYPE_OPTIONS = [
   { label: '全部', value: '' },
   { label: '笔试', value: 'written_test' },
   { label: '测评', value: 'assessment' },
-  { label: '面试', value: 'interview' },
+  { label: '视频面试', value: 'interview' },
+  { label: 'AI 面试', value: 'ai_interview' },
 ];
 
 const TYPE_TAG: Record<string, { label: string; color: string }> = {
   written_test: { label: '笔试', color: 'blue' },
   assessment: { label: '测评', color: 'purple' },
-  interview: { label: '面试', color: 'gold' },
+  interview: { label: '视频面试', color: 'gold' },
+  ai_interview: { label: 'AI 数字人面试', color: 'geekblue' },
 };
 
 const STATUS_TAG: Record<string, { label: string; color: string }> = {
@@ -125,7 +127,9 @@ export default function InviteRecordsDrawer({ open, initialKeyword = '', onClose
                   <div style={{ margin: '6px 0', fontSize: 12, color: '#617982' }}>
                     {item.type === 'interview'
                       ? <>面试时间：{item.interview_time ? dayjs(item.interview_time).format('YYYY-MM-DD HH:mm') : '未设置'} · </>
-                      : <>{item.question_count ?? '自动'} 题 · {item.duration_minutes} 分钟 · </>}
+                      : item.type === 'ai_interview'
+                        ? <>AI 面试 · {item.question_count ?? '—'} 题 · {item.duration_minutes} 分钟 · </>
+                        : <>{item.question_count ?? '自动'} 题 · {item.duration_minutes} 分钟 · </>}
                     有效期至 {item.expires_at ? dayjs(item.expires_at).format('MM-DD HH:mm') : '—'}
                   </div>
 

@@ -74,6 +74,11 @@ class PermissionEnum(StrEnum):
     RESUME_PARSE = "resume:parse"
     ASSESSMENT_READ = "assessment:read"
     ASSESSMENT_MANAGE = "assessment:manage"
+    # AI 数字人面试：read 查看会话与报告，manage 创建/取消面试并发送链接。
+    # 复用 assessment 的读写粒度，但单独成码：面试过程包含候选人对话原声转写，
+    # 属于更敏感的人才数据，不能因为「能看测评」就默认「能看面试全文」。
+    AI_INTERVIEW_READ = "ai_interview:read"
+    AI_INTERVIEW_MANAGE = "ai_interview:manage"
     TRAINING_READ = "training:read"
     # 自助上报：只允许操作「本人」的学习记录（Service 用 users.talent_id 校验归属）。
     # 与 MANAGE 分开的意义：MANAGER / EMPLOYEE 需要推进自己的培训，
@@ -121,6 +126,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         PermissionEnum.POSITION_READ, PermissionEnum.POSITION_MANAGE,
         PermissionEnum.RESUME_UPLOAD, PermissionEnum.RESUME_PARSE,
         PermissionEnum.ASSESSMENT_READ, PermissionEnum.ASSESSMENT_MANAGE,
+        PermissionEnum.AI_INTERVIEW_READ, PermissionEnum.AI_INTERVIEW_MANAGE,
         PermissionEnum.TRAINING_READ, PermissionEnum.TRAINING_MANAGE,
         PermissionEnum.MATCHING_READ, PermissionEnum.MATCHING_RUN,
         PermissionEnum.MATCHING_REVIEW,
@@ -138,6 +144,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         PermissionEnum.POSITION_READ, PermissionEnum.POSITION_MANAGE,
         PermissionEnum.RESUME_UPLOAD, PermissionEnum.RESUME_PARSE,
         PermissionEnum.ASSESSMENT_READ, PermissionEnum.ASSESSMENT_MANAGE,
+        PermissionEnum.AI_INTERVIEW_READ, PermissionEnum.AI_INTERVIEW_MANAGE,
         PermissionEnum.TRAINING_READ, PermissionEnum.TRAINING_MANAGE,
         PermissionEnum.MATCHING_READ, PermissionEnum.MATCHING_RUN,
         PermissionEnum.MATCHING_REVIEW,
@@ -152,6 +159,7 @@ ROLE_PERMISSIONS: dict[str, set[str]] = {
         PermissionEnum.TALENT_READ,
         PermissionEnum.POSITION_READ,
         PermissionEnum.ASSESSMENT_READ,
+        PermissionEnum.AI_INTERVIEW_READ,
         PermissionEnum.TRAINING_READ,
         PermissionEnum.TRAINING_REPORT,
         PermissionEnum.MATCHING_READ,

@@ -23,6 +23,9 @@ EXPECTED_MYSQL_TABLES = {
     "assessment_questions",
     "assessment_results",
     "assessments",
+    # [AI 面试] 数字人面试会话与逐轮问答
+    "ai_interview_sessions",
+    "ai_interview_turns",
     "audit_logs",
     "chat_messages",
     "conversations",

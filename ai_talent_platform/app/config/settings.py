@@ -353,6 +353,18 @@ class Settings(BaseSettings):
     PROCTOR_INTERVAL_SECONDS: int = 5               # 前端监考帧上报间隔（秒）
     WEBRTC_ICE_SERVERS: str = '[{"urls":"stun:stun.l.google.com:19302"}]'
 
+    # ------------------------------------------- AI 数字人面试（[Agent组]）
+    # 说明：面试链接复用 INVITE_BASE_URL / FRONTEND_URL / PUBLIC_BASE_URL 的优先级，
+    #      未配置时退回请求 Host（仅调试可用）。
+    AI_INTERVIEW_DEFAULT_QUESTION_COUNT: int = 6    # 默认问题数（夹到 3-10）
+    AI_INTERVIEW_MAX_QUESTION_COUNT: int = 10
+    AI_INTERVIEW_DEFAULT_DURATION_MINUTES: int = 30
+    AI_INTERVIEW_LINK_TTL_HOURS: int = 72           # 面试链接有效期（小时）
+    AI_INTERVIEW_LLM_PLAN: bool = True              # 是否用大模型个性化问题（失败自动规则降级）
+    AI_INTERVIEW_LLM_FEEDBACK: bool = True          # 是否用大模型润色评语（分数仍由规则引擎给出）
+    AI_INTERVIEW_LLM_TIMEOUT_SECONDS: int = 45      # 单次模型调用超时（秒）
+    AI_INTERVIEW_ANSWER_MAX_CHARS: int = 4000       # 单题回答最大长度（防滥用）
+
     # ------------------------------------------------------------------ 校验器
     # 说明：DIFY_API_KEY 现为 str 语义（见上方注释），原先的 _parse_dify_keys
     #       「把空字符串解析成 {}」校验器会把 dict 交给 str 字段导致启动即报错，已移除。

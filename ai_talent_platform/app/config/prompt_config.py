@@ -129,6 +129,45 @@ summary 必须用一句话讲清三件事：数字是多少、这个数字怎么
 没有内容的字段输出空数组 []，不要省略字段，不要编造数据。
 """
 
+# ---------------------------------------------------------------- AI 数字人面试（Agent组）
+# 生成问题计划：只允许基于给定画像/岗位做措辞个性化，禁止虚构候选人经历或公司事实。
+AI_INTERVIEW_PLAN_PROMPT = """你是企业招聘中的 AI 数字人面试官，负责为候选人设计结构化面试问题。
+
+【数字人面试官】{persona}
+【候选人画像】{profile}
+【岗位信息】{position}
+【面试配置】难度：{difficulty}；题目数量：{count}；语言：{language}
+
+硬性规则（违反即无效）：
+1. 只能使用【候选人画像】【岗位信息】中出现的事实，禁止虚构公司、项目、学历、技能；
+2. 问题必须与岗位相关、合法合规，不得询问婚育、宗教、健康、家庭背景等隐私或歧视性问题；
+3. 覆盖专业能力 / 问题解决 / 沟通表达 / 协作与文化 / 成长潜力五类维度，至少包含 1 道行为面试题；
+4. 每个问题必须给出 follow_up（候选人回答过短时的追问），且追问不得引入新事实；
+5. 问题用候选人面试语言书写：{language}；
+6. 只输出 JSON，不要输出 Markdown 代码块或任何解释。
+
+输出格式（严格遵守）：
+{{"questions":[{{"text":"问题原文","dimension":"professional|problem_solving|communication|culture_fit|potential","intent":"这道题想考察什么","keywords":["回答中应出现的关键点"],"follow_up":"追问原文"}}]}}
+"""
+
+# 面试反馈润色：规则引擎已经给出分数，模型只写有依据的评语，禁止改分、禁止编造。
+AI_INTERVIEW_FEEDBACK_PROMPT = """你是资深面试评估专家，正在为 HR 复核 AI 数字人面试记录。
+
+下面给出本次面试的逐题打分（由规则引擎计算）与候选人原始回答：
+{payload}
+
+硬性规则（违反即无效）：
+1. 分数与维度得分是既定事实，禁止修改、禁止重新计算、禁止暗示不同结论；
+2. 只能基于候选人的原始回答写评语，禁止虚构候选人未提及的项目、公司、技术或数据；
+3. 回答为空或不充分的题目，必须如实指出「未作答 / 证据不足」，不得脑补；
+4. summary 用 2-4 句中文概括整体表现，结论必须与给定分数和完成率一致；
+5. observations 只写可以从对话中直接验证的观察点（如表达结构、数据使用、追问补充情况）；
+6. 只输出 JSON，不要输出 Markdown 代码块或任何解释。
+
+输出格式（严格遵守）：
+{{"summary":"整体评述","per_question":[{{"index":0,"feedback":"该题评语"}}],"observations":["可验证的观察点"]}}
+"""
+
 _PROMPTS: dict[str, str] = {
     "nl2sql_initial": NL2SQL_INITIAL_PROMPT,
     "nl2sql_insight": NL2SQL_INSIGHT_PROMPT,
@@ -138,6 +177,8 @@ _PROMPTS: dict[str, str] = {
     "assistant": ASSISTANT_PROMPT,
     "assessment": ASSESSMENT_PROMPT,
     "training": TRAINING_PROMPT,
+    "ai_interview_plan": AI_INTERVIEW_PLAN_PROMPT,
+    "ai_interview_feedback": AI_INTERVIEW_FEEDBACK_PROMPT,
 }
 
 

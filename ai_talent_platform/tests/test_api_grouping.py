@@ -41,6 +41,7 @@ EXPECTED_GROUP = {
     "matchings": "人岗匹配",
     "trainings": "培训管理",
     "assessments": "人才测评",
+    "ai-interviews": "AI 面试",
     "invites": "人才邀约",
     "files": "文件管理",
     "audit": "审计日志",

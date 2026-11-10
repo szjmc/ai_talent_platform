@@ -1,4 +1,8 @@
-"""临时复现脚本：mock 取数与 LLM，观察决策报告输出结构。"""
+"""
+临时复现脚本：mock 取数与 LLM，观察决策报告输出结构。
+
+标签：[Vanna组] [P2]（人才决策报告复现脚本，仅本地排障使用）
+"""
 import asyncio
 import json
 import sys

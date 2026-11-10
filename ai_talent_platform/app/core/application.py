@@ -59,6 +59,7 @@ TAGS_METADATA = [
     {"name": "人才档案", "description": "人才档案、画像、语义检索"},
     {"name": "简历管理", "description": "简历上传、AI 解析"},
     {"name": "人才测评", "description": "测评任务、答题、结果分析"},
+    {"name": "AI 面试", "description": "AI 数字人面试官、逐轮问答与评估报告"},
     {"name": "培训管理", "description": "培训计划、课程、学习记录"},
     {"name": "人岗匹配", "description": "向量匹配、匹配解释"},
     {"name": "知识库", "description": "知识文档与 RAG 检索"},

@@ -29,6 +29,7 @@ from app.routers._stub import placeholder_router
 from app.core.response import ApiResponse, success
 from app.routers.a_rag_router import router as a_rag_router  # [合并 lz] RAG 问答链路
 from app.routers.agent_router import router as agent_router
+from app.routers.ai_interview_router import router as ai_interview_router  # [AI 面试] 数字人面试官
 from app.routers.analytics_router import router as analytics_router  # [架构组合并] 分析 MVP 真实路由
 from app.routers.assessment_router import router as assessment_router  # [合并 origin/develop] 测评 Agent 落地
 from app.routers.auth_router import router as auth_router
@@ -62,6 +63,8 @@ api_router.include_router(user_router)
 api_router.include_router(organization_router)
 api_router.include_router(analytics_router)  # [架构组合并] 统计概览 / NL2SQL 问数（分析 MVP）
 api_router.include_router(agent_router)
+# AI 数字人面试：HR 创建/复盘 + 候选人 token 免登录作答
+api_router.include_router(ai_interview_router)
 # 培训管理：14 条路径 / 16 个方法，六节点全链路 + 站内信（见 routers/training_router.py）
 api_router.include_router(training_router)
 # *kwq* 新增（MATCH-010/011）：岗位画像与匹配接口从占位切换为真实实现。
@@ -92,6 +95,7 @@ IMPLEMENTED_MODULES: list[str] = [
     "users",
     "organizations",
     "agents",
+    "ai_interviews",
     "talents",
     "analytics",
     "knowledge",
