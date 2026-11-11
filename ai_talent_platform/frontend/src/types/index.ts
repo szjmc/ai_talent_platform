@@ -172,6 +172,8 @@ export interface PeriodReportResponse {
 export interface AiInterviewPersona {
   key: string; name: string; title: string; style: string; tagline?: string;
   avatar_theme: string; language: string; voice_hint?: string;
+  /** 数字人真人肖像照片 URL；后端配置后前端渲染真人数字人，未配置则使用默认头像。 */
+  photo_url?: string;
 }
 export interface AiInterviewSession {
   id: number; talent_id?: number | null; position_id?: number | null; invitation_id?: number | null;
@@ -228,6 +230,11 @@ export interface AiInterviewPublicState {
     summary: string; strengths: string[]; weaknesses: { label?: string; score?: number; gap?: string }[];
     suggestions: string[]; per_question: { index: number; question: string; dimension_label: string; score: number | null; feedback: string }[];
     scoring_method: string;
+  } | null;
+  /** [防作弊] 行为监考策略：切屏 / 远程控制 / 投屏 / 多显示器 */
+  proctoring?: {
+    enabled: boolean; strict: boolean; require_screen_share: boolean; allow_multi_display: boolean;
+    heartbeat_seconds: number; snapshot_interval_seconds: number;
   } | null;
   server_time?: string | null;
 }

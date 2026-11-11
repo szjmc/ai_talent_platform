@@ -111,6 +111,12 @@ class InviteVisitResponse(BaseModel):
     proctor_enabled: bool = True
     proctor_engine: str = "disabled"
     frame_interval_seconds: int = 5
+    # [防作弊] 行为监考策略：切屏 / 远程控制 / 投屏 / 多显示器 / 虚拟摄像头
+    proctor_strict_mode: bool = True
+    proctor_require_screen_share: bool = False
+    proctor_allow_multi_display: bool = False
+    proctor_heartbeat_seconds: int = 15
+    proctor_snapshot_interval_seconds: int = 20
     ice_servers: list[dict[str, Any]] = Field(default_factory=list)
 
 
@@ -135,6 +141,12 @@ class ExamStartResponse(BaseModel):
     proctor_enabled: bool = True
     proctor_engine: str = "disabled"
     frame_interval_seconds: int = 5
+    # [防作弊] 行为监考策略（前端据此请求屏幕共享 / 拦截多屏 / 开启全屏）
+    proctor_strict_mode: bool = True
+    proctor_require_screen_share: bool = False
+    proctor_allow_multi_display: bool = False
+    proctor_heartbeat_seconds: int = 15
+    proctor_snapshot_interval_seconds: int = 20
 
 
 class ExamSubmitRequest(BaseModel):
@@ -159,6 +171,11 @@ class ExamResultResponse(BaseModel):
     submitted_at: datetime | None = None
     violations_count: int = 0
     pending_manual: bool = False
+    # [防作弊] 行为监考结论（切屏 / 远程控制 / 投屏等），仅作复核依据，不扣卷面分
+    proctor_risk_score: float = 0
+    proctor_risk_level: str = "clean"
+    proctor_message: str = ""
+    proctor_blocked: bool = False
 
 
 class FrameCheckRequest(BaseModel):

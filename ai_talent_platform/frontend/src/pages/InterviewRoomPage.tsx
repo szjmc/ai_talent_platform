@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
-import { Alert, Button, Result, Space, Spin, Tag, Typography, message } from 'antd';
+import { Alert, Button, Result, Space, Spin, Tag, Tooltip, Typography, message } from 'antd';
 import {
-  AudioOutlined, AudioMutedOutlined, DisconnectOutlined, PhoneFilled, UserOutlined, VideoCameraOutlined,
+  AudioOutlined, AudioMutedOutlined, DisconnectOutlined, PhoneFilled, SafetyCertificateOutlined,
+  UserOutlined, VideoCameraOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { formatApiError, invitesApi, inviteWsUrl, type InviteVisit } from '../services/api';
+import { formatApiError, invitesApi, inviteWsUrl, proctoringApi, type InviteVisit } from '../services/api';
+import { useProctoring } from '../hooks/useProctoring';
 
 type Role = 'candidate' | 'interviewer';
 type WsStatus = 'idle' | 'connecting' | 'open' | 'closed' | 'error';
@@ -52,6 +54,34 @@ export default function InterviewRoomPage() {
   const wsRef = useRef<WebSocket | null>(null);
   const pendingIceRef = useRef<RTCIceCandidateInit[]>([]);
   const makingOfferRef = useRef(false);
+  const [integrityNotice, setIntegrityNotice] = useState('');
+
+  /* ------------------------------------------------------- 行为监考（仅候选人端）
+   * 视频面试同样存在「切屏查答案 / 第三人提示 / 远程代面」，这里复用同一套
+   * useProctoring：切屏、失焦、退出全屏、多显示器、远程控制、虚拟摄像头都会被记录。
+   * 面试官端不采集（避免把面试官自己的操作判成候选人违规）。
+   */
+  const proctoring = useProctoring({
+    subject: 'interview',
+    token,
+    transport: proctoringApi,
+    active: role === 'candidate' && phase === 'room',
+    policy: {
+      enabled: true,
+      strict: false,           // 视频面试由真人主导，命中风险只提示不阻断
+      requireScreenShare: false,
+      allowMultiDisplay: false,
+      heartbeatSeconds: 20,
+      snapshotIntervalSeconds: 30,
+    },
+    onLevelChange: (ack) => {
+      if (ack.state.warning) setIntegrityNotice(ack.state.warning);
+      if (ack.new_violations.length) {
+        const last = ack.new_violations[ack.new_violations.length - 1];
+        setSysNotice(`监考提示：${last.label || last.detail || '检测到异常行为'}`);
+      }
+    },
+  });
 
   /* ------------------------------------------------------------------ 落地信息 */
   useEffect(() => {
@@ -303,6 +333,13 @@ export default function InterviewRoomPage() {
           </Tag>
           <Tag color={peerConnected ? 'success' : 'default'}>{peerConnected ? '对方在场' : '等待对方加入'}</Tag>
           <Tag>{role === 'interviewer' ? '面试官' : '候选人'}</Tag>
+          {role === 'candidate' && proctoring.policy.enabled && (
+            <Tooltip title={integrityNotice || '切屏 / 退出全屏 / 多显示器 / 远程控制 / 投屏都会被记录并同步给面试官'}>
+              <Tag color={proctoring.riskLevel === 'clean' ? 'green' : ['watch', 'review'].includes(proctoring.riskLevel) ? 'gold' : 'red'}>
+                <SafetyCertificateOutlined /> 监考 {proctoring.riskLevel}
+              </Tag>
+            </Tooltip>
+          )}
         </Space>
         <Space>
           {sysNotice && <Typography.Text style={{ color: '#e8c98a' }}>{sysNotice}</Typography.Text>}

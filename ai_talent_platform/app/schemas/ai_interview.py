@@ -45,6 +45,7 @@ class AiInterviewCreateRequest(BaseModel):
         description="数字人人设：friendly_hr / tech_lead / strict_expert / global_interviewer",
     )
     interviewer_name: str | None = Field(default=None, max_length=64, description="覆盖数字人姓名（可空）")
+    interviewer_photo_url: str | None = Field(default=None, max_length=512, description="数字人面试官真人肖像照片 URL；空则使用人设默认头像")
     language: InterviewLanguage = Field(default="zh-CN", description="面试语言")
     difficulty: InterviewDifficulty = Field(default="middle", description="难度：junior / middle / senior")
     question_count: int = Field(default=6, ge=3, le=10, description="问题数量（3-10）")
@@ -214,6 +215,8 @@ class AiInterviewPublicState(BaseModel):
     current_question: AiInterviewQuestionResponse | None = None
     transcript: list[dict[str, Any]] = Field(default_factory=list)
     result: dict[str, Any] | None = None
+    # [防作弊] 行为监考策略（切屏 / 远程控制 / 投屏 / 多显示器）：候选人页据此开启监听与全屏
+    proctoring: dict[str, Any] = Field(default_factory=dict)
     server_time: datetime | None = None
 
 
@@ -242,6 +245,26 @@ class AiInterviewPersonaOption(BaseModel):
     avatar_theme: str
     language: str
     voice_hint: str = ""
+    photo_url: str = ""
+
+
+class AiInterviewDigitalHumanVideoRequest(BaseModel):
+    """生成数字人说话头视频请求。"""
+
+    text: str = Field(..., min_length=1, max_length=2000, description="数字人播报文本")
+    persona_key: str = Field(default="default", max_length=32, description="数字人人设 key")
+    voice: str | None = Field(default=None, max_length=64, description="语音音色（留空则由供应商默认）")
+    language: str = Field(default="zh-CN", max_length=16, description="播报语言")
+
+
+class AiInterviewDigitalHumanVideoResponse(BaseModel):
+    """生成数字人视频响应。"""
+
+    ok: bool = False
+    provider: str = ""
+    video_url: str = ""
+    elapsed_ms: float = 0.0
+    error: str = ""
 
 
 class AiInterviewConfigResponse(BaseModel):
@@ -261,6 +284,8 @@ __all__ = [
     "AiInterviewAnswerResult",
     "AiInterviewConfigResponse",
     "AiInterviewCreateRequest",
+    "AiInterviewDigitalHumanVideoRequest",
+    "AiInterviewDigitalHumanVideoResponse",
     "AiInterviewDetailResponse",
     "AiInterviewPersonaOption",
     "AiInterviewProgress",

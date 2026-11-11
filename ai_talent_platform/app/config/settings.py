@@ -353,6 +353,20 @@ class Settings(BaseSettings):
     PROCTOR_INTERVAL_SECONDS: int = 5               # 前端监考帧上报间隔（秒）
     WEBRTC_ICE_SERVERS: str = '[{"urls":"stun:stun.l.google.com:19302"}]'
 
+    # ------------------------------------------- 在线监考 · 行为与环境防作弊（[Agent组]）
+    # 视觉检测只能看画面内的东西；切屏 / 远程控制 / 投屏 / 多显示器 / 虚拟摄像头
+    # 这些「画面外」作弊必须由浏览器信号 + 服务端判定，配置项见 ai/proctoring/integrity.py。
+    PROCTOR_ENABLED: bool = True                     # 行为监考总开关（关闭后不再要求上报与共享）
+    PROCTOR_STRICT_MODE: bool = True                 # 严格模式：命中硬性风险（远程控制/投屏/代考）即阻断作答
+    PROCTOR_REQUIRE_SCREEN_SHARE: bool = False        # 是否强制候选人共享整个屏幕（笔试作弊高发场景建议开启）
+    PROCTOR_HEARTBEAT_SECONDS: int = 15              # 前端监考心跳间隔（秒）
+    PROCTOR_HEARTBEAT_TIMEOUT_SECONDS: int = 60      # 心跳超过该时长未更新即判 heartbeat_lost
+    PROCTOR_SNAPSHOT_INTERVAL_SECONDS: int = 20      # 屏幕/摄像头快照抽样间隔（秒，留给人工复核）
+    PROCTOR_SNAPSHOT_MAX_PER_SESSION: int = 15       # 单个会话最多留存的可疑快照数（控存储成本）
+    PROCTOR_RISK_BLOCK_SCORE: int = 85               # 风险分达到该值后禁止继续作答/作答无效
+    PROCTOR_MAX_EVENTS_PER_REPORT: int = 30          # 单次上报允许的最大事件条数（防刷分）
+    PROCTOR_ALLOW_MULTI_DISPLAY: bool = False        # 是否允许候选人使用多显示器（默认不允许）
+
     # ------------------------------------------- AI 数字人面试（[Agent组]）
     # 说明：面试链接复用 INVITE_BASE_URL / FRONTEND_URL / PUBLIC_BASE_URL 的优先级，
     #      未配置时退回请求 Host（仅调试可用）。
@@ -364,6 +378,19 @@ class Settings(BaseSettings):
     AI_INTERVIEW_LLM_FEEDBACK: bool = True          # 是否用大模型润色评语（分数仍由规则引擎给出）
     AI_INTERVIEW_LLM_TIMEOUT_SECONDS: int = 45      # 单次模型调用超时（秒）
     AI_INTERVIEW_ANSWER_MAX_CHARS: int = 4000       # 单题回答最大长度（防滥用）
+
+    # ------------------------------------------- ComfyUI 本地数字人（[Agent组] AI 面试视频合成）
+    # 用户在 ComfyUI（默认 http://127.0.0.1:8188）里搭好数字人工作流（MuseTalk / SadTalker /
+    # AnimateDiff + 音频驱动），导出 API 格式 JSON，通过以下配置接入平台。
+    # 未配置时，数字人视频生成自动降级为现有「照片 + 唇形同步」方案，面试不中断。
+    COMFYUI_BASE_URL: str = ""               # 如 http://127.0.0.1:8188，空表示未启用 ComfyUI 数字人
+    COMFYUI_WORKFLOW: str = ""               # 工作流 API JSON 字符串，或指向 workflow.json 的文件路径
+    COMFYUI_TEXT_NODE_ID: str = ""           # 负责输入文本的节点 ID；留空则自动寻找含 "text" 字段的节点
+    COMFYUI_TEXT_INPUT_KEY: str = "text"     # 文本输入字段名，默认 "text"
+    COMFYUI_OUTPUT_NODE_ID: str = ""         # 负责保存视频的节点 ID；留空则自动从 outputs 提取首个视频
+    COMFYUI_TIMEOUT_SECONDS: int = 300       # 单次 ComfyUI 生成超时（秒）
+    COMFYUI_POLL_INTERVAL_SECONDS: float = 2 # 轮询历史间隔（秒）
+    DIGITAL_HUMAN_PROVIDER: str = "comfyui"  # 数字人供应商：comfyui（预留 heygen/did 等扩展）
 
     # ------------------------------------------------------------------ 校验器
     # 说明：DIFY_API_KEY 现为 str 语义（见上方注释），原先的 _parse_dify_keys

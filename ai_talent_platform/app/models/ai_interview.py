@@ -127,6 +127,9 @@ class AiInterviewSession(BaseModel):
         String(64), nullable=False, default="", server_default=text("''"),
         comment="浏览器语音合成音色提示（如 female-zh），空表示跟随系统默认",
     )
+    photo_url: Mapped[str | None] = mapped_column(
+        String(512), nullable=True, comment="数字人面试官真人肖像照片 URL；空则使用默认头像",
+    )
     language: Mapped[str] = mapped_column(
         String(16), nullable=False, default="zh-CN", server_default=text("'zh-CN'"),
         comment="面试语言：zh-CN / en-US",
@@ -179,6 +182,14 @@ class AiInterviewSession(BaseModel):
     report: Mapped[dict | None] = mapped_column(JSON, nullable=True, comment="完整评估报告")
     generator: Mapped[str | None] = mapped_column(
         String(64), nullable=True, comment="报告生成方式：rule / rule+llm:<model>"
+    )
+
+    # ------------------------------------------------------------ 防作弊监考
+    # [防作弊] 行为监考快照：{score, level, integrity{...}, heartbeat_lost, ...}
+    # 结构由 app/ai/proctoring/integrity.py 定义，写入方是 services/proctoring_service.py；
+    # 用 JSON 而非独立列，避免监考口径迭代时反复改表（历史事故：口径一变就要迁移）。
+    proctor_state: Mapped[dict | None] = mapped_column(
+        JSON, nullable=True, comment="行为监考状态快照（切屏/远程/投屏/多显示器风险汇总）"
     )
 
     # ------------------------------------------------------------ 时间

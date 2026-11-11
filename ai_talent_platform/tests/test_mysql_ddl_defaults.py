@@ -20,7 +20,7 @@
    需要默认值请用 ORM 侧 `default=`（INSERT 时由 SQLAlchemy 补值）；
 2. exam_sessions 的 question_ids / violations 必须保留 ORM 默认，
    保证 `ExamSession(...)` 不传这两列也能落库；
-3. 全部 38 张表的 DDL 必须能用 MySQL 方言编译（不引入 DDL 语法错误）；
+3. 全部业务表（含本轮新增的 3 张在线监考表）的 DDL 必须能用 MySQL 方言编译（不引入 DDL 语法错误）；
 4. 自动建表必须**逐表隔离**：`create_tables_individually` 遇到单表 DDL 错误时
    只记录失败表，其余表照常创建（防止「第一张表失败 → 后面全部不建」再演）。
 

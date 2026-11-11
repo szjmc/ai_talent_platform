@@ -23,7 +23,9 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const InvitePage = lazy(() => import('./pages/InvitePage'));
 const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
 const AIInterviewsPage = lazy(() => import('./pages/AIInterviewsPage'));
+const ProctoringPage = lazy(() => import('./pages/ProctoringPage'));
 const AIInterviewSessionPage = lazy(() => import('./pages/AIInterviewSessionPage'));
+const DigitalHumanDemo = lazy(() => import('./pages/DigitalHumanDemo'));
 const Loader = <div className="loading-page"><Spin size="large" tip="正在加载智才云…"/></div>;
 
 function Protected() { const { user, loading } = useAuth(); if (loading) return Loader; return user ? <AppLayout/> : <Navigate to="/login" replace/>; }
@@ -35,6 +37,7 @@ export default function App() {
     <Route path="/invite/:token/room" element={<InterviewRoomPage/>}/>
     {/* AI 数字人面试候选人页：凭 ai_interview_sessions.token 访问，无需登录（[Agent组] AI 面试） */}
     <Route path="/ai-interview/:token" element={<AIInterviewSessionPage/>}/>
+    <Route path="/dh-demo" element={<DigitalHumanDemo/>}/>
     <Route element={<Protected/>}>
       <Route path="/" element={<Navigate to="/dashboard" replace/>}/>
       <Route path="/dashboard" element={<DashboardPage/>}/>
@@ -42,6 +45,7 @@ export default function App() {
       <Route path="/resumes" element={<ResumesPage/>}/><Route path="/matchings" element={<MatchingsPage/>}/>
       <Route path="/assessments" element={<AssessmentsPage/>}/>
       <Route path="/ai-interviews" element={<AIInterviewsPage/>}/>
+      <Route path="/proctoring" element={<ProctoringPage/>}/>
       <Route path="/trainings" element={<TrainingsPage/>}/>
       <Route path="/knowledge" element={<KnowledgePage/>}/><Route path="/analytics" element={<AnalyticsPage/>}/>
       <Route path="/assistant" element={<AssistantPage/>}/><Route path="/organizations" element={<OrganizationsPage/>}/>

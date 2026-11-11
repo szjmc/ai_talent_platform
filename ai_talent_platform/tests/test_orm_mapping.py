@@ -37,6 +37,10 @@ EXPECTED_MYSQL_TABLES = {
     "interview_record_sheets",
     "talent_invitations",
     "exam_sessions",
+    # [防作弊] 跨环节在线监考：会话汇总 / 事件明细 / 可疑快照
+    "proctoring_sessions",
+    "proctoring_events",
+    "proctoring_snapshots",
     "knowledge_chunks",
     "knowledge_docs",
     "knowledge_revisions",

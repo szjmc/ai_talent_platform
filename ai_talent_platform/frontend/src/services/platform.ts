@@ -283,4 +283,17 @@ export const aiInterviewsApi = {
     request<AiInterviewAnswerResult>({ url: `/ai-interviews/session/${encodeURIComponent(token)}/answer`, method: 'POST', data }),
   repeat: (token: string) => request<{ text: string; completed: boolean }>({ url: `/ai-interviews/session/${encodeURIComponent(token)}/repeat`, method: 'POST' }),
   finish: (token: string) => request<AiInterviewPublicState>({ url: `/ai-interviews/session/${encodeURIComponent(token)}/finish`, method: 'POST' }),
+
+  /** 生成数字人说话头视频（ComfyUI 驱动，需 ai_interview:manage 权限） */
+  generateDigitalHumanVideo: (data: {
+    text: string;
+    persona_key?: string;
+    voice?: string | null;
+    language?: string;
+  }) =>
+    request<{ ok: boolean; provider: string; video_url: string; elapsed_ms: number; error: string }>({
+      url: '/ai-interviews/digital-human/video',
+      method: 'POST',
+      data,
+    }),
 };
