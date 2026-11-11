@@ -1,4 +1,6 @@
 /* AI 数字人面试官形象（仅作用于 .dh-* 命名空间，避免影响平台其它页面） */
+
+/* ── 舞台 ── */
 .dh-stage {
   position: relative;
   width: var(--dh-size, 260px);
@@ -10,6 +12,12 @@
   isolation: isolate;
   flex: none;
 }
+/* 真人照片模式：容器保持与头像模式一致比例，照片做上半身椭圆裁剪 */
+.dh-stage.dh-photo { align-items: center; }
+.dh-stage.dh-photo .dh-figure { display: none !important; }
+.dh-stage.dh-photo .dh-aurora { inset: 2% 4% 10%; }
+.dh-stage.dh-photo .dh-nameplate { bottom: 6px; }
+
 .dh-aurora {
   position: absolute;
   inset: 4% 6% 12%;
@@ -63,6 +71,7 @@
 .dh-particles i:nth-child(5) { left: 30%; top: 12%; animation-delay: -6s; }
 .dh-particles i:nth-child(6) { right: 27%; top: 8%; animation-delay: -4s; }
 
+/* ── 头像卡通模式 ── */
 .dh-figure {
   position: relative;
   z-index: 2;
@@ -73,15 +82,98 @@
   animation: dh-idle-bob 6.5s ease-in-out infinite;
   transform-origin: 50% 90%;
 }
+
+/* ── 真人照片模式 ── */
+.dh-photo-wrap {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 20px 32px rgba(12, 22, 48, .28));
+  animation: dh-idle-bob 6.5s ease-in-out infinite;
+  transform-origin: 50% 90%;
+}
+.dh-photo-wrap img {
+  width: 100%;
+  height: auto;
+  display: block;
+  /* 裁剪为上半身人像椭圆，保留肩部与胸牌位置 */
+  clip-path: ellipse(48% 42% at 50% 34%);
+  border-radius: 48% 48% 40% 40%;
+  overflow: hidden;
+}
+.dh-stage.dh-speaking .dh-photo-wrap img { animation-duration: 2.6s; }
+.dh-stage.dh-listening .dh-photo-wrap img { animation: dh-listen 2.4s ease-in-out infinite; }
+
+/* ── 视频数字人模式：ComfyUI 生成的真人说话头视频 ── */
+.dh-video {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 20px 32px rgba(12, 22, 48, .28));
+  animation: dh-idle-bob 6.5s ease-in-out infinite;
+  transform-origin: 50% 90%;
+  /* 与照片模式一致的椭圆裁剪 */
+  clip-path: ellipse(48% 42% at 50% 34%);
+  border-radius: 48% 48% 40% 40%;
+  background: #000;
+}
+.dh-stage.dh-speaking .dh-video { animation-duration: 2.6s; }
+.dh-stage.dh-listening .dh-video { animation: dh-listen 2.4s ease-in-out infinite; }
+
+/* ── 嘴部覆盖层（照片模式下覆于照片嘴部；头像模式下不渲染此层，口型由 SVG 内部控制） ── */
+.dh-lip-layer {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  left: 50%;
+  top: 52%;
+  translate: -50% -50%;
+  width: calc(var(--dh-size, 260px) * 0.26);
+  height: calc(var(--dh-size, 260px) * 0.15);
+}
+.dh-stage.dh-photo .dh-lip-layer {
+  left: var(--dh-mouth-x, 50%);
+  top: var(--dh-mouth-y, 52%);
+}
+/* 头像模式下隐藏照片专属的嘴部覆盖层 */
+.dh-stage:not(.dh-photo) .dh-lip-layer { display: none; }
+
+.dh-lip-upper, .dh-lip-lower { transform-origin: 50% 50%; transform-box: fill-box; }
+/* 唇形同步：张合（由 JSX 口度驱动 scale，此处仅兜底状态动画） */
+.dh-speaking .dh-lip-upper { animation: dh-lip-up .34s ease-in-out infinite; }
+.dh-speaking .dh-lip-lower { animation: dh-lip-down .34s ease-in-out infinite; }
+@keyframes dh-lip-up {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(.55) translateY(-2px); }
+}
+@keyframes dh-lip-down {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(.6) translateY(3px); }
+}
+
+/* 头像模式：眼睛眨眼 */
 .dh-eye { animation: dh-blink 5.4s infinite; }
+/* 表情：speaking 时微笑眯眼；thinking 时眼神上望与微皱眉 */
+.dh-speaking .dh-eye { animation-duration: 2.6s; transform: scaleY(.78); }
+.dh-speaking .dh-brow { transform: rotate(2deg); }
+.dh-thinking .dh-pupil { transform: translateY(-3px); }
+.dh-thinking .dh-brow { transform: rotate(-2deg); }
+.dh-brow { transform-origin: 50% 50%; transform-box: fill-box; }
+.dh-brow-think { transform: rotate(-2deg); }
+.dh-brow-speak { transform: rotate(2deg); }
 .dh-mouth { transform-box: fill-box; }
-.dh-speaking .dh-mouth { animation: dh-talk .34s ease-in-out infinite; }
+/* 旧的固定关键帧口型已移除，口型由播报进度驱动（见 DigitalHuman.tsx 的口型同步逻辑） */
 .dh-speaking .dh-figure { animation-duration: 2.6s; }
 .dh-listening .dh-figure { animation: dh-listen 2.4s ease-in-out infinite; }
 .dh-listening .dh-ring-1 { animation-duration: 9s; opacity: 1; }
 .dh-thinking .dh-ring-2 { animation-duration: 7s; opacity: .8; }
 .dh-done .dh-figure { filter: drop-shadow(0 20px 32px rgba(12, 22, 48, .2)) grayscale(.12); }
 
+/* ── 声波条 ── */
 .dh-waveform {
   position: absolute;
   left: 50%;
@@ -109,6 +201,7 @@
 .dh-listening .dh-waveform i:nth-child(2n) { animation-delay: .2s; }
 .dh-listening .dh-waveform i:nth-child(3n) { animation-delay: .38s; }
 
+/* ── 状态条与名牌 ── */
 .dh-status {
   position: absolute;
   left: 50%;
@@ -151,6 +244,7 @@
 .dh-nameplate strong { display: block; font-size: 12px; letter-spacing: .4px; }
 .dh-nameplate span { font-size: 9px; opacity: .75; }
 
+/* ── 关键帧 ── */
 @keyframes dh-idle-bob {
   0%, 100% { transform: translateY(0) scale(1); }
   50% { transform: translateY(-5px) scale(1.004); }
@@ -168,12 +262,6 @@
   0%, 92%, 100% { transform: scaleY(1); }
   94% { transform: scaleY(.08); }
   96% { transform: scaleY(1); }
-}
-@keyframes dh-talk {
-  0%, 100% { transform: scaleY(.52); }
-  25% { transform: scaleY(1.2); }
-  50% { transform: scaleY(.7); }
-  75% { transform: scaleY(1.32); }
 }
 @keyframes dh-spin { to { transform: rotate(360deg); } }
 @keyframes dh-spin-reverse { to { transform: rotate(-360deg); } }
@@ -198,4 +286,7 @@
   .dh-stage *,
   .dh-stage *::before,
   .dh-stage *::after { animation: none !important; }
+  .dh-speaking .dh-eye,
+  .dh-speaking .dh-brow,
+  .dh-thinking .dh-pupil { transform: none !important; }
 }

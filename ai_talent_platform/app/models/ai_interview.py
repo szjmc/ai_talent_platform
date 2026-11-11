@@ -127,6 +127,9 @@ class AiInterviewSession(BaseModel):
         String(64), nullable=False, default="", server_default=text("''"),
         comment="浏览器语音合成音色提示（如 female-zh），空表示跟随系统默认",
     )
+    photo_url: Mapped[str | None] = mapped_column(
+        String(512), nullable=True, comment="数字人面试官真人肖像照片 URL；空则使用默认头像",
+    )
     language: Mapped[str] = mapped_column(
         String(16), nullable=False, default="zh-CN", server_default=text("'zh-CN'"),
         comment="面试语言：zh-CN / en-US",

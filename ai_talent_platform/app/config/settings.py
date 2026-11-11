@@ -365,6 +365,19 @@ class Settings(BaseSettings):
     AI_INTERVIEW_LLM_TIMEOUT_SECONDS: int = 45      # 单次模型调用超时（秒）
     AI_INTERVIEW_ANSWER_MAX_CHARS: int = 4000       # 单题回答最大长度（防滥用）
 
+    # ------------------------------------------- ComfyUI 本地数字人（[Agent组] AI 面试视频合成）
+    # 用户在 ComfyUI（默认 http://127.0.0.1:8188）里搭好数字人工作流（MuseTalk / SadTalker /
+    # AnimateDiff + 音频驱动），导出 API 格式 JSON，通过以下配置接入平台。
+    # 未配置时，数字人视频生成自动降级为现有「照片 + 唇形同步」方案，面试不中断。
+    COMFYUI_BASE_URL: str = ""               # 如 http://127.0.0.1:8188，空表示未启用 ComfyUI 数字人
+    COMFYUI_WORKFLOW: str = ""               # 工作流 API JSON 字符串，或指向 workflow.json 的文件路径
+    COMFYUI_TEXT_NODE_ID: str = ""           # 负责输入文本的节点 ID；留空则自动寻找含 "text" 字段的节点
+    COMFYUI_TEXT_INPUT_KEY: str = "text"     # 文本输入字段名，默认 "text"
+    COMFYUI_OUTPUT_NODE_ID: str = ""         # 负责保存视频的节点 ID；留空则自动从 outputs 提取首个视频
+    COMFYUI_TIMEOUT_SECONDS: int = 300       # 单次 ComfyUI 生成超时（秒）
+    COMFYUI_POLL_INTERVAL_SECONDS: float = 2 # 轮询历史间隔（秒）
+    DIGITAL_HUMAN_PROVIDER: str = "comfyui"  # 数字人供应商：comfyui（预留 heygen/did 等扩展）
+
     # ------------------------------------------------------------------ 校验器
     # 说明：DIFY_API_KEY 现为 str 语义（见上方注释），原先的 _parse_dify_keys
     #       「把空字符串解析成 {}」校验器会把 dict 交给 str 字段导致启动即报错，已移除。
