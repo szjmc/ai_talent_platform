@@ -215,6 +215,8 @@ class AiInterviewPublicState(BaseModel):
     current_question: AiInterviewQuestionResponse | None = None
     transcript: list[dict[str, Any]] = Field(default_factory=list)
     result: dict[str, Any] | None = None
+    # [防作弊] 行为监考策略（切屏 / 远程控制 / 投屏 / 多显示器）：候选人页据此开启监听与全屏
+    proctoring: dict[str, Any] = Field(default_factory=dict)
     server_time: datetime | None = None
 
 

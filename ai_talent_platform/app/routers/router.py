@@ -41,6 +41,7 @@ from app.routers.knowledge_router import router as knowledge_router  # [合并 l
 from app.routers.matching_router import router as matching_router
 from app.routers.organization_router import router as organization_router
 from app.routers.position_router import router as position_router
+from app.routers.proctoring_router import router as proctoring_router  # [防作弊] 在线监考核心/证据链
 from app.routers.rag_router import router as rag_router  # [合并 lz] 向量检索
 from app.routers.resume_router import router as resume_router  # [合并 lz] 简历解析
 from app.routers.talent_router import router as talent_router
@@ -84,6 +85,8 @@ api_router.include_router(rag_router)
 api_router.include_router(talent_router)
 # [接口分组治理] 之前漏挂 / 只挂占位的模块，此处补真实实现
 api_router.include_router(invite_router)  # 人才邀约（前端 InvitePage / InterviewRoomPage 依赖）
+# [防作弊] 在线监考：切屏 / 远程控制 / 投屏 / 多显示器 / 虚拟摄像头的上报与 HR 复盘
+api_router.include_router(proctoring_router)
 api_router.include_router(file_router)    # 文件中心（原 /files 仅 501 占位）
 api_router.include_router(audit_router)   # 审计查询（原 /audit 仅 501 占位）
 
@@ -111,6 +114,7 @@ IMPLEMENTED_MODULES: list[str] = [
     # [合并 origin/develop] 测评 Agent 上线后，assessments 由占位切换为真实路由
     "assessments",
     # [接口分组治理] 以下模块已有真实实现，之前遗漏在清单外（对外表现为「未实现」）
+    "proctoring",  # 在线监考（防作弊）：心跳/事件上报 + HR 证据链
     "invites",   # 人才邀约：接口早已实现，但从未 include_router（/invites/* 一直 404）
     "files",     # 文件中心：file_router（原为 501 占位）
     "audit",     # 审计查询：audit_router（原为 501 占位）

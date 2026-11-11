@@ -11,7 +11,8 @@ import {
 import DigitalHuman, { type DigitalHumanState } from '../components/ai/DigitalHuman';
 import { useSpeech } from '../hooks/useSpeech';
 import { aiInterviewsApi } from '../services/platform';
-import { formatApiError } from '../services/api';
+import { formatApiError, proctoringApi } from '../services/api';
+import { useProctoring } from '../hooks/useProctoring';
 import type { AiInterviewPublicState } from '../types';
 import './ai-interview-session.css';
 
@@ -52,6 +53,41 @@ export default function AIInterviewSessionPage() {
   /** ComfyUI 生成的数字人视频 URL；有值时 DigitalHuman 优先播放真人视频。 */
   const [videoSrc, setVideoSrc] = useState<string | undefined>(undefined);
   const videoCacheRef = useRef<Map<string, string>>(new Map());
+  /** [防作弊] 监考提示与被阻断原因 */
+  const [integrityNotice, setIntegrityNotice] = useState('');
+  const [integrityBlocked, setIntegrityBlocked] = useState('');
+
+  /* ------------------------------------------------------------ 行为监考（防作弊）
+   * 切屏 / 失焦 / 退出全屏 / 多显示器 / 远程控制 / 虚拟摄像头 / 粘贴长答案
+   * 全部交给服务端判定（见 app/ai/proctoring/integrity.py）。风险分不参与 AI 评分，
+   * 只作为 HR 复核依据；严格模式命中硬性风险（远程/投屏/代考）会立刻中断面试。
+   */
+  const proctoring = useProctoring({
+    subject: 'ai_interview',
+    token,
+    transport: proctoringApi,
+    active: phase === 'interview',
+    policy: {
+      enabled: state?.proctoring?.enabled ?? true,
+      strict: state?.proctoring?.strict ?? true,
+      requireScreenShare: state?.proctoring?.require_screen_share ?? false,
+      allowMultiDisplay: state?.proctoring?.allow_multi_display ?? false,
+      heartbeatSeconds: state?.proctoring?.heartbeat_seconds ?? 15,
+      snapshotIntervalSeconds: state?.proctoring?.snapshot_interval_seconds ?? 20,
+    },
+    onLevelChange: (ack) => {
+      setIntegrityNotice(ack.state.warning || '');
+      if (ack.new_violations.length) {
+        const last = ack.new_violations[ack.new_violations.length - 1];
+        message.warning(`监考提示：${last.label || last.detail || '检测到异常行为'}`);
+      }
+    },
+    onBlocked: (reason) => {
+      setIntegrityBlocked(reason);
+      speech.stopSpeaking();
+      speech.stopListening();
+    },
+  });
 
   const speech = useSpeech(state?.language || 'zh-CN', state?.interviewer?.voice_hint);
   const chatRef = useRef<HTMLDivElement | null>(null);
@@ -157,13 +193,8 @@ export default function AIInterviewSessionPage() {
     return () => observer.disconnect();
   }, [phase]);
 
-  /* ------------------------------------------------------------ 离场提示 */
-  useEffect(() => {
-    if (phase !== 'interview') return;
-    const handler = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
-    window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
-  }, [phase]);
+  /* 离场提示统一由 useProctoring 注册（它同时会把「尝试关闭/刷新」作为监考事件上报，
+   * 这里不再重复 addEventListener，否则会弹两次确认框。 */
 
   useEffect(() => { if (!speech.ttsSupported) setVoiceOn(false); }, [speech.ttsSupported]);
 
@@ -205,6 +236,8 @@ export default function AIInterviewSessionPage() {
       setRemaining(data.progress.remaining_seconds ?? null);
       if (data.status === 'completed') { setResult(data.result); setPhase('completed'); return; }
       setPhase('interview');
+      // [防作弊] 与笔试一致：开始即全屏；浏览器拒绝时不阻塞（服务端仍会记录 fullscreen_exit）
+      void document.documentElement.requestFullscreen?.().catch(() => undefined);
       window.setTimeout(scrollChatToBottom, 120);
       window.setTimeout(scrollChatToBottom, 420);
       if (voiceOn) speakWithVideo(`${data.greeting} ${data.current_question?.text || ''}`.trim());
@@ -336,6 +369,34 @@ export default function AIInterviewSessionPage() {
     );
   }
 
+  /* [防作弊] 严格模式命中硬性风险（远程控制 / 投屏 / 疑似代考）：立即中断，
+   * 已答内容保留并由服务端照常评估，但不再接受新的回答（后端 answer 接口同样会拒绝）。
+   */
+  if (phase === 'interview' && integrityBlocked) {
+    return (
+      <div className="aic-page">
+        <ConfigProvider theme={{ token: { colorPrimary: '#315efb', borderRadius: 12 } }}>
+          <div className="aic-blocked-page">
+            <div className="aic-blocked-card">
+              <div className="aic-blocked-icon"><CloseCircleFilled /></div>
+              <h2>本次面试已中止</h2>
+              <p>{integrityBlocked}</p>
+              <ul style={{ textAlign: 'left', color: '#5b6472', fontSize: 13, lineHeight: 1.9 }}>
+                <li>检测到严重违反面试纪律的行为（如切屏他处、远程控制、外接投影/投屏、非本人作答）；</li>
+                <li>你已完成的回答会正常提交并由面试官复核；</li>
+                <li>若属于误判（例如开考前忘记关闭 TeamViewer），请联系 HR 说明并申请复核。</li>
+              </ul>
+              <div className="aic-blocked-actions">
+                <Button type="primary" ghost onClick={() => setPrivacyOpen(true)}>查看隐私说明</Button>
+              </div>
+            </div>
+            <PrivacyModal open={privacyOpen} onClose={() => setPrivacyOpen(false)} />
+          </div>
+        </ConfigProvider>
+      </div>
+    );
+  }
+
   return (
     <ConfigProvider theme={{ token: { colorPrimary: '#315efb', borderRadius: 12 } }}>
       <div className="aic-page">
@@ -447,6 +508,33 @@ export default function AIInterviewSessionPage() {
                 </div>
               </div>
               <Progress percent={progress?.percent ?? 0} showInfo={false} size="small" strokeColor={{ '0%': '#315efb', '100%': '#7c6bff' }} className="aic-progress" />
+
+              {/* [防作弊] 行为监考状态条：让候选人清楚知道「为什么被提醒」，减少误判争议 */}
+              {proctoring.policy.enabled && (
+                <Alert
+                  style={{ marginBottom: 10 }}
+                  type={proctoring.riskLevel === 'clean' ? 'success' : ['watch', 'review'].includes(proctoring.riskLevel) ? 'warning' : 'error'}
+                  showIcon
+                  message={
+                    <span style={{ fontSize: 12 }}>
+                      面试纪律监考中 · 风险 {proctoring.riskLevel}
+                      {` · ${proctoring.fullscreen ? '全屏' : '非全屏'} `}
+                      {` · ${proctoring.screenSharing ? '屏幕共享中' : proctoring.policy.requireScreenShare ? '未共享屏幕（必填）' : '未共享屏幕'}`}
+                    </span>
+                  }
+                  description={
+                    <span style={{ fontSize: 12 }}>
+                      {integrityNotice || '请勿切换标签页/窗口、勿使用远程控制或投屏；离开面试页会被记录并同步给面试官。'}
+                      {!proctoring.fullscreen && (
+                        <Button size="small" type="link" style={{ padding: '0 4px' }} onClick={() => void proctoring.enterFullscreen()}>恢复全屏</Button>
+                      )}
+                      {proctoring.policy.requireScreenShare && !proctoring.screenSharing && (
+                        <Button size="small" type="link" danger style={{ padding: '0 4px' }} onClick={() => void proctoring.startScreenShare()}>共享屏幕</Button>
+                      )}
+                    </span>
+                  }
+                />
+              )}
 
               <div className="aic-chat" ref={chatRef} onScroll={(event) => {
                 const node = event.currentTarget;

@@ -18,6 +18,8 @@ ComfyUI 交互流程：
     COMFYUI_OUTPUT_NODE_ID=<负责保存视频的节点 ID，如 "11">；留空则自动提取首个视频
     COMFYUI_TIMEOUT_SECONDS=300
     COMFYUI_POLL_INTERVAL_SECONDS=2
+
+标签：[Agent组] [P1]（ComfyUI 数字人适配器；补标签以通过 tests/test_code_tags.py 守门）
 """
 
 from __future__ import annotations

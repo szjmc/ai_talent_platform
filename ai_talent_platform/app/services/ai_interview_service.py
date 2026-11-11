@@ -454,6 +454,7 @@ class AiInterviewService:
             turns = await self.turn_repo.list_by_session(self.db, row.id)
             return self._public_state(row, turns)
         if row.status == "pending":
+            await self._assert_integrity_ok(row)
             plan = row.plan or []
             if not plan:
                 raise BusinessRuleError("面试问题尚未生成，请联系 HR")
@@ -505,6 +506,10 @@ class AiInterviewService:
             }
         if row.status != "in_progress":
             raise BusinessRuleError("面试尚未开始或已结束")
+
+        # [防作弊] 严格模式下风险超阈值的会话不再接收新回答：
+        # 已答内容仍会照常评估（不销毁证据），但后续作答不再计入。
+        await self._assert_integrity_ok(row)
 
         deadline = self._deadline(row)
         if deadline is not None and datetime.now() > deadline:
@@ -674,6 +679,20 @@ class AiInterviewService:
             report["timed_out"] = True
         if settings.AI_INTERVIEW_LLM_FEEDBACK and provider_configured(settings.LLM_PROVIDER):
             report = await self._polish_report(row, report, turns)
+        # [防作弊] 把行为监考结论并入报告：HR 在评分旁边直接看到风险等级与命中项，
+        # 风险分不参与总分计算（避免「误触一次切屏就扣分」的争议），仅作决策依据。
+        integrity = await self._integrity_summary(row)
+        if integrity:
+            report["proctoring"] = integrity
+            observations = list(report.get("observations") or [])
+            if integrity.get("risk_level") in {"review", "serious", "void"}:
+                observations.insert(
+                    0,
+                    f"监考风险 {integrity.get('risk_score')} 分（{integrity.get('risk_level')}）："
+                    f"{integrity.get('message')}；命中项 "
+                    + "、".join(integrity.get("event_labels", {}).values() or ["无"]),
+                )
+                report["observations"] = observations[:8]
         row.status = "completed"
         row.finished_at = datetime.now()
         row.total_score = float(report.get("total_score") or 0)
@@ -760,6 +779,33 @@ class AiInterviewService:
         except Exception as exc:  # noqa: BLE001 - 润色失败不影响规则报告
             logger.warning("AI 面试报告润色失败，保留规则版：%s", type(exc).__name__)
             return report
+
+    # ================================================================ 内部：防作弊闸门
+    async def _integrity_summary(self, row: AiInterviewSession) -> dict[str, Any] | None:
+        """读取监考结论（表未建 / 库异常时返回 None，绝不影响面试主流程）。"""
+        try:
+            from app.services.proctoring_service import ProctoringService
+
+            if row.id is None:
+                return None
+            return await ProctoringService(self.db).summary_for_subject("ai_interview", row.id)
+        except Exception as exc:  # noqa: BLE001 —— 监考能力缺失不阻断面试
+            logger.info("AI 面试监考结论读取失败（忽略）：%s", type(exc).__name__)
+            return None
+
+    async def _assert_integrity_ok(self, row: AiInterviewSession) -> None:
+        """严格模式下的作答闸门：命中严重作弊风险即拒绝继续作答。
+
+        判定口径与 HR 页面 / 报告完全一致（同一份 summary），避免「HR 看到作弊、
+        候选人还能继续答题」这种口径分裂。
+        """
+        summary = await self._integrity_summary(row)
+        if not summary:
+            return
+        if summary.get("blocked") and summary.get("risk_level") in {"serious", "void"}:
+            raise BusinessRuleError(
+                "监考检测到严重异常行为（如切屏、远程控制、投屏或非本人作答），本次面试已停止，请联系 HR"
+            )
 
     # ================================================================ 内部：查询 / 序列化
     async def _get_by_token(self, token: str, *, lock: bool = False) -> AiInterviewSession:
@@ -996,7 +1042,21 @@ class AiInterviewService:
             "current_question": self._current_question(row, turns),
             "transcript": transcript,
             "result": self._candidate_result(row),
+            # [防作弊] 候选人页面据此开启行为监考（切屏/远程/投屏/多屏）与全屏锁定；
+            # 只下发「要不要做」，不下发权重与阈值（防止按分数反推作弊空间）。
+            "proctoring": self._proctor_policy(),
             "server_time": datetime.now(),
+        }
+
+    @staticmethod
+    def _proctor_policy() -> dict[str, Any]:
+        return {
+            "enabled": bool(settings.PROCTOR_ENABLED),
+            "strict": bool(settings.PROCTOR_ENABLED and settings.PROCTOR_STRICT_MODE),
+            "require_screen_share": bool(settings.PROCTOR_ENABLED and settings.PROCTOR_REQUIRE_SCREEN_SHARE),
+            "allow_multi_display": bool(settings.PROCTOR_ALLOW_MULTI_DISPLAY),
+            "heartbeat_seconds": max(5, int(settings.PROCTOR_HEARTBEAT_SECONDS or 15)),
+            "snapshot_interval_seconds": max(5, int(settings.PROCTOR_SNAPSHOT_INTERVAL_SECONDS or 20)),
         }
 
     def _candidate_result(self, row: AiInterviewSession) -> dict[str, Any] | None:

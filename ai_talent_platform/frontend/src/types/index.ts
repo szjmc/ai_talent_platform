@@ -231,6 +231,11 @@ export interface AiInterviewPublicState {
     suggestions: string[]; per_question: { index: number; question: string; dimension_label: string; score: number | null; feedback: string }[];
     scoring_method: string;
   } | null;
+  /** [防作弊] 行为监考策略：切屏 / 远程控制 / 投屏 / 多显示器 */
+  proctoring?: {
+    enabled: boolean; strict: boolean; require_screen_share: boolean; allow_multi_display: boolean;
+    heartbeat_seconds: number; snapshot_interval_seconds: number;
+  } | null;
   server_time?: string | null;
 }
 export interface AiInterviewAnswerResult {

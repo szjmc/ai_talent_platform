@@ -7,6 +7,8 @@
     传入播报文本，返回数字人说话头视频（二进制）或可直接播放的 URL。
 
 适配器示例：comfyui_adapter（本地 ComfyUI 工作流驱动的真人数字人）。
+
+标签：[Agent组] [P1]（数字人生成统一接口，补标签以通过 tests/test_code_tags.py 守门）
 """
 
 from __future__ import annotations

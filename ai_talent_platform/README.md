@@ -14,7 +14,10 @@ ORM 层已完整落地：MySQL 业务表（含 AI 面试 2 张）+ PgSQL 6 张�
 见 `docs/plan/05-代码标签与优先级总表.md` 与 `docs/storage_and_llm_adapters.md`；全局 ORM 映射由 `python scripts/dump_orm_mapping.py` 自动生成；
 PgSQL 分析库另有独立初始化脚本 `scripts/init_pgsql.py`（含分区父表和 DEFAULT 分区，数据同步/ETL 仍未实现）；
 AI 数字人面试提供「创建 → 候选人 token 链接 → 数字人提问/追问 → 语音或文字作答 → 规则量化评分 → HR 报告」闭环，
-见 [docs/ai_interview.md](docs/ai_interview.md)。
+见 [docs/ai_interview.md](docs/ai_interview.md)；
+在线监考（反作弊）覆盖 **切屏 / 失焦 / 退出全屏 / 多显示器 / 外接投影 / 远程控制 / 虚拟摄像头 / 断流**，
+AI 面试、笔试、视频面试间共用同一套判定引擎与 HR 证据链，见
+[docs/在线监考与防作弊.md](docs/在线监考与防作弊.md)。
 
 ---
 

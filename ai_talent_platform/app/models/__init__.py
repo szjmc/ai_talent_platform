@@ -69,6 +69,14 @@ from app.models.reserve_warning import (  # noqa: E402
     ReserveWarning,
     WARNING_TYPES,
 )
+# [防作弊] 跨环节在线监考：会话汇总 / 事件明细 / 可疑快照。
+# 必须在此显式 import，否则 Base.metadata 不含这三张表，create_all 会漏表。
+from app.models.proctoring import (  # noqa: E402
+    SUBJECT_TYPES,
+    ProctoringEvent,
+    ProctoringSession,
+    ProctoringSnapshot,
+)
 from app.models.role import Role, UserRole  # noqa: E402
 from app.models.talent import Talent, TalentPortrait  # noqa: E402
 from app.models.training import (  # noqa: E402
@@ -132,6 +140,11 @@ __all__ = [
     "REVIEW_STATUS_LABELS",
     "REVIEW_TRANSITIONS",
     "REVIEW_REASON_CODES",
+    # 在线监考（切屏 / 远程控制 / 投屏 / 多显示器 / 虚拟摄像头）
+    "ProctoringSession",
+    "ProctoringEvent",
+    "ProctoringSnapshot",
+    "SUBJECT_TYPES",
     # 知识库
     "KnowledgeDoc",
     "KnowledgeChunk",

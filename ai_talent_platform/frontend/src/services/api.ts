@@ -170,16 +170,26 @@ export interface InviteVisit {
   type: InviteType; title: string; status: string; candidate_name?: string | null;
   interview_time?: string | null; expires_at?: string | null; duration_minutes: number;
   question_count?: number | null; proctor_enabled: boolean; proctor_engine: string;
-  frame_interval_seconds: number; ice_servers: { urls: string; username?: string; credential?: string }[];
+  frame_interval_seconds: number;
+  /** [防作弊] 行为监考策略：切屏 / 远程控制 / 投屏 / 多显示器 */
+  proctor_strict_mode?: boolean; proctor_require_screen_share?: boolean;
+  proctor_allow_multi_display?: boolean; proctor_heartbeat_seconds?: number;
+  proctor_snapshot_interval_seconds?: number;
+  ice_servers: { urls: string; username?: string; credential?: string }[];
 }
 export interface ExamQuestion { id: number; seq: number; type: 'single' | 'multiple' | 'text'; content: string; options?: { key: string; text: string }[] | null }
 export interface ExamStart {
   status: string; started_at?: string | null; deadline?: string | null; questions: ExamQuestion[];
   total_score: number; proctor_enabled: boolean; proctor_engine: string; frame_interval_seconds: number;
+  proctor_strict_mode?: boolean; proctor_require_screen_share?: boolean;
+  proctor_allow_multi_display?: boolean; proctor_heartbeat_seconds?: number;
+  proctor_snapshot_interval_seconds?: number;
 }
 export interface ExamResult {
   status: string; score?: number | null; total_score?: number | null; submitted_at?: string | null;
   violations_count: number; pending_manual: boolean;
+  /** [防作弊] 行为监考结论：切屏 / 远程控制 / 投屏等，仅作复核依据，不扣卷面分 */
+  proctor_risk_score?: number; proctor_risk_level?: string; proctor_message?: string; proctor_blocked?: boolean;
 }
 export interface FrameCheck {
   enabled: boolean; engine: string; violations: { ts: number; type: string; detail: string }[];
@@ -207,4 +217,52 @@ export function inviteWsUrl(token: string, role: 'candidate' | 'interviewer'): s
   url.pathname = `${url.pathname.replace(/\/$/, '')}/invites/ws/${encodeURIComponent(token)}`;
   url.search = `?role=${role}`;
   return url.toString();
+}
+
+/* ======================= 在线监考（防作弊）[Agent组] ======================= */
+export type ProctorSubject = 'ai_interview' | 'exam' | 'interview' | 'assessment';
+export interface ProctorServerState {
+  enabled: boolean; strict: boolean; risk_level: string; blocked: boolean; block_reason: string;
+  warning: string; heartbeat_seconds: number; snapshot_interval_seconds: number;
+  screen_shared: boolean; display_count: number; event_total: number;
+  requirements: { screen_share: boolean; single_display: boolean; no_remote_control: boolean; no_virtual_camera: boolean; fullscreen: boolean };
+}
+export interface ProctorViolation { ts?: number | null; type: string; label?: string; detail?: string; score?: number; source?: string }
+export interface ProctorAck { state: ProctorServerState; new_violations: ProctorViolation[]; score: number; level: string }
+
+/**
+ * 候选人监考上报（公开接口，凭 token；无需登录）。
+ * 分数与等级全部由服务端计算，前端只上报「发生了什么」，不参与判定。
+ */
+export const proctoringApi = {
+  heartbeat: (subject: ProctorSubject, token: string, body: Record<string, unknown>) =>
+    request<ProctorAck>({ url: `/proctoring/${subject}/${encodeURIComponent(token)}/heartbeat`, method: 'post', data: body }),
+  snapshot: (subject: ProctorSubject, token: string, body: Record<string, unknown>) =>
+    request<{ stored: boolean; id?: number; url?: string; total?: number; reason?: string }>(
+      { url: `/proctoring/${subject}/${encodeURIComponent(token)}/snapshot`, method: 'post', data: body }),
+  state: (subject: ProctorSubject, token: string) =>
+    request<ProctorServerState>({ url: `/proctoring/${subject}/${encodeURIComponent(token)}/state` }),
+  config: () => request<Record<string, unknown>>({ url: '/proctoring/config' }),
+  sessions: (params?: Record<string, unknown>) =>
+    request<{ items: ProctorSessionSummary[]; total: number; page: number; page_size: number; pages: number }>(
+      { url: '/proctoring/sessions', params }),
+  report: (id: number) => request<ProctorSessionReport>({ url: `/proctoring/sessions/${id}` }),
+  review: (id: number, verdict: 'confirmed' | 'false_positive' | 'pending', note = '') =>
+    request<ProctorSessionReport>({ url: `/proctoring/sessions/${id}/review`, method: 'post', params: { verdict, note } }),
+};
+
+export interface ProctorSessionSummary {
+  id: number; subject_type: string; subject_id?: number | null; subject_token: string;
+  candidate_name: string; position_title?: string | null; risk_score: number; risk_level: string;
+  risk_advice: string; blocked: boolean; hard_violations: string[]; event_total: number;
+  started_at?: string | null; finished_at?: string | null; last_heartbeat_at?: string | null; created_at?: string | null;
+}
+export interface ProctorSessionReport extends ProctorSessionSummary {
+  message: string; require_review: boolean; void_suggested: boolean;
+  event_counts: Record<string, number>; event_labels: Record<string, string>;
+  timeline: ProctorViolation[];
+  snapshots: { id: number; source: string; trigger_type: string; captured_at?: string | null; url: string; note?: string | null }[];
+  integrity: Record<string, unknown>;
+  strict_mode: boolean; require_screen_share: boolean; screen_shared: boolean;
+  remote_control: boolean; display_count: number; heartbeat_lost: boolean;
 }

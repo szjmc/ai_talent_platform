@@ -7,6 +7,8 @@
 
 扩展方式：实现 BaseDigitalHuman 并 @digital_human_registry.register("xxx"),
 业务侧通过 get_digital_human("xxx") 切换，无需改动调用方。
+
+标签：[Agent组] [P1]（数字人适配器注册表；补标签以通过 tests/test_code_tags.py 守门）
 """
 
 from __future__ import annotations

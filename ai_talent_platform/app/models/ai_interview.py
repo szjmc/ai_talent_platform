@@ -184,6 +184,14 @@ class AiInterviewSession(BaseModel):
         String(64), nullable=True, comment="报告生成方式：rule / rule+llm:<model>"
     )
 
+    # ------------------------------------------------------------ 防作弊监考
+    # [防作弊] 行为监考快照：{score, level, integrity{...}, heartbeat_lost, ...}
+    # 结构由 app/ai/proctoring/integrity.py 定义，写入方是 services/proctoring_service.py；
+    # 用 JSON 而非独立列，避免监考口径迭代时反复改表（历史事故：口径一变就要迁移）。
+    proctor_state: Mapped[dict | None] = mapped_column(
+        JSON, nullable=True, comment="行为监考状态快照（切屏/远程/投屏/多显示器风险汇总）"
+    )
+
     # ------------------------------------------------------------ 时间
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="开始时间")
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, comment="结束时间")

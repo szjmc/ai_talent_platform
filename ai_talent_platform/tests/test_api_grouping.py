@@ -43,6 +43,7 @@ EXPECTED_GROUP = {
     "assessments": "人才测评",
     "ai-interviews": "AI 面试",
     "invites": "人才邀约",
+    "proctoring": "在线监考",
     "files": "文件管理",
     "audit": "审计日志",
     "analytics": "数据分析",

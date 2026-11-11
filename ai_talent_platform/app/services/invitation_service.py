@@ -85,6 +85,22 @@ def _scalar(value: Any) -> Any:
     return value
 
 
+def _behavior_policy() -> dict[str, Any]:
+    """行为监考策略快照（前端据此请求屏幕共享 / 拦截多屏 / 强制全屏）。
+
+    集中在一处，visit / start_exam / 结果页三处口径一致，避免前端各页自己判断。
+    """
+    return {
+        "proctor_strict_mode": bool(settings.PROCTOR_ENABLED and settings.PROCTOR_STRICT_MODE),
+        "proctor_require_screen_share": bool(
+            settings.PROCTOR_ENABLED and settings.PROCTOR_REQUIRE_SCREEN_SHARE
+        ),
+        "proctor_allow_multi_display": bool(settings.PROCTOR_ALLOW_MULTI_DISPLAY),
+        "proctor_heartbeat_seconds": max(5, int(settings.PROCTOR_HEARTBEAT_SECONDS or 15)),
+        "proctor_snapshot_interval_seconds": max(5, int(settings.PROCTOR_SNAPSHOT_INTERVAL_SECONDS or 20)),
+    }
+
+
 def normalize_answer(value: Any) -> Any:
     """单选归一为字符串，多选归一为去重列表（保持出现顺序），文本保留。"""
     if isinstance(value, (list, tuple)):
@@ -431,6 +447,7 @@ class InvitationService:
             proctor_enabled=detector.enabled,
             proctor_engine=detector.engine,
             frame_interval_seconds=max(2, settings.PROCTOR_INTERVAL_SECONDS),
+            **_behavior_policy(),
             ice_servers=ice,
         )
 
@@ -489,6 +506,7 @@ class InvitationService:
                 proctor_enabled=detector.enabled,
                 proctor_engine=detector.engine,
                 frame_interval_seconds=max(2, settings.PROCTOR_INTERVAL_SECONDS),
+                **_behavior_policy(),
             )
         # 截止时间：min(链接过期, 首次打开+时长)
         if session.started_at is None:
@@ -516,6 +534,7 @@ class InvitationService:
             proctor_enabled=detector.enabled,
             proctor_engine=detector.engine,
             frame_interval_seconds=max(2, settings.PROCTOR_INTERVAL_SECONDS),
+            **_behavior_policy(),
         )
 
     async def submit(self, token: str, answers: dict[str, Any], *, client_ip: str | None = None) -> ExamResultResponse:
@@ -554,13 +573,20 @@ class InvitationService:
         detail = session.score_detail or {}
         pending = any(bool(v.get("manual")) for v in detail.values() if isinstance(v, dict))
         violations = list(session.violations or [])
+        integrity = (session.proctor_state or {}).get("integrity") if isinstance(session.proctor_state, dict) else None
+        integrity = integrity if isinstance(integrity, dict) else {}
         return ExamResultResponse(
             status=session.status,
             score=float(session.score) if session.score is not None else None,
             total_score=float(session.total_score) if session.total_score is not None else None,
             submitted_at=session.submitted_at,
-            violations_count=len(violations),
+            violations_count=max(len(violations), int(integrity.get("event_counts") and sum(
+                int(v or 0) for v in (integrity.get("event_counts") or {}).values()) or 0)),
             pending_manual=pending,
+            proctor_risk_score=float(integrity.get("risk_score") or 0),
+            proctor_risk_level=str(integrity.get("risk_level") or "clean"),
+            proctor_message=str(integrity.get("risk_message") or ""),
+            proctor_blocked=bool(integrity.get("risk_level") in {"serious", "void"}),
         )
 
     async def result(self, token: str) -> ExamResultResponse:

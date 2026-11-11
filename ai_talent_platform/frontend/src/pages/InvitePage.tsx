@@ -6,9 +6,10 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
-  formatApiError, invitesApi,
+  formatApiError, invitesApi, proctoringApi,
   type ExamQuestion, type ExamResult, type ExamStart, type InviteVisit,
 } from '../services/api';
+import { useProctoring } from '../hooks/useProctoring';
 
 type Phase = 'loading' | 'intro' | 'camera' | 'exam' | 'result' | 'failed';
 
@@ -34,6 +35,39 @@ export default function InvitePage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const captureTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [integrityNotice, setIntegrityNotice] = useState('');
+  const [integrityBlocked, setIntegrityBlocked] = useState('');
+
+  /* ---------------------------------------------------------------- 行为监考
+   * 切屏 / 失焦 / 退出全屏 / 多显示器 / 远程控制 / 虚拟摄像头 / 粘贴答案等信号
+   * 由浏览器采集后交给服务端判定（判定口径唯一，前端不做任何结论）。
+   * 仅在「开始答题」后生效：落地页与摄像头确认阶段不采集，避免打扰候选人。
+   */
+  const proctoring = useProctoring({
+    subject: 'exam',
+    token,
+    transport: proctoringApi,
+    active: phase === 'exam',
+    policy: {
+      enabled: exam?.proctor_enabled !== false,
+      strict: exam?.proctor_strict_mode ?? true,
+      requireScreenShare: exam?.proctor_require_screen_share ?? false,
+      allowMultiDisplay: exam?.proctor_allow_multi_display ?? false,
+      heartbeatSeconds: exam?.proctor_heartbeat_seconds ?? 15,
+      snapshotIntervalSeconds: exam?.proctor_snapshot_interval_seconds ?? 20,
+    },
+    onLevelChange: (ack) => {
+      if (ack.state.warning) setIntegrityNotice(ack.state.warning);
+      if (ack.new_violations.length) {
+        const last = ack.new_violations[ack.new_violations.length - 1];
+        message.warning(`监考提示：${last.label || last.detail || '检测到异常行为'}`);
+      }
+    },
+    onBlocked: (reason) => {
+      setIntegrityBlocked(reason);
+      stopCamera();
+    },
+  });
 
   /* ---------------------------------------------------------------- 落地信息 */
   const loadVisit = useCallback(async () => {
@@ -107,6 +141,8 @@ export default function InvitePage() {
       setViolations({ total: 0, latest: '' });
       setPhase('exam');
       if (started.deadline) setRemaining(Math.max(0, dayjs(started.deadline).diff(dayjs(), 'second')));
+      // [防作弊] 开局即进入全屏：把「意外切屏」和「刻意切屏」都记录在案（浏览器可能要求用户手势，失败静默）
+      void document.documentElement.requestFullscreen?.().catch(() => undefined);
       if (started.proctor_enabled && streamRef.current) {
         captureAndReport();
         captureTimer.current = setInterval(captureAndReport, Math.max(2, started.frame_interval_seconds) * 1000);
@@ -208,7 +244,9 @@ export default function InvitePage() {
         extra={[
           <div key="meta" style={{ textAlign: 'center', marginBottom: 16 }}>
             {result.violations_count > 0
-              ? <Alert type="warning" showIcon style={{ textAlign: 'left' }} message={`监考记录到 ${result.violations_count} 次异常行为，将随答卷一并复核`} />
+              ? <Alert type="warning" showIcon style={{ textAlign: 'left' }}
+                  message={`监考记录到 ${result.violations_count} 次异常行为，将随答卷一并复核`}
+                  description={result.proctor_message ? `行为监考风险 ${result.proctor_risk_score ?? 0} 分（${result.proctor_risk_level ?? ''}）：${result.proctor_message}` : undefined} />
               : <Alert type="success" showIcon style={{ textAlign: 'left' }} message="监考全程未记录到异常行为" />}
           </div>,
           <Button key="done" type="primary" href="/">完成</Button>,
@@ -266,6 +304,8 @@ export default function InvitePage() {
           <Alert type="info" showIcon icon={<EyeOutlined />} message="考试须知"
             description={<ul style={{ margin: 0, paddingLeft: 18 }}>
               <li>全程需打开摄像头：系统通过 {visit?.proctor_engine === 'disabled' ? '基础采集（当前监考引擎未启用）' : `AI 视觉检测（${visit?.proctor_engine}）`} 判断是否存在代考、多人、遮挡等异常；</li>
+              <li>全程保持全屏、单独使用一块屏幕：切屏、退出全屏、扩展屏 / 外接投影、远程控制软件（ToDesk、向日葵、TeamViewer 等）、虚拟摄像头都会被记录，命中严重风险将立即结束本次作答；</li>
+              {visit?.proctor_require_screen_share && <li>本次考试要求共享整个屏幕（仅用于识别切屏与投屏，不采集其他内容）；</li>}
               <li>题量按您的简历解析结果自动组卷，从平台题库随机抽题；</li>
               <li>倒计时结束将自动交卷，请合理安排时间。</li>
             </ul>} />
@@ -293,6 +333,18 @@ export default function InvitePage() {
     );
   }
 
+  /* -------- 监考阻断（严格模式命中严重风险）-------- */
+  if (integrityBlocked) {
+    return shell(
+      <Result
+        status="error"
+        title="本次作答已结束"
+        subTitle={integrityBlocked}
+        extra={<Button type="primary" onClick={() => loadVisit()}>返回</Button>}
+      />,
+    );
+  }
+
   /* -------- 答题 -------- */
   return shell(
     <div style={{ background: '#fff', borderRadius: 14, padding: '24px 26px', boxShadow: '0 14px 44px rgba(26,62,73,.1)' }}>
@@ -309,6 +361,37 @@ export default function InvitePage() {
         <Alert type="error" showIcon style={{ marginBottom: 14 }}
           message={`监考告警（累计 ${violations.total} 次）`}
           description={violations.latest || '请确保本人独立作答、画面中仅您一人'} />
+      )}
+      {/* [防作弊] 行为监考：全屏锁定 / 屏幕共享 / 命中硬性风险时的明确提示 */}
+      {(proctoring.policy.enabled) && (
+        <Alert
+          type={proctoring.riskLevel === 'clean' ? 'info' : ['watch', 'review'].includes(proctoring.riskLevel) ? 'warning' : 'error'}
+          showIcon
+          style={{ marginBottom: 14 }}
+          message={
+            <>
+              行为监考已开启
+              <Tag style={{ marginLeft: 8 }} color={proctoring.riskLevel === 'clean' ? 'green' : 'orange'}>
+                风险：{proctoring.riskLevel}
+              </Tag>
+              <Tag>{proctoring.fullscreen ? '已全屏' : '未全屏'}</Tag>
+              <Tag color={proctoring.screenSharing ? 'blue' : proctoring.policy.requireScreenShare ? 'red' : 'default'}>
+                {proctoring.screenSharing ? '共享中' : proctoring.policy.requireScreenShare ? '未共享（必填）' : '未共享'}
+              </Tag>
+            </>
+          }
+          description={
+            <Space direction="vertical" size={6} style={{ width: '100%' }}>
+              <span>{integrityNotice || '请保持全屏、勿切换标签页或窗口；禁止使用远程控制、投屏、扩展屏与虚拟摄像头。'}</span>
+              <Space wrap>
+                {!proctoring.fullscreen && <Button size="small" onClick={() => void proctoring.enterFullscreen()}>进入全屏</Button>}
+                {proctoring.policy.requireScreenShare && !proctoring.screenSharing && (
+                  <Button size="small" danger onClick={() => void proctoring.startScreenShare()}>共享整个屏幕</Button>
+                )}
+              </Space>
+            </Space>
+          }
+        />
       )}
       <Space direction="vertical" size={18} style={{ width: '100%' }}>
         {(exam?.questions ?? []).map(q => {

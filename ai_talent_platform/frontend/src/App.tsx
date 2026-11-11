@@ -23,6 +23,7 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const InvitePage = lazy(() => import('./pages/InvitePage'));
 const InterviewRoomPage = lazy(() => import('./pages/InterviewRoomPage'));
 const AIInterviewsPage = lazy(() => import('./pages/AIInterviewsPage'));
+const ProctoringPage = lazy(() => import('./pages/ProctoringPage'));
 const AIInterviewSessionPage = lazy(() => import('./pages/AIInterviewSessionPage'));
 const DigitalHumanDemo = lazy(() => import('./pages/DigitalHumanDemo'));
 const Loader = <div className="loading-page"><Spin size="large" tip="正在加载智才云…"/></div>;
@@ -44,6 +45,7 @@ export default function App() {
       <Route path="/resumes" element={<ResumesPage/>}/><Route path="/matchings" element={<MatchingsPage/>}/>
       <Route path="/assessments" element={<AssessmentsPage/>}/>
       <Route path="/ai-interviews" element={<AIInterviewsPage/>}/>
+      <Route path="/proctoring" element={<ProctoringPage/>}/>
       <Route path="/trainings" element={<TrainingsPage/>}/>
       <Route path="/knowledge" element={<KnowledgePage/>}/><Route path="/analytics" element={<AnalyticsPage/>}/>
       <Route path="/assistant" element={<AssistantPage/>}/><Route path="/organizations" element={<OrganizationsPage/>}/>

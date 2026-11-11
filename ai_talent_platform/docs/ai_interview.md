@@ -34,6 +34,31 @@ AI 数字人面试在现有平台之上补齐「首轮结构化面试」环节�
 | 结果 | `total_score` / `level` / `recommendation` / `report` / `plan` | `report` 为 JSON，含逐题评分、维度分、亮点/短板/建议 |
 | 安全 | `token`（唯一索引）/ `started_at` / `finished_at` | token 由 `generate_random_token` 生成，仅用于本次面试 |
 
+### 2.1.1 `proctor_state`（行为监考快照）
+
+`ai_interview_sessions.proctor_state`（JSON）保存行为监考结论，由 `services/proctoring_service.py` 写入：
+
+```json
+{
+  "score": 42.5,
+  "level": "review",
+  "integrity": {
+    "risk_score": 42.5, "risk_level": "review", "risk_advice": "review",
+    "hard_violations": ["multi_display"],
+    "event_counts": {"tab_hidden": 3, "multi_display": 2},
+    "hardware": {"display_count": 2, "screen_shared": false, "remote_control": false, "heartbeat_lost": false}
+  }
+}
+```
+
+- 判定口径与 HR「在线监考」页面完全一致（同一份 `assess_integrity` 结论）；
+- 面试结束生成报告时，结论并入 `report.proctoring`，并把严重风险写进 `report.observations`；
+- **不参与总分计算**：只作 HR 复核依据，避免误触切屏导致扣分争议；
+- 严格模式下命中硬性风险（远程控制 / 投屏 / 疑似代考）会阻断后续作答（`answer` / `start` 返回业务异常），
+  已作答内容照常评估。
+
+详见 [在线监考与防作弊.md](在线监考与防作弊.md)。
+
 ### 2.2 `ai_interview_turns`（对话轮次）
 
 `seq`（会话内递增）、`role`（interviewer / candidate）、`kind`（greeting / main / follow_up / ack / answer / closing）、
