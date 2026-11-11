@@ -172,6 +172,8 @@ export interface PeriodReportResponse {
 export interface AiInterviewPersona {
   key: string; name: string; title: string; style: string; tagline?: string;
   avatar_theme: string; language: string; voice_hint?: string;
+  /** 数字人真人肖像照片 URL；后端配置后前端渲染真人数字人，未配置则使用默认头像。 */
+  photo_url?: string;
 }
 export interface AiInterviewSession {
   id: number; talent_id?: number | null; position_id?: number | null; invitation_id?: number | null;

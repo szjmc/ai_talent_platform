@@ -37,6 +37,8 @@ from app.schemas.ai_interview import (
     AiInterviewConfigResponse,
     AiInterviewCreateRequest,
     AiInterviewDetailResponse,
+    AiInterviewDigitalHumanVideoRequest,
+    AiInterviewDigitalHumanVideoResponse,
     AiInterviewPublicState,
     AiInterviewSessionResponse,
 )
@@ -77,6 +79,7 @@ async def interview_config():
             "avatar_theme": persona["avatar_theme"],
             "language": persona["language"],
             "voice_hint": persona["voice_hint"],
+            "photo_url": persona.get("photo_url", ""),
         }
         for key, persona in engine.PERSONAS.items()
     ]
@@ -98,6 +101,26 @@ async def interview_config():
             ],
         }
     )
+
+
+# ---------------------------------------------------------------- 数字人视频生成（ComfyUI）
+@router.post(
+    "/digital-human/video",
+    summary="生成数字人说话头视频（ComfyUI 工作流驱动）",
+    response_model=SuccessResponse[AiInterviewDigitalHumanVideoResponse],
+    dependencies=[Depends(require_permission(P.AI_INTERVIEW_MANAGE))],
+)
+async def generate_digital_human_video(
+    body: AiInterviewDigitalHumanVideoRequest,
+    db: DbSession,
+):
+    data = await AiInterviewService(db).generate_digital_human_video(
+        text=body.text,
+        persona_key=body.persona_key,
+        voice=body.voice,
+        language=body.language,
+    )
+    return success(data=data, message="数字人视频已生成" if data.get("ok") else "数字人视频生成失败")
 
 
 # ================================================================== host 侧

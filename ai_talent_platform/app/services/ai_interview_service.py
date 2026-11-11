@@ -56,6 +56,7 @@ from app.repositories.talent_repository import TalentRepository
 from app.schemas.ai_interview import AiInterviewCreateRequest
 from app.services import ai_interview_engine as engine
 from app.services.invite_notify import send_email as send_plain_email
+from app.adapters.digital_human import get_digital_human
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +167,7 @@ class AiInterviewService:
             interviewer_style=str(persona["style"]),
             avatar_theme=str(persona["avatar_theme"]),
             voice_hint=str(persona["voice_hint"]),
+            photo_url=payload.interviewer_photo_url or persona.get("photo_url") or None,
             language=language,
             status="pending",
             difficulty=payload.difficulty,
@@ -192,6 +194,44 @@ class AiInterviewService:
         data["plan_source"] = plan_source
         data["email"] = email_result
         return data
+
+    # ================================================================ 数字人视频生成（ComfyUI）
+    async def generate_digital_human_video(
+        self,
+        text: str,
+        *,
+        persona_key: str = "default",
+        voice: str | None = None,
+        language: str = "zh-CN",
+    ) -> dict[str, Any]:
+        """调用配置的数字人供应商生成说话头视频，返回平台内可播放 URL。
+
+        未配置 ComfyUI 时返回 {"ok": False, "video_url": ""}，调用方应自行降级到
+        现有「照片 + 唇形同步」方案，不阻断面试流程。
+        """
+        try:
+            dh = get_digital_human()
+            result = await dh.generate_video(
+                text,
+                persona_key=persona_key,
+                voice=voice,
+                language=language,
+            )
+            return {
+                "ok": True,
+                "provider": result.provider,
+                "video_url": result.video_url,
+                "elapsed_ms": round(result.elapsed_ms, 1),
+                "raw": result.raw,
+            }
+        except Exception as exc:  # noqa: BLE001 - 数字人生成失败不应阻断面试
+            logger.warning("数字人视频生成失败，自动降级：%s", type(exc).__name__)
+            return {
+                "ok": False,
+                "provider": getattr(settings, "DIGITAL_HUMAN_PROVIDER", "comfyui"),
+                "video_url": "",
+                "error": str(exc),
+            }
 
     def _profile(self, talent: Any, invite: Any) -> dict[str, Any]:
         """候选人画像（只用真实档案字段，不补充臆测信息）。"""
@@ -820,6 +860,7 @@ class AiInterviewService:
             "style": row.interviewer_style or persona["style"],
             "avatar_theme": row.avatar_theme or persona["avatar_theme"],
             "voice_hint": row.voice_hint or persona["voice_hint"],
+            "photo_url": row.photo_url or persona.get("photo_url") or "",
             "language": row.language or persona["language"],
             "tagline": persona.get("tagline") or "",
         }

@@ -88,6 +88,7 @@ PERSONAS: dict[str, dict[str, Any]] = {
         "voice_hint": "female",
         "language": "zh-CN",
         "tagline": "关注你的真实经历与成长动机",
+        "photo_url": "/assets/digital-human-friendly-hr.png",
     },
     "tech_lead": {
         "name": "陈拓",
@@ -97,6 +98,7 @@ PERSONAS: dict[str, dict[str, Any]] = {
         "voice_hint": "male",
         "language": "zh-CN",
         "tagline": "深挖技术深度与工程判断",
+        "photo_url": "/assets/digital-human-it-interviewer.png",
     },
     "strict_expert": {
         "name": "沈砚",
@@ -106,6 +108,7 @@ PERSONAS: dict[str, dict[str, Any]] = {
         "voice_hint": "male",
         "language": "zh-CN",
         "tagline": "高标准、重证据的结构化面试",
+        "photo_url": "/assets/digital-human-strict-expert.png",
     },
     "global_interviewer": {
         "name": "Ava",
@@ -115,6 +118,7 @@ PERSONAS: dict[str, dict[str, Any]] = {
         "voice_hint": "female",
         "language": "en-US",
         "tagline": "Bilingual, competency-based interview",
+        "photo_url": "/assets/digital-human-global-interviewer.png",
     },
 }
 
@@ -155,6 +159,7 @@ def persona_profile(value: str | None) -> dict[str, Any]:
         "voice_hint": persona["voice_hint"],
         "language": persona["language"],
         "tagline": persona["tagline"],
+        "photo_url": persona.get("photo_url", ""),
     }
 
 

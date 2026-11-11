@@ -49,6 +49,9 @@ export default function AIInterviewSessionPage() {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [testingMic, setTestingMic] = useState(false);
+  /** ComfyUI 生成的数字人视频 URL；有值时 DigitalHuman 优先播放真人视频。 */
+  const [videoSrc, setVideoSrc] = useState<string | undefined>(undefined);
+  const videoCacheRef = useRef<Map<string, string>>(new Map());
 
   const speech = useSpeech(state?.language || 'zh-CN', state?.interviewer?.voice_hint);
   const chatRef = useRef<HTMLDivElement | null>(null);
@@ -164,6 +167,35 @@ export default function AIInterviewSessionPage() {
 
   useEffect(() => { if (!speech.ttsSupported) setVoiceOn(false); }, [speech.ttsSupported]);
 
+  /* ------------------------------------------------------------ 数字人视频生成（ComfyUI） */
+  const generateVideoForText = useCallback(async (text: string): Promise<string | undefined> => {
+    if (!text) return undefined;
+    if (videoCacheRef.current.has(text)) return videoCacheRef.current.get(text);
+    try {
+      const data = await aiInterviewsApi.generateDigitalHumanVideo({
+        text,
+        persona_key: state?.interviewer?.key || 'default',
+        voice: state?.interviewer?.voice_hint || undefined,
+        language: state?.language || 'zh-CN',
+      });
+      if (data.ok && data.video_url) {
+        videoCacheRef.current.set(text, data.video_url);
+        return data.video_url;
+      }
+    } catch {
+      // 数字人视频生成失败不阻断面试，静默降级到照片/头像模式
+    }
+    return undefined;
+  }, [aiInterviewsApi, state?.interviewer?.key, state?.interviewer?.voice_hint, state?.language]);
+
+  /** 播报文本并同步生成数字人视频；视频生成完成后切换为真人视频播放，失败则保持照片/头像模式。 */
+  const speakWithVideo = useCallback((text: string) => {
+    speech.speak(text);
+    void generateVideoForText(text).then((url) => {
+      if (url) setVideoSrc(url);
+    });
+  }, [speech, generateVideoForText]);
+
   /* ------------------------------------------------------------ 开始 */
   const start = async () => {
     setStarting(true); setError('');
@@ -175,7 +207,7 @@ export default function AIInterviewSessionPage() {
       setPhase('interview');
       window.setTimeout(scrollChatToBottom, 120);
       window.setTimeout(scrollChatToBottom, 420);
-      if (voiceOn) speech.speak(`${data.greeting} ${data.current_question?.text || ''}`.trim());
+      if (voiceOn) speakWithVideo(`${data.greeting} ${data.current_question?.text || ''}`.trim());
     } catch (err) { setError(formatApiError(err)); }
     finally { setStarting(false); }
   };
@@ -192,7 +224,7 @@ export default function AIInterviewSessionPage() {
       try {
         const data = await aiInterviewsApi.finish(token);
         setState(data); setResult(data.result); setPhase('completed'); setRemaining(null);
-        if (voiceOn) speech.speak(closingText(language, data.candidate_name || ''));
+        if (voiceOn) speakWithVideo(closingText(language, data.candidate_name || ''));
       } catch (err) { setError(formatApiError(err)); }
       finally { setSubmitting(false); }
       return;
@@ -208,10 +240,10 @@ export default function AIInterviewSessionPage() {
         const finalResult = res.result || res.state?.result || null;
         setResult(finalResult); setPhase('completed'); setRemaining(null);
         if (res.timed_out) message.warning('作答时间已到，系统已自动提交');
-        if (voiceOn) speech.speak(closingText(language, res.state?.candidate_name || state?.candidate_name || ''));
+        if (voiceOn) speakWithVideo(closingText(language, res.state?.candidate_name || state?.candidate_name || ''));
       } else {
         const next = res.next_question;
-        if (voiceOn) speech.speak([res.interviewer_reply, next?.text].filter(Boolean).join(' '));
+        if (voiceOn) speakWithVideo([res.interviewer_reply, next?.text].filter(Boolean).join(' '));
       }
     } catch (err) {
       setError(formatApiError(err));
@@ -232,7 +264,7 @@ export default function AIInterviewSessionPage() {
   const repeat = async () => {
     try {
       const data = await aiInterviewsApi.repeat(token);
-      if (data.text) { if (!voiceOn) setVoiceOn(true); speech.speak(data.text); }
+      if (data.text) { if (!voiceOn) setVoiceOn(true); speakWithVideo(data.text); }
       else message.info('暂时没有可重听的问题');
     } catch (err) { message.error(formatApiError(err)); }
   };
@@ -248,7 +280,7 @@ export default function AIInterviewSessionPage() {
           const data = await aiInterviewsApi.finish(token);
           setState(data); setResult(data.result); setPhase('completed'); setRemaining(null);
           speech.stopListening();
-          speech.speak(closingText(language, data.candidate_name || ''));
+          speakWithVideo(closingText(language, data.candidate_name || ''));
         } catch (err) { message.error(formatApiError(err)); }
         finally { setFinishing(false); }
       },
@@ -328,7 +360,12 @@ export default function AIInterviewSessionPage() {
               name={interviewer?.name || 'AI 面试官'}
               title={interviewer?.title || '数字人面试官'}
               theme={interviewer?.avatar_theme || 'aurora'}
+              photo={interviewer?.photo_url || undefined}
+              videoSrc={videoSrc}
+              videoReady={Boolean(videoSrc)}
               state={dhState}
+              speaking={speech.speaking}
+              speakingText={currentQuestion?.text || state?.greeting || undefined}
             />
             <div className="aic-stage-name">{interviewer?.name || 'AI 面试官'}</div>
             <div className="aic-stage-title">{interviewer?.title || '数字人面试官'}</div>
@@ -390,9 +427,14 @@ export default function AIInterviewSessionPage() {
                     name={interviewer?.name || 'AI 面试官'}
                     title={interviewer?.title}
                     theme={interviewer?.avatar_theme || 'aurora'}
+                    photo={interviewer?.photo_url || undefined}
+                    videoSrc={videoSrc}
+                    videoReady={Boolean(videoSrc)}
                     state={dhState}
                     size={38}
                     showStatus={false}
+                    speaking={speech.speaking}
+                    speakingText={currentQuestion?.text || undefined}
                   />
                   <div>
                   <div className="aic-chat-title">第 {Math.min(currentIndex, total || currentIndex)} / {total || state.question_count} 题</div>
@@ -429,7 +471,7 @@ export default function AIInterviewSessionPage() {
                       {speech.speaking && <span className="aic-speaking"><i /><i /><i />正在播报</span>}
                     </div>
                     <div className="aic-question-text">{currentQuestion.text}</div>
-                    <button type="button" className="aic-replay" onClick={() => speech.speak(currentQuestion.text)}><SoundOutlined /> 再听一遍</button>
+                    <button type="button" className="aic-replay" onClick={() => speakWithVideo(currentQuestion.text)}><SoundOutlined /> 再听一遍</button>
                   </div>
                 )}
 
